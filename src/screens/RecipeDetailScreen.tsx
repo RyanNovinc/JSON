@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Share,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -34,6 +35,12 @@ import { displayIngredient } from '../utils/ingredientScaling';
 import { resolveBaseIngredients, resolveMealInstructions } from '../utils/resolveMealIngredients';
 import { computePlateMacros } from '../utils/computeMacros';
 import { getVariantChoices, setVariantChoice } from '../utils/variantChoices';
+import { CustomIngredient, CustomMealView, isCustomMealSlug } from '../types/custom_meals';
+import {
+  loadCustomMeals,
+  removeCustomMeal,
+  toCustomMealView,
+} from '../utils/customMealsStorage';
 
 type RecipeDetailRoute = RouteProp<RootStackParamList, 'RecipeDetail'>;
 type RecipeDetailNav = StackNavigationProp<RootStackParamList, 'RecipeDetail'>;
@@ -122,6 +129,21 @@ function getStepSummary(step: any): string {
   return step?.summary ?? step?.text ?? '';
 }
 
+/**
+ * Quantity string for a free-text custom ingredient. No library scaling
+ * classes — plain linear multiply by portions × planScale, trimmed to two
+ * decimals. Rows without an amount show just the unit text (or a dash).
+ */
+function formatCustomQty(
+  ing: CustomIngredient,
+  portions: number,
+  planScale: number
+): string {
+  if (ing.amount == null) return ing.unit?.trim() ? ing.unit.trim() : '—';
+  const n = Math.round(ing.amount * portions * planScale * 100) / 100;
+  return ing.unit?.trim() ? `${n} ${ing.unit.trim()}` : String(n);
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -132,7 +154,36 @@ export default function RecipeDetailScreen() {
   const { themeColor } = useTheme();
 
   const { mealSlug } = route.params;
-  const meal: CuratedMeal | undefined = (CURATED_MEALS as any)[mealSlug];
+
+  // Custom meals live in AsyncStorage, not the static catalogue. Curated
+  // slugs resolve synchronously as before; a custom_ slug loads async into
+  // state (reloaded on focus, so returning from the edit form refreshes it)
+  // and merges into the SAME `meal` variable — the whole screen below stays
+  // on one code path, since CustomMealView is CuratedMeal-shaped.
+  const isCustom = isCustomMealSlug(mealSlug);
+  const [customView, setCustomView] = useState<CustomMealView | null>(null);
+  const [customLoading, setCustomLoading] = useState(isCustom);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isCustom) return;
+      let active = true;
+      (async () => {
+        const record = (await loadCustomMeals()).find((m) => m.slug === mealSlug);
+        if (active) {
+          setCustomView(record ? toCustomMealView(record) : null);
+          setCustomLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [isCustom, mealSlug])
+  );
+
+  const meal: CuratedMeal | undefined =
+    ((CURATED_MEALS as any)[mealSlug] as CuratedMeal | undefined) ??
+    customView ??
+    undefined;
 
   // Optional plan scale — when opened from a plan-day meal, that occurrence is
   // "plate macros × scale_factor" (e.g. 0.85 → a 680 kcal serving of an 800
@@ -278,7 +329,9 @@ export default function RecipeDetailScreen() {
   // full method here was just a second copy. The "N steps · ~time" meta stays
   // visible as the effort cue, and one tap reveals the steps for anyone who
   // wants to pre-read.
-  const [instructionsExpanded, setInstructionsExpanded] = useState(false);
+  // EXCEPTION: custom meals have no cook mode (deliberate), so this screen IS
+  // the step-by-step — start them expanded.
+  const [instructionsExpanded, setInstructionsExpanded] = useState(isCustom);
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Read favourite state whenever the screen gains focus OR the selected plate
@@ -317,6 +370,8 @@ export default function RecipeDetailScreen() {
 
   const imageSource = useMemo(() => {
     if (!meal) return undefined;
+    const customUri = (meal as any).image_uri as string | undefined;
+    if (customUri) return { uri: customUri };
     const p = meal.plates[selectedPlateIndex];
     const plateImg = p?.image_filename ? getMealImage(p.image_filename) : undefined;
     if (plateImg) return plateImg;
@@ -324,6 +379,10 @@ export default function RecipeDetailScreen() {
   }, [meal, selectedPlateIndex]);
 
   if (!meal) {
+    // A custom slug resolves async — don't flash "not found" mid-load.
+    if (customLoading) {
+      return <View style={styles.container} />;
+    }
     return (
       <View style={[styles.container, { paddingTop: insets.top + 16, padding: 16 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBackBtn}>
@@ -418,6 +477,13 @@ export default function RecipeDetailScreen() {
 
   const handleShare = async () => {
     try {
+      // Custom meals have no public json.fit page — share the caption only.
+      if ((meal as any).custom) {
+        await Share.share({
+          message: `${plate.display_name} — ${dispKcal} cal, ${dispProtein}g protein`,
+        });
+        return;
+      }
       // Static per-plate page — it carries a real og: card, so the link previews
       // properly in iMessage/WhatsApp. The old ?meal=&plate= form redirects here.
       const url = `https://json.fit/r/${meal.slug}/${plate.id}/`;
@@ -432,6 +498,28 @@ export default function RecipeDetailScreen() {
     } catch (err) {
       console.warn('Share failed:', err);
     }
+  };
+
+  const handleEditCustom = () => {
+    navigation.navigate('AddCustomMeal' as any, { editSlug: meal.slug });
+  };
+
+  const handleDeleteCustom = () => {
+    Alert.alert(
+      'Delete this meal?',
+      'It will be removed from Your meals and from any picker picks. Saved plans that already include it keep their own copy.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await removeCustomMeal(meal.slug);
+            navigation.goBack();
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -466,19 +554,21 @@ export default function RecipeDetailScreen() {
           >
             <Ionicons name="share-outline" size={18} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.headerHeartBtn, { top: insets.top + 8 }]}
-            onPress={handleToggleFavorite}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={isFavorite ? 'Remove from favourites' : 'Save to favourites'}
-          >
-            <Ionicons
-              name={isFavorite ? 'heart' : 'heart-outline'}
-              size={20}
-              color={isFavorite ? themeColor : '#fff'}
-            />
-          </TouchableOpacity>
+          {!(meal as any).custom && (
+            <TouchableOpacity
+              style={[styles.headerHeartBtn, { top: insets.top + 8 }]}
+              onPress={handleToggleFavorite}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={isFavorite ? 'Remove from favourites' : 'Save to favourites'}
+            >
+              <Ionicons
+                name={isFavorite ? 'heart' : 'heart-outline'}
+                size={20}
+                color={isFavorite ? themeColor : '#fff'}
+              />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* TITLE BLOCK */}
@@ -487,7 +577,7 @@ export default function RecipeDetailScreen() {
             {plate.display_name}
           </Text>
           <Text style={styles.subtitle}>
-            {meal.cuisine}
+            {(meal as any).custom ? 'your meal' : meal.cuisine}
             {showPlateSwitcher ? ` · ${meal.plates.length} ways to plate` : ''}
           </Text>
         </View>
@@ -792,12 +882,31 @@ export default function RecipeDetailScreen() {
               used to explain that jump, so the list looked wrong. */}
           {ingredientsExpanded && meal.produces_servings > 1 && (
             <Text style={styles.batchNote}>
-              Amounts are per serving · this recipe makes {meal.produces_servings}.
-              Cook mode walks you through the full batch.
+              {(meal as any).custom
+                ? `Amounts are per serving · this recipe makes ${meal.produces_servings}.`
+                : `Amounts are per serving · this recipe makes ${meal.produces_servings}.
+              Cook mode walks you through the full batch.`}
             </Text>
           )}
 
-          {ingredientsExpanded && (
+          {ingredientsExpanded && ((meal as any).custom ? (
+            <>
+              {(((meal as any).custom_ingredients ?? []) as CustomIngredient[]).map(
+                (ing) => (
+                  <View key={ing.id} style={styles.ingredientRow}>
+                    <Text style={styles.ingredientName}>{ing.name}</Text>
+                    <Text style={styles.ingredientAmount}>
+                      {formatCustomQty(ing, servings, planScale)}
+                    </Text>
+                  </View>
+                )
+              )}
+              {(((meal as any).custom_ingredients ?? []) as CustomIngredient[])
+                .length === 0 && (
+                <Text style={styles.batchNote}>No ingredients listed.</Text>
+              )}
+            </>
+          ) : (
             <>
               {plate.additional_ingredients.length > 0 && (
                 <Text style={styles.subEyebrow}>FOR THE BASE</Text>
@@ -827,7 +936,7 @@ export default function RecipeDetailScreen() {
                 </>
               )}
             </>
-          )}
+          ))}
         </View>
 
         {/* INSTRUCTIONS — collapsed by default; CookMode owns the step-by-step.
@@ -896,16 +1005,43 @@ export default function RecipeDetailScreen() {
 
       {/* STICKY BOTTOM CTA */}
       <View style={[styles.ctaBar, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
-          onPress={handleStartCooking}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="play" size={16} color="#0a0a0b" />
-          <Text style={styles.ctaText}>
-            {meal.cuisine === 'smoothie' ? 'Start blending' : 'Start cooking'}
-          </Text>
-        </TouchableOpacity>
+        {(meal as any).custom ? (
+          // No cook mode for custom meals (deliberate) — the CTA slot becomes
+          // owner actions instead.
+          <View style={styles.ctaRow}>
+            <TouchableOpacity
+              style={[
+                styles.ctaButton,
+                { backgroundColor: themeColor, shadowColor: themeColor, flex: 1 },
+              ]}
+              onPress={handleEditCustom}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="create-outline" size={16} color="#0a0a0b" />
+              <Text style={styles.ctaText}>Edit meal</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.ctaDeleteBtn}
+              onPress={handleDeleteCustom}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Delete this meal"
+            >
+              <Ionicons name="trash-outline" size={18} color="#f87171" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.ctaButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
+            onPress={handleStartCooking}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="play" size={16} color="#0a0a0b" />
+            <Text style={styles.ctaText}>
+              {meal.cuisine === 'smoothie' ? 'Start blending' : 'Start cooking'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -1230,4 +1366,14 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   ctaText: { color: '#0a0a0b', fontSize: 15, fontWeight: '600', letterSpacing: 0.2 },
+  ctaRow: { flexDirection: 'row', gap: 10 },
+  ctaDeleteBtn: {
+    width: 54,
+    borderRadius: 14,
+    backgroundColor: '#1c1c1f',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

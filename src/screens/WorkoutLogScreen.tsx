@@ -336,6 +336,18 @@ const PR_MIN_PRIOR_SESSIONS = 1;
  * inside the noise of the Epley formula rather than evidence of anything.
  */
 const PR_MIN_IMPROVEMENT = 1.01;
+
+/**
+ * Float slack for "is this bigger than what was already announced this session".
+ *
+ * The 1.01 margin above is measured against your ALL-TIME record, so crossing into record
+ * territory has to be worth something. Once you are past it, every further climb inside the
+ * same session is worth announcing even if it is small, because you are visibly building.
+ * This only exists to stop an identical repeat set re-firing: estimated 1RMs are computed,
+ * not measured, so the same numbers can land a hair above the stored value. A hundredth of a
+ * kilo is far below anything a plate can express.
+ */
+const PR_REANNOUNCE_EPSILON = 0.01;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 /**
@@ -586,6 +598,105 @@ function formatPrevWeight(
 
   const converted = convertWeight(raw, previous.unit ?? globalUnit, globalUnit);
   return String(Number(converted.toFixed(1)));
+}
+
+/**
+ * Per-set estimated 1RM anchors from last session, in kg, indexed by THIS session's
+ * set index (0-based). One anchor per row rather than one for the whole exercise.
+ *
+ * Set 3 measures against last session's set 3, not against last session's best set.
+ * The best set is almost always set 1, when the lifter was fresh, so anchoring every
+ * row to it quietly over-suggests through the back half of the exercise. Matching
+ * set-for-set carries last session's own fatigue curve into the suggestion for free,
+ * with no fatigue model to tune. It also makes the two halves of the calculation
+ * agree: target reps were already per set (parseTargetReps), so a whole-exercise
+ * anchor was measuring a per-set target against a session-wide reference.
+ *
+ * Warmups are not modelled. Nothing in the data marks a set as a warmup, so a logged
+ * light first set becomes set 1's anchor and reads light. The old max-based anchor
+ * hid that by accident; matching set-for-set surfaces it honestly.
+ *
+ * Fallback when this week runs longer than last week: the last usable anchor carries
+ * forward rather than the row going blank. Set 5 is at least as fatigued as set 4, so
+ * set 4's anchor is a defensible floor, and a blank cell below a column of ghosts
+ * reads as broken rather than as honest. Leading gaps stay 0 — there is nothing
+ * earlier to carry — and 0 at any index means that row falls through to the
+ * prescription ghost.
+ *
+ * Each set converts through its own stored unit (missing unit = the unit on screen,
+ * same rule as formatPrevWeight) so a kg session read on an lbs screen still compares
+ * truthfully.
+ */
+function previousOneRMKgBySet(
+  previousSets: PreviousSets,
+  setCount: number,
+  globalUnit: 'kg' | 'lbs',
+  calculate1RM: (w: number, r: number) => number,
+): number[] {
+  const anchors: number[] = [];
+  let carried = 0; // last usable anchor, carried into longer weeks and interior gaps
+  for (let i = 0; i < setCount; i++) {
+    const p = previousSets[i + 1]; // PreviousSets is keyed by 1-based setNumber
+    if (p) {
+      const w = parseFloat(p.weight);
+      const r = parseInt(p.reps, 10);
+      if (Number.isFinite(w) && Number.isFinite(r) && w > 0 && r > 0) {
+        carried = calculate1RM(toKg(w, p.unit ?? globalUnit), r);
+      }
+    }
+    anchors.push(carried);
+  }
+  return anchors;
+}
+
+/**
+ * The reps a weight works out to against a reference 1RM: the largest rep count
+ * whose estimated 1RM does not exceed the reference. A downward search rather than
+ * an inverted formula so a custom calculate1RM keeps working; 30 is the ceiling the
+ * Epley default is defined over. A weight above the reference floors at "1" — the
+ * honest reading of loading past last session's best. Empty string = no answer, so
+ * the caller can fall through to the target-reps ghost.
+ */
+function repsForWeightAgainstOneRM(
+  weightKg: number,
+  oneRMKg: number,
+  calculate1RM: (w: number, r: number) => number,
+): string {
+  if (!(weightKg > 0) || !(oneRMKg > 0)) return '';
+  for (let r = 30; r >= 1; r--) {
+    if (calculate1RM(weightKg, r) <= oneRMKg * 1.0001) return String(r);
+  }
+  return '1';
+}
+
+/**
+ * The load that lines up a target rep count with a reference 1RM, in kg. Uses
+ * calculate1RM(1, reps) as the rep multiplier, which is exact for any estimator
+ * linear in weight (Epley, Brzycki, and every common formula are). 0 = no answer.
+ */
+function weightForRepsAgainstOneRM(
+  targetReps: number,
+  oneRMKg: number,
+  calculate1RM: (w: number, r: number) => number,
+): number {
+  if (!(targetReps > 0) || !(oneRMKg > 0)) return 0;
+  const multiplier = calculate1RM(1, targetReps);
+  if (!(multiplier > 0)) return 0;
+  return oneRMKg / multiplier;
+}
+
+/**
+ * Round a suggested load to something loadable in the display unit — nearest
+ * 2.5 kg or nearest 5 lbs — formatted like PREV (trailing zeros dropped).
+ * '' when rounding lands on zero: a bar you can't load isn't a suggestion.
+ */
+function formatSuggestedWeight(weightKg: number, unit: 'kg' | 'lbs'): string {
+  if (!(weightKg > 0)) return '';
+  const inUnit = fromKg(weightKg, unit);
+  const step = unit === 'lbs' ? 5 : 2.5;
+  const rounded = Math.round(inUnit / step) * step;
+  if (rounded <= 0) return '';
+  return String(Number(rounded.toFixed(1)));
 }
 
 /** One { completed, total } per exercise index. Single source of the done-state rule. */
@@ -1158,6 +1269,13 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // ── Modal state ────────────────────────────────────────────────────
   const [showFinishModal, setShowFinishModal] = useState(false);
+  // Explainer for the suggested weight/reps ghosts, opened from the info dot in
+  // the sets header. Keyboard dismissed first for the same reason as the 1RM modal.
+  const [showSuggestionInfo, setShowSuggestionInfo] = useState(false);
+  const handleShowSuggestionInfo = useCallback(() => {
+    Keyboard.dismiss();
+    setShowSuggestionInfo(true);
+  }, []);
   // Guards against the finish action firing twice (double tap / re-entry).
   // On a real device a second fire can pop one screen too many; the simulator's
   // timing usually hides it, which is why the two behave differently.
@@ -1516,6 +1634,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // Stable card-facing openers (identity-stable so the memoised cards hold)
   const handleOpenOneRM = useCallback((exerciseName: string, exerciseIndex: number) => {
+    // The keyboard otherwise stays open and fights the progression modal — dismiss
+    // it first, and clear the focused set so the accessory bar goes with it.
+    Keyboard.dismiss();
+    setFocusedSet(null);
     setShow1RMProgression({ exerciseName, exerciseIndex });
   }, []);
   const handleShowDeleteModal = useCallback((exerciseIndex: number, setIndex: number) => {
@@ -1571,6 +1693,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const openOneRMProgressionForCurrent = useCallback(() => {
     const exerciseName = effectiveCurrentExercise?.exercise;
     if (!exerciseName) return;
+    Keyboard.dismiss();
+    setFocusedSet(null);
     setShow1RMProgression({ exerciseName, exerciseIndex: currentIndex });
   }, [effectiveCurrentExercise?.exercise, currentIndex]);
 
@@ -1589,6 +1713,21 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     () => computeExerciseProgress(exercises, allSetsData),
     [exercises, allSetsData],
   );
+
+  // Finish-button expansion: while sets remain the button is a compact pill and the
+  // rest timer takes the width; once everything is logged the full-width button
+  // returns. Derived from exerciseProgress so both agree on the done rule. Deleting
+  // sets counts too — done means nothing left to log, not a fixed set count.
+  const allSetsComplete = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    for (const p of exerciseProgress) {
+      total += p.total;
+      done += p.completed;
+    }
+    return total > 0 && done >= total;
+  }, [exerciseProgress]);
+  const compactFinish = workoutStarted && !allSetsComplete;
 
   // Which variant each slot shows, from allSetsData — but keyed through a STRING so
   // the derived arrays keep their identity across keystrokes. allSetsData changes on
@@ -1721,15 +1860,27 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   const [prToast, setPrToast] = useState<PRToastData | null>(null);
 
   /**
-   * Exercise indices already celebrated this session, and the id counter that keeps two
-   * consecutive toasts distinguishable.
+   * The best value already ANNOUNCED this session, per exercise index and per record kind,
+   * plus the id counter that keeps two consecutive toasts distinguishable.
    *
-   * Refs, not state: writing them must not itself cause a render, and they carry across
-   * the effect's many no-op runs. The set is what makes this once per exercise per
-   * session — without it, sets 2, 3 and 4 each beat the one before as you work up, and a
-   * single exercise would fire three times on the way to its top set.
+   * This replaces an earlier `firedPRRef: Set<number>`, which allowed one toast per
+   * exercise per session and then went silent. That was backwards: working up 100, 102,
+   * 108 announced the 100 and swallowed the 108, so the set you actually care about — the
+   * top one — was the one guaranteed to say nothing. Reported from the gym as "I set a 1RM
+   * then set a bigger one and got no popup".
+   *
+   * Recording the number instead of the exercise keeps warm-ups quiet (they never beat the
+   * all-time record, so detection returns nothing) while letting every genuine climb inside
+   * a session speak. It also makes un-logging and re-logging a set silent, since the value
+   * is already announced. Matches how Hevy's live PR banner behaves.
+   *
+   * Values are stored as detection produced them: kg for `1rm` and `weight`, a raw count
+   * for `reps`. Unit conversion happens at the toast, not here.
+   *
+   * Refs, not state: writing them must not itself cause a render, and they carry across the
+   * effect's many no-op runs.
    */
-  const firedPRRef = useRef<Set<number>>(new Set());
+  const announcedPRRef = useRef<Record<number, Partial<Record<PRKind, number>>>>({});
   const prIdRef = useRef(0);
 
   /**
@@ -1746,6 +1897,34 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
    * already completed when this screen mounted happened before it existed.
    */
   const prevCompletedRef = useRef<string[] | null>(null);
+
+  /**
+   * Clear both detection refs when the session identity changes.
+   *
+   * Refs survive as long as the screen is mounted, which is longer than a workout. Finish
+   * one session and start another without this screen unmounting and the announced values
+   * carry over: the new workout's first genuine record is measured against the old
+   * workout's numbers and stays silent. The stale fingerprint has the mirror problem, since
+   * every already-completed set reads as new.
+   *
+   * Keyed on the start time because that IS the session identity. A null start time means
+   * no workout is running, and clearing then is exactly right: whatever comes next starts
+   * from nothing.
+   *
+   * The dependency is the NUMBER, not the Date. `workoutStartTime` is a prop, and a parent
+   * that rebuilds it each render would hand over a new object with the same instant. Keyed
+   * on object identity, this would then wipe the announced values on every render, and the
+   * same record would fire again and again.
+   *
+   * Setting the fingerprint back to null rather than to the current sets matters. Null makes
+   * the next detection pass seed and announce nothing, which is the same treatment a fresh
+   * mount gets, so resuming a workout cannot fire retroactively for sets logged before.
+   */
+  const sessionKey = workoutStartTime ? workoutStartTime.getTime() : 0;
+  useEffect(() => {
+    announcedPRRef.current = {};
+    prevCompletedRef.current = null;
+  }, [sessionKey]);
 
   /**
    * A fingerprint of every COMPLETED set in the workout.
@@ -1815,8 +1994,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     if (previous === null) return;
 
     for (let idx = 0; idx < exercises.length; idx++) {
-      if (firedPRRef.current.has(idx)) continue;
-
       // The heart of it: only the exercise whose completed sets just changed is a
       // candidate. Everything else is either unchanged or was already judged.
       if (current[idx] === previous[idx]) continue;
@@ -1850,7 +2027,22 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
       if (!result.pr) continue;
 
-      firedPRRef.current.add(idx);
+      // Detection always measures the session's best set against your ALL-TIME record, so
+      // once you are in record territory it keeps returning a record for every subsequent
+      // set — including ones that only match what was already celebrated. This is the gate
+      // that turns that stream into news: say it only if it beats what was already said.
+      const announced = announcedPRRef.current[idx] || {};
+      const alreadySaid = announced[result.pr.kind];
+      if (alreadySaid !== undefined && result.pr.value <= alreadySaid + PR_REANNOUNCE_EPSILON) {
+        if (__DEV__) {
+          console.log(
+            `🏆 [PR] ${idx} "${name}" — suppressed, ${result.pr.value} does not beat announced ${alreadySaid}`,
+          );
+        }
+        continue;
+      }
+
+      announcedPRRef.current[idx] = { ...announced, [result.pr.kind]: result.pr.value };
       prIdRef.current += 1;
       setPrToast({
         exerciseName: name,
@@ -2093,6 +2285,10 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           { useNativeDriver: true },
         )}
         scrollEventThrottle={1}
+        // "handled": with the keyboard open, taps on buttons/checkmarks/inputs fire
+        // immediately instead of being swallowed by a keyboard-dismiss first tap.
+        // Taps on empty space still dismiss the keyboard as before.
+        keyboardShouldPersistTaps="handled"
       >
         {/* ── PAGED EXERCISE STAGE ──
             Sized to the TALLEST card in the workout and never animated, so an
@@ -2152,6 +2348,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
                   onSetExercisePreference={stableSetPreference}
                   onLongPress={handleExerciseLongPress}
                   onOpenOneRM={handleOpenOneRM}
+                  onShowSuggestionInfo={handleShowSuggestionInfo}
                 />
               </Animated.View>
             ))}
@@ -2320,6 +2517,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           <TouchableOpacity
             style={[
               styles.timerBadge,
+              compactFinish && styles.timerBadgeGrow,
               restTimer.isOvertime && { borderColor: hexA(OVERTIME_COLOR, 0.35) },
             ]}
             onPress={showTimerModal}
@@ -2327,35 +2525,79 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           >
             <Ionicons
               name="time-outline"
-              size={16}
-              color={restTimer.isOvertime ? OVERTIME_COLOR : '#9898a4'}
+              size={compactFinish ? 17 : 16}
+              color={
+                restTimer.isOvertime
+                  ? OVERTIME_COLOR
+                  : compactFinish && restTimer.visible
+                    ? themeColor
+                    : '#9898a4'
+              }
             />
-            <Text style={[styles.timerText, restTimer.isOvertime && { color: OVERTIME_COLOR }]}>
+            <Text
+              style={[
+                styles.timerText,
+                compactFinish && styles.timerTextGrow,
+                restTimer.isOvertime
+                  ? { color: OVERTIME_COLOR }
+                  : compactFinish && restTimer.visible
+                    ? { color: themeColor }
+                    : null,
+              ]}
+            >
               {restTimer.text}
             </Text>
+            {compactFinish && restTimer.visible && (
+              <Text style={styles.timerRestLabel}>rest</Text>
+            )}
           </TouchableOpacity>
 
-          <AnimatedTouchableOpacity
-            style={[
-              styles.primaryBtn,
-              {
-                backgroundColor: themeColor,
-                transform: [{ translateX: shakeAnimation || 0 }]
-              }
-            ]}
-            onPress={workoutStarted ? handleFinishWorkoutPress : onStartWorkout}
-          >
-            <View style={styles.primaryBtnContent}>
-              <Text style={styles.primaryBtnText}>
-                {workoutStarted ? 'Finish Workout' : 'Start Workout'}
-              </Text>
-              {workoutStarted && workoutStartTime && (
-                <Text style={styles.workoutDurationText}>
+          {compactFinish ? (
+            // Mid-workout: finishing is not the main action yet, so it recedes to a
+            // pill (flag + duration) and the rest timer gets the width. Still fully
+            // tappable — nothing is locked away, it just stops shouting.
+            <AnimatedTouchableOpacity
+              style={[
+                styles.compactFinishBtn,
+                {
+                  backgroundColor: hexA(themeColor, 0.14),
+                  borderColor: hexA(themeColor, 0.35),
+                  transform: [{ translateX: shakeAnimation || 0 }],
+                },
+              ]}
+              onPress={handleFinishWorkoutPress}
+              accessibilityLabel="Finish workout"
+            >
+              <Ionicons name="flag-outline" size={16} color={themeColor} />
+              {workoutStartTime && (
+                <Text style={[styles.compactFinishText, { color: themeColor }]}>
                   {formatWorkoutDuration(workoutDuration)}
                 </Text>
               )}
-            </View>
-          </AnimatedTouchableOpacity>
+            </AnimatedTouchableOpacity>
+          ) : (
+            <AnimatedTouchableOpacity
+              style={[
+                styles.primaryBtn,
+                {
+                  backgroundColor: themeColor,
+                  transform: [{ translateX: shakeAnimation || 0 }]
+                }
+              ]}
+              onPress={workoutStarted ? handleFinishWorkoutPress : onStartWorkout}
+            >
+              <View style={styles.primaryBtnContent}>
+                <Text style={styles.primaryBtnText}>
+                  {workoutStarted ? 'Finish Workout' : 'Start Workout'}
+                </Text>
+                {workoutStarted && workoutStartTime && (
+                  <Text style={styles.workoutDurationText}>
+                    {formatWorkoutDuration(workoutDuration)}
+                  </Text>
+                )}
+              </View>
+            </AnimatedTouchableOpacity>
+          )}
         </View>
       )}
 
@@ -2445,6 +2687,44 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
     {/* Existing Timer Modal */}
     <TimerModal />
+
+    {/* Ghost-suggestion explainer sheet (info dot beside the unit header) */}
+    <Modal
+      visible={showSuggestionInfo}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowSuggestionInfo(false)}
+    >
+      <Pressable
+        style={styles.suggestionInfoBackdrop}
+        onPress={() => setShowSuggestionInfo(false)}
+      >
+        <Pressable
+          style={[styles.suggestionInfoCard, { paddingBottom: insets.bottom + 16 }]}
+          onPress={() => {}}
+        >
+          <Text style={styles.suggestionInfoTitle}>Suggested weight</Text>
+          <Text style={styles.suggestionInfoBody}>
+            Each set is matched to the same set from last session. We work out how
+            strong that set was, then show the weight that hits this week's target
+            reps.
+          </Text>
+          <Text style={styles.suggestionInfoBody}>
+            It holds you at the strength you already have, it doesn't add weight for
+            you. Feeling stronger? Type a heavier weight and the faint reps adjust.
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.suggestionInfoBtn,
+              { backgroundColor: hexA(themeColor, 0.14), borderColor: hexA(themeColor, 0.35) },
+            ]}
+            onPress={() => setShowSuggestionInfo(false)}
+          >
+            <Text style={[styles.suggestionInfoBtnText, { color: themeColor }]}>Got it</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
 
     {/* Exercise History Modal */}
     {historyModalProps && <ExerciseHistoryModal {...historyModalProps} />}
@@ -2696,6 +2976,7 @@ interface ExerciseCardProps {
   onSetExercisePreference: (exerciseIndex: number, primaryExercise: string, alternatives: string[], selectedAlternative: string) => void;
   onLongPress: (exerciseIndex: number) => void;
   onOpenOneRM: (exerciseName: string, exerciseIndex: number) => void;
+  onShowSuggestionInfo: () => void;
 }
 
 const ExerciseCard = React.memo(function ExerciseCard({
@@ -2727,6 +3008,7 @@ const ExerciseCard = React.memo(function ExerciseCard({
   onSetExercisePreference,
   onLongPress,
   onOpenOneRM,
+  onShowSuggestionInfo,
 }: ExerciseCardProps) {
   // Which variant this slot shows, resolved from sets[0].selectedExerciseIndex, the
   // single display source of truth. The neighbour cards go through this exact same
@@ -3208,6 +3490,8 @@ const ExerciseCard = React.memo(function ExerciseCard({
           exercise={effective}
           currentWeek={currentWeek}
           previousSets={previousSets}
+          calculate1RM={calculate1RM}
+          onShowSuggestionInfo={onShowSuggestionInfo}
           onUpdate={onSetUpdate}
           onComplete={onSetComplete}
           onAdd={onSetAdd}
@@ -3238,6 +3522,8 @@ interface SetsTableProps {
   exercise: Exercise; // For accessing weekly reps
   currentWeek: number; // For determining which week's reps to use
   previousSets: PreviousSets; // Last session's reference, keyed by setNumber
+  calculate1RM: (w: number, r: number) => number; // For the suggestion ghosts
+  onShowSuggestionInfo: () => void; // Info dot beside the unit header
   onUpdate: (
     exerciseIndex: number,
     setIndex: number,
@@ -3262,6 +3548,8 @@ function SetsTable({
   exercise,
   currentWeek,
   previousSets,
+  calculate1RM,
+  onShowSuggestionInfo,
   onUpdate,
   onComplete,
   onAdd,
@@ -3274,13 +3562,30 @@ function SetsTable({
   const weeklyReps = exercise.reps_weekly?.[String(currentWeek)] || exercise.reps;
   const targetRepsArray = weeklyReps ? parseTargetReps(String(weeklyReps), sets.length) : [];
 
+  // One estimated 1RM anchor per row, in kg, matched set-for-set against last
+  // session. 0 at an index = no usable reference for that row, which then falls
+  // straight through to the prescription ghost.
+  const prevOneRMKgBySet = previousOneRMKgBySet(previousSets, sets.length, unit, calculate1RM);
+
   return (
     <View style={styles.setsTable}>
       {/* Header row */}
       <View style={styles.setsHeader}>
         <Text style={[styles.setsHeaderCell, { width: 30 }]}>SET</Text>
         <Text style={[styles.setsHeaderCell, { width: 60 }]}>PREV</Text>
-        <Text style={[styles.setsHeaderCell, { flex: 1, textAlign: 'center' }]}>{unit.toUpperCase()}</Text>
+        {/* The unit header doubles as the entry point to the ghost explainer: the
+            info dot sits beside KG/LBS because the weight column is where the
+            suggestion lives. Inert on neighbour cards like every other control. */}
+        <TouchableOpacity
+          style={styles.setsHeaderUnitCell}
+          onPress={interactive ? onShowSuggestionInfo : undefined}
+          disabled={!interactive}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          accessibilityLabel="What the suggested weight means"
+        >
+          <Text style={styles.setsHeaderCell}>{unit.toUpperCase()}</Text>
+          <Ionicons name="information-circle-outline" size={13} color="#55555f" />
+        </TouchableOpacity>
         <Text style={[styles.setsHeaderCell, { flex: 1, textAlign: 'center' }]}>REPS</Text>
         <Text style={[styles.setsHeaderCell, { width: 34, textAlign: 'center' }]}>
           ✓
@@ -3298,6 +3603,8 @@ function SetsTable({
           interactive={interactive}
           targetReps={targetRepsArray[i] || undefined}
           previous={previousSets[i + 1]}
+          prevOneRMKg={prevOneRMKgBySet[i] || 0}
+          calculate1RM={calculate1RM}
           isLastSet={i === sets.length - 1}
           onUpdate={(field, val) => onUpdate(exerciseIndex, i, field, val)}
           onComplete={() => onComplete(exerciseIndex, i)}
@@ -3335,6 +3642,8 @@ interface SetRowProps {
   interactive: boolean;
   targetReps?: string; // Target reps for this specific set
   previous?: { weight: string; reps: string; unit?: 'kg' | 'lbs' }; // Last session's numbers for this set
+  prevOneRMKg: number; // Estimated 1RM of the MATCHING set last session, in kg. 0 = none
+  calculate1RM: (w: number, r: number) => number;
   isLastSet: boolean; // Whether this is the last set in the array
   onUpdate: (field: 'weight' | 'reps', val: string) => void;
   onComplete: () => void;
@@ -3353,6 +3662,8 @@ function SetRow({
   interactive,
   targetReps,
   previous,
+  prevOneRMKg,
+  calculate1RM,
   isLastSet,
   onUpdate,
   onComplete,
@@ -3363,6 +3674,30 @@ function SetRow({
   globalUnit,
 }: SetRowProps) {
   const completed = set.completed;
+
+  // Recommended reps for the typed weight, measured against the matching set's
+  // estimated 1RM from last session. Empty until a weight is typed or when there
+  // is no previous set to measure against.
+  const typedWeight = parseFloat(set.weight);
+  const suggestedReps =
+    Number.isFinite(typedWeight) && typedWeight > 0 && prevOneRMKg > 0
+      ? repsForWeightAgainstOneRM(toKg(typedWeight, globalUnit), prevOneRMKg, calculate1RM)
+      : '';
+
+  // Suggested load for this set: this week's prescribed reps against the matching
+  // set's estimated 1RM from last session, shown in the on-screen unit, rounded to
+  // plates. Deliberately holds that 1RM flat — the mesocycle already progresses via
+  // reps_weekly / rir_weekly, and adding load on top would progress twice. Only a
+  // prescription can drive it — suggesting against last session's reps would just
+  // echo the PREV column.
+  const targetRepsInt = targetReps ? parseInt(targetReps, 10) : NaN;
+  const suggestedWeight =
+    Number.isFinite(targetRepsInt) && targetRepsInt > 0 && prevOneRMKg > 0
+      ? formatSuggestedWeight(
+          weightForRepsAgainstOneRM(targetRepsInt, prevOneRMKg, calculate1RM),
+          globalUnit,
+        )
+      : '';
   const handlePressIn = () => {
     if (interactive && !workoutStarted) {
       onSetTapWhenNotStarted();
@@ -3443,10 +3778,9 @@ function SetRow({
             onBlur={() => setWeightFocused(false)}
             onPressIn={handlePressIn}
             keyboardType="decimal-pad"
-            // No ghost weight — last session's load is already one column left,
-            // under PREV. The plan prescribes reps, not load, so there is no
-            // target to suggest here.
-            placeholder=""
+            // Ghost weight: the load that lines up this week's prescribed reps
+            // with last session's estimated 1RM, rounded to a loadable increment.
+            placeholder={suggestedWeight}
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
           />
@@ -3473,10 +3807,12 @@ function SetRow({
             onBlur={() => setRepsFocused(false)}
             onPressIn={handlePressIn}
             keyboardType="number-pad"
-            // The rep target is the prescription for this week — the ghost text
-            // should say what to hit, not what was hit last time. Last session's
-            // reps are still one column to the left, under PREV.
-            placeholder={targetReps || previous?.reps || ''}
+            // Ghost precedence: once a weight is typed, the suggestion says what
+            // that load works out to against last session's estimated 1RM (both
+            // sides normalised to kg). With no weight yet, this week's prescription
+            // shows — what to hit, not what was hit last time. Last session's reps
+            // are still one column to the left, under PREV.
+            placeholder={suggestedReps || targetReps || previous?.reps || ''}
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
           />
@@ -4613,6 +4949,76 @@ const styles = StyleSheet.create({
     minWidth: 45,
     textAlign: 'center',
     paddingHorizontal: 4,
+  },
+  timerBadgeGrow: {
+    flex: 1,
+  },
+  timerTextGrow: {
+    fontSize: 15,
+  },
+  timerRestLabel: {
+    fontSize: 12,
+    color: '#55555f',
+    marginLeft: 'auto',
+  },
+  compactFinishBtn: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 14,
+  },
+  compactFinishText: {
+    fontSize: 13,
+    fontFamily: 'DMMono-Medium',
+  },
+  setsHeaderUnitCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  suggestionInfoBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  suggestionInfoCard: {
+    backgroundColor: '#121218',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+    paddingHorizontal: 18,
+    paddingTop: 18,
+  },
+  suggestionInfoTitle: {
+    fontSize: 15,
+    fontFamily: 'Outfit-SemiBold',
+    color: '#e8e8ee',
+    marginBottom: 8,
+  },
+  suggestionInfoBody: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: 'Outfit-Regular',
+    color: '#9898a4',
+    marginBottom: 8,
+  },
+  suggestionInfoBtn: {
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  suggestionInfoBtnText: {
+    fontSize: 14,
+    fontFamily: 'Outfit-SemiBold',
   },
 
   // ── History styles (used by ExerciseHistoryModal-adjacent layouts) ──

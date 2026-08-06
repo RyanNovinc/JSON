@@ -292,36 +292,50 @@ export default function DaysScreen() {
   };
 
   const initializeWeek = async () => {
-    if (initialWeek) {
-      setCurrentWeek(initialWeek);
+    // The week you last stood on — written by the week arrows and by opening a
+    // workout. Reading it here is the fix for the week-1 snap-back: this screen has
+    // ALWAYS saved the browsed week, but nothing ever read it, so any fresh mount
+    // let the completion-derived initialWeek param stomp the view back to week 1
+    // whenever week 1 had an unfinished day in it.
+    let savedWeek = NaN;
+    try {
+      const savedRaw = await AsyncStorage.getItem(`currentWeek_${localBlock.block_name}`);
+      if (savedRaw) savedWeek = parseInt(savedRaw, 10);
+    } catch (error) {
+      console.error('Failed to load saved week:', error);
+    }
 
-      const bookmarkKey = `bookmark_${localBlock.block_name}`;
-      const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
-      if (savedBookmark) {
-        const { week, isBookmarked: bookmarked } = JSON.parse(savedBookmark);
-        setIsBookmarked(bookmarked);
-        setBookmarkedWeek(bookmarked ? week : null);
-      }
+    // Bookmark display state loads regardless, exactly as before.
+    const bookmarkKey = `bookmark_${localBlock.block_name}`;
+    const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
+    let bookmarked = false;
+    let bookmarkWeek: number | null = null;
+    if (savedBookmark) {
+      const parsed = JSON.parse(savedBookmark);
+      bookmarked = !!parsed.isBookmarked;
+      bookmarkWeek = parsed.week ?? null;
+      setIsBookmarked(bookmarked);
+      setBookmarkedWeek(bookmarked ? bookmarkWeek : null);
+    }
+
+    if (Number.isFinite(savedWeek) || initialWeek) {
+      // Resolve to the LATER of "where you left off" and "first incomplete week",
+      // capped at the block's length. A browsed-ahead week is respected (the bug
+      // this fixes), a fully finished saved week still auto-advances, and a stale
+      // save from a shortened block can't point past the end. Going deliberately
+      // backwards for review is what the bookmark is for.
+      const resolved = Math.min(
+        totalWeeks,
+        Math.max(Number.isFinite(savedWeek) ? savedWeek : 1, initialWeek || 1),
+      );
+      setCurrentWeek(resolved);
       return;
     }
 
-    const bookmarkKey = `bookmark_${localBlock.block_name}`;
-    const savedBookmark = await AsyncStorage.getItem(bookmarkKey);
-
-    if (savedBookmark) {
-      const { week, isBookmarked: bookmarked } = JSON.parse(savedBookmark);
-      setIsBookmarked(bookmarked);
-
-      if (bookmarked) {
-        setBookmarkedWeek(week);
-        setCurrentWeek(week);
-      } else {
-        setBookmarkedWeek(null);
-        const incompleteWeek = await findFirstIncompleteWeek();
-        setCurrentWeek(incompleteWeek);
-      }
+    // No saved week and no param: the original fallback chain, untouched.
+    if (bookmarked && bookmarkWeek != null) {
+      setCurrentWeek(bookmarkWeek);
     } else {
-      setBookmarkedWeek(null);
       const incompleteWeek = await findFirstIncompleteWeek();
       setCurrentWeek(incompleteWeek);
     }
@@ -396,17 +410,9 @@ export default function DaysScreen() {
     }
   };
 
-  const loadCurrentWeek = async () => {
-    try {
-      const savedWeek = await AsyncStorage.getItem(`currentWeek_${localBlock.block_name}`);
-      if (savedWeek) {
-        setCurrentWeek(parseInt(savedWeek));
-      }
-    } catch (error) {
-      console.error('Failed to load current week:', error);
-    }
-  };
-
+  // loadCurrentWeek used to live here: it read currentWeek_<block> and had ZERO
+  // callers, which is precisely why the saved week never took effect. Its job now
+  // lives in initializeWeek, where the resolution order is documented.
   const saveCurrentWeek = async (week: number) => {
     try {
       await AsyncStorage.setItem(`currentWeek_${localBlock.block_name}`, week.toString());
@@ -649,6 +655,17 @@ export default function DaysScreen() {
   };
 
   const handleDayPress = (day: Day) => {
+    // Rest days are informational — a workout with zero exercises is not a screen
+    // worth opening. Plans now carry REST DAY entries in `days` (json-prompt rule 8),
+    // so this guard is what keeps them display-only.
+    if (day.day_name && day.day_name.toUpperCase().includes('REST')) return;
+
+    // The week you're acting from becomes the saved week, so returning from the
+    // workout or a review restores it even when this screen gets rebuilt — this
+    // covers the arrows-untouched case where you landed here via initialWeek.
+    // Fire and forget: a lost write just means the old behaviour for one visit.
+    AsyncStorage.setItem(`currentWeek_${localBlock.block_name}`, String(currentWeek)).catch(() => undefined);
+
     const isCompleted = isWorkoutCompleted(day.day_name || 'unknown');
     const stats = getCompletionStats(day.day_name || 'unknown');
 

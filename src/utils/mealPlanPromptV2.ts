@@ -44,6 +44,7 @@
 
 import { CuratedMeal, MealSlot, Plate } from '../types/curated_meals';
 import { CURATED_MEALS } from '../data/curated_meals';
+import { loadCustomMealViews } from './customMealsStorage';
 import { INGREDIENTS } from '../data/ingredients';
 import { resolveBaseIngredients } from './resolveMealIngredients';
 import {
@@ -224,6 +225,8 @@ interface PlanOption {
   prep: 'full' | 'partial' | 'none';
   stunt: boolean;
   filler: boolean;
+  /** User-created meal (custom_ slug) — macros are user-entered and authoritative. */
+  custom: boolean;
 }
 
 interface SlotFrame {
@@ -244,6 +247,12 @@ export interface BuildOpts {
   profileWeightKg?: number;
   /** True when GoalsProfile has goalWeightKg or goalBodyFatPct — triggers lean-mass-targets.md fetch. */
   hasLeanMassTargets?: boolean;
+  /**
+   * User-created meals as CuratedMeal-shaped views — injected by the async
+   * wrappers (assembleMealPlanPromptV2 / buildReviewLauncherFromStorage) so
+   * this module's pure functions stay storage-free and snapshot-testable.
+   */
+  customMeals?: CuratedMeal[];
 }
 
 interface SleepDataLike {
@@ -332,6 +341,7 @@ function plateOption(meal: CuratedMeal, plate: Plate, filler = false): PlanOptio
     prep: prepOf(meal, plate),
     stunt: !!plate.is_stunt_plate,
     filler,
+    custom: (meal as any).custom === true,
   };
 }
 
@@ -598,7 +608,7 @@ const pretty = (d: Date) =>
 // ---------------------------------------------------------------------------
 
 function optionRow(o: PlanOption): string {
-  const name = `${o.name}${o.stunt ? ' (stunt)' : ''}${o.filler ? ' (UF)' : ''}`;
+  const name = `${o.name}${o.stunt ? ' (stunt)' : ''}${o.filler ? ' (UF)' : ''}${o.custom ? ' (user-created)' : ''}`;
   return `| ${name} | ${o.key} | ${n0(o.kcal)} | ${n0(o.p)} | ${n0(o.c)} | ${n0(o.f)} | ${n0(o.fib)} | ${o.sMin}–${o.sMax} | ${o.serves} | ${o.prep} |`;
 }
 
@@ -614,6 +624,10 @@ function frameSection(f: SlotFrame): string {
   if (f.options.some((o) => o.filler))
     notes.push(
       'Rows marked (UF) were NOT picked by the user — use them only to cover occurrences their picks don\u2019t.'
+    );
+  if (f.options.some((o) => o.custom))
+    notes.push(
+      'Rows marked (user-created) are the user\u2019s OWN meals, typed into the app by them. Their macros are user-entered and authoritative: schedule them exactly as listed at the fixed scale shown, and never adjust their numbers, rename them, or substitute your own version of the dish.'
     );
   if (f.borrowableWith)
     notes.push(
@@ -717,7 +731,15 @@ function promptIngredientRows(list: any[]): PromptIngredientRow[] {
 
 const amt = (x: number) => (Math.abs(x - Math.round(x)) < 0.005 ? String(Math.round(x)) : x.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
 
-function ingredientsSection(frames: SlotFrame[]): string {
+function ingredientsSection(frames: SlotFrame[], all?: CuratedMeal[]): string {
+  // Resolve slugs against the same merged list the frames were built from, so
+  // custom_ slugs land on their views rather than missing the static map.
+  const bySlug = new Map(
+    (all ?? (Object.values(CURATED_MEALS) as CuratedMeal[])).map((m) => [
+      m.slug as string,
+      m,
+    ])
+  );
   // Distinct slugs across every option the model can choose from, plus the
   // plate ids actually offered, so plate accompaniments are covered too.
   const platesBySlug = new Map<string, Set<string>>();
@@ -746,8 +768,36 @@ function ingredientsSection(frames: SlotFrame[]): string {
 
   const blocks: string[] = [];
   for (const slug of order) {
-    const meal: CuratedMeal | undefined = (CURATED_MEALS as any)[slug];
+    const meal: CuratedMeal | undefined = bySlug.get(slug);
     if (!meal) continue;
+
+    // USER-CREATED meals: free-text rows the user typed, amounts PER SERVING,
+    // no library ids, no pack data. Emitted so the grocery list can localise
+    // and price them — and so the model never reconstructs them from the name.
+    if ((meal as any).custom) {
+      const rows = (((meal as any).custom_ingredients ?? []) as any[]).filter(
+        (r) => r && typeof r.name === 'string' && r.name.trim().length > 0
+      );
+      const cServes = meal.produces_servings ?? 1;
+      const lines: string[] = [
+        `#### ${meal.display_name} — \`${slug}\`  (USER-CREATED · amounts are PER SERVING · one cook makes ${cServes} serving${cServes === 1 ? '' : 's'})`,
+      ];
+      if (rows.length > 0) {
+        lines.push('| ingredient | amount | unit |', '|---|---|---|');
+        for (const r of rows) {
+          const a = Number(r.amount);
+          const amountStr = Number.isFinite(a) && a > 0 ? amt(a) : '\u2014';
+          const unitStr = String(r.unit ?? '').trim() || '\u2014';
+          lines.push(`| ${String(r.name).trim()} | ${amountStr} | ${unitStr} |`);
+        }
+      } else {
+        lines.push(
+          'The user listed no ingredients for this meal. Do NOT invent a recipe for it \u2014 nothing goes on the grocery list for this meal.'
+        );
+      }
+      blocks.push(lines.join('\n'));
+      continue;
+    }
 
     // Default (jar / shortcut) variant — what the app cooks unless the user
     // flips to from-scratch, so it is what they need to buy.
@@ -825,6 +875,7 @@ function ingredientsSection(frames: SlotFrame[]): string {
     '- "id" is the app\u2019s internal key for that ingredient. Carry it into the grocery list (see below) so the app can match your priced item to its own records.',
     '- Everyday seasonings (salt, pepper, oil spray) are omitted deliberately — do not add them to the list.',
     '- "From-scratch version ALSO needs" rows are the alternative the user can switch to in the app AFTER importing. They are NOT part of the plan you are building — the plan always uses the default version. Price them in the separate from-scratch section of the grocery list, never in the main list.',
+    '- Tables marked USER-CREATED are the user\u2019s own meals: their amounts are already PER SERVING (multiply by scale_factor only — never divide by servings), their rows carry no id (so no brackets on the grocery list), and the ingredient list is exactly what the user typed. Localise and price those items like everything else, but never pad the list with ingredients the user did not write.',
     '',
     blocks.join('\n\n'),
   ].join('\n');
@@ -936,7 +987,11 @@ export function buildMealPlanPrompt(
   if (!targets) {
     throw new Error('Macro targets are missing — complete the nutrition questionnaire first.');
   }
-  const frames = buildFrames(answers, favorites, targets, Object.values(CURATED_MEALS));
+  const allMeals: CuratedMeal[] = [
+    ...(Object.values(CURATED_MEALS) as CuratedMeal[]),
+    ...(opts?.customMeals ?? []),
+  ];
+  const frames = buildFrames(answers, favorites, targets, allMeals);
   const times = mealTimes(frames, sleep);
   const dessertOcc = frames.find((f) => f.slot === 'dessert')?.occurrencesPerWeek ?? 0;
   const start = resolveStartDate(a.startDate);
@@ -1016,6 +1071,7 @@ export function buildMealPlanPrompt(
       `6. Adjusters (table below) are standalone items used to close a day\u2019s gaps. Maximum ${MAX_ADJUSTERS_PER_DAY} per day.`,
       '7. Fallback order when a day misses target: rescale \u2192 adjusters \u2192 swap option within the slot \u2192 universal fillers (marked UF) for uncovered occurrences \u2192 only if all else fails, invent a simple meal and say so in the plan notes.',
       '8. Curated options are output as references (slug + plate_id + scale_factor) \u2014 never rewrite them as recipes. Slugs and plate_ids are verbatim lookup keys; copy them exactly.',
+      '9. Options marked (user-created) are meals the user added themselves. Treat them like curated references (rule 8 applies verbatim, custom_ slugs included), with their scale fixed at 1.0 \u2014 their user-entered macros are authoritative, so never rescale, adjust, or reinterpret them.',
     ].join('\n')
   );
 
@@ -1066,7 +1122,7 @@ export function buildMealPlanPrompt(
   // arrives. They are marked as step-2 material so they are not carried through
   // the planning work — the grocery list is still BUILT at the review step,
   // once the meals are settled.
-  const ingredientTables = ingredientsSection(frames);
+  const ingredientTables = ingredientsSection(frames, allMeals);
   if (ingredientTables) {
     parts.push(
       [
@@ -1285,6 +1341,9 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
   }
 
   const favorites = await loadCuratedFavoritesV2();
+  // User-created meals ride in as CuratedMeal-shaped views so the pure
+  // builder can treat them as ordinary options.
+  const customMeals = await loadCustomMealViews();
   let sleep: SleepDataLike | null = null;
   try {
     const sleepResults: any = await WorkoutStorage.loadSleepOptimizationResults();
@@ -1301,6 +1360,7 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
 
   return buildMealPlanPrompt(answers as NutritionAnswers, macros, favorites, sleep, {
     ...opts,
+    customMeals,
     derivedPhase,
     profileWeightKg,
     hasLeanMassTargets,
@@ -1334,11 +1394,15 @@ export async function buildReviewLauncherFromStorage(): Promise<string> {
   // Same frames the generation prompt was built from, so the tables cover
   // every option the plan could have used.
   const favorites = await loadCuratedFavoritesV2();
+  const allMeals: CuratedMeal[] = [
+    ...(Object.values(CURATED_MEALS) as CuratedMeal[]),
+    ...(await loadCustomMealViews()),
+  ];
   const frames = buildFrames(
     answers as NutritionAnswers,
     favorites,
     targets,
-    Object.values(CURATED_MEALS)
+    allMeals
   );
   const a: any = answers;
   const budget =
@@ -1352,7 +1416,7 @@ export async function buildReviewLauncherFromStorage(): Promise<string> {
     `. Weekly budget: ${budget}.`;
 
   return buildReviewLauncher(targets, (answers as any).mealVariety ?? 'balanced', {
-    ingredientTables: ingredientsSection(frames),
+    ingredientTables: ingredientsSection(frames, allMeals),
     groceryContext,
   });
 }

@@ -129,6 +129,7 @@ import NutritionRefinementsScreen from '../screens/nutrition/questionnaire/Nutri
 import NutritionSummaryScreen from '../screens/nutrition/questionnaire/NutritionSummaryScreen';
 import NutritionPromptReadyScreen from '../screens/nutrition/questionnaire/NutritionPromptReadyScreen';
 import CuratedFavoritesScreen from '../screens/nutrition/CuratedFavoritesScreen';
+import AddCustomMealScreen from '../screens/nutrition/AddCustomMealScreen';
 import FridgePantryScreen from '../screens/nutrition/FridgePantryScreen';
 
 // New: custom tab bar
@@ -314,6 +315,8 @@ export type RootStackParamList = {
   MealDetail: {
     meal: any;
   };
+  // Create/edit a user-created custom meal. editSlug present = edit mode.
+  AddCustomMeal: { editSlug?: string } | undefined;
   GroceryList: {
     groceryList?: any;
   };
@@ -1812,6 +1815,18 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 children={() => (
                   <NutritionThemeProvider>
                     <MealDetailScreen />
+                  </NutritionThemeProvider>
+                )}
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                }}
+              />
+              <RootStack.Screen
+                name="AddCustomMeal"
+                children={() => (
+                  <NutritionThemeProvider>
+                    <AddCustomMealScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{

@@ -97,9 +97,72 @@ function ingredientName(id: string): string {
   return id.split('_').filter(Boolean).join(' ');
 }
 
+// ---------------------------------------------------------------------------
+// Dates for the STORE IT finale. Shelf life as a number of days is a spec the
+// user has to add to today themselves; a date is the same fact already usable.
+// Date-only strings are built in LOCAL time — new Date('2026-08-07') parses as
+// UTC midnight, which can render as the previous day.
+// ---------------------------------------------------------------------------
+function parseEatDate(raw: string): Date | null {
+  const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) {
+    return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+  }
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// "2026-08-07" → "Fri 7 Aug". Unparseable values pass through untouched, so a
+// format change upstream degrades to showing the raw value rather than "—".
+function formatEatDate(raw: string): string {
+  const d = parseEatDate(raw);
+  if (!d) return raw;
+  const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+  const month = d.toLocaleDateString(undefined, { month: 'short' });
+  return `${weekday} ${d.getDate()} ${month}`;
+}
+
+// "Fri 7 Aug" / "Fri 7 Aug and Sat 8 Aug" / "Fri 7 Aug, Sat 8 Aug and Sun 9 Aug"
+function joinEatDates(dates: string[]): string {
+  const parts = dates.map(formatEatDate);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+// The last day the fridge portions are still good: today (cook day) + shelf life.
+function eatByLabel(fridgeDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + fridgeDays);
+  const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+  const month = d.toLocaleDateString(undefined, { month: 'short' });
+  return `${weekday} ${d.getDate()} ${month}`;
+}
+
 function humanizeEquipment(id: string): string {
   const words = id.split('_').filter(Boolean).join(' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// A recognisable icon per piece of gear, matched on the raw equipment id so
+// new ids fall through to a generic tool rather than breaking the tile.
+function equipmentIcon(id: string): keyof typeof Ionicons.glyphMap {
+  const k = id.toLowerCase();
+  if (k.includes('slow_cooker') || k.includes('pressure') || k.includes('instant'))
+    return 'timer-outline';
+  if (k.includes('oven') || k.includes('tray') || k.includes('sheet') || k.includes('dish'))
+    return 'grid-outline';
+  if (k.includes('air_fry')) return 'thermometer-outline';
+  if (k.includes('stove') || k.includes('pan') || k.includes('pot') || k.includes('wok') || k.includes('skillet'))
+    return 'flame-outline';
+  if (k.includes('knife') || k.includes('board')) return 'cut-outline';
+  if (k.includes('blender') || k.includes('processor') || k.includes('mixer'))
+    return 'flash-outline';
+  if (k.includes('bowl') || k.includes('container') || k.includes('jar'))
+    return 'ellipse-outline';
+  if (k.includes('scale')) return 'speedometer-outline';
+  if (k.includes('grill') || k.includes('bbq')) return 'bonfire-outline';
+  return 'construct-outline';
 }
 
 interface IngredientRow {
@@ -147,6 +210,19 @@ export default function PrepModeScreen() {
   // The gather (mise en place) screen shows once per dish entry, between the
   // method choice and step 1: everything to get out before cooking starts.
   const [gathered, setGathered] = useState(false);
+  // Which gather rows have been pulled out. Keyed by row index within the
+  // resolved ingredient list, so it survives a trip into step 1 and back but
+  // resets whenever the method (and therefore the list) changes.
+  const [checked, setChecked] = useState<Record<number, boolean>>({});
+
+  const toggleChecked = useCallback((i: number) => {
+    setChecked((prev) => {
+      const next = { ...prev };
+      if (next[i]) delete next[i];
+      else next[i] = true;
+      return next;
+    });
+  }, []);
 
   // ----- Steps for the chosen variant × method -----------------------------
   const allSteps: StepEntry[] = useMemo(() => {
@@ -184,10 +260,28 @@ export default function PrepModeScreen() {
     ];
   }, [meal, methods, variants, variantId, methodId]);
 
-  const equipment: string[] = useMemo(() => {
+  const equipment: { id: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] =
+    useMemo(() => {
+      const method = methods.find((m) => m.id === methodId);
+      return ((method?.equipment_required ?? []) as string[]).map((id) => ({
+        id,
+        label: humanizeEquipment(id),
+        icon: equipmentIcon(id),
+      }));
+    }, [methods, methodId]);
+
+  // Footer context on the gather screen: what's waiting on the other side of
+  // the button, so the space under the list carries information instead of air.
+  const activeMinutes: number | null = useMemo(() => {
     const method = methods.find((m) => m.id === methodId);
-    return ((method?.equipment_required ?? []) as string[]).map(humanizeEquipment);
+    const v = method?.time_active_minutes;
+    return typeof v === 'number' && v > 0 ? v : null;
   }, [methods, methodId]);
+
+  const checkedCount = useMemo(
+    () => ingredientRows.reduce((n, _row, i) => n + (checked[i] ? 1 : 0), 0),
+    [ingredientRows, checked]
+  );
 
   const stepScale = meal?.produces_servings === 1 ? servings : 1;
   const totalScreens = prepSteps.length + 1; // + STORE IT finale
@@ -198,12 +292,21 @@ export default function PrepModeScreen() {
     | { fridge_days?: number; freeze_months?: number }
     | undefined;
 
-  const freezeNote: string | null = useMemo(() => {
+  // The whole freshness object, not just its prose note: fridge_days,
+  // freeze_servings and freeze_dates are what let the finale say WHERE each
+  // container goes instead of quoting shelf-life specs at the user.
+  const freshness = useMemo(() => {
     const item = freshnessSession?.items.find(
       (i) => i.curated_meal_slug === mealSlug && i.plate_id === plateId
     );
-    return item?.freshness?.freeze_note ?? null;
+    return item?.freshness ?? null;
   }, [freshnessSession, mealSlug, plateId]);
+
+  // How the batch divides. freeze_servings is one container per eat-date that
+  // falls outside the fridge window; everything else stays in the fridge.
+  const freezeCount = freshness?.freeze_servings ?? 0;
+  const fridgeCount = Math.max(0, servings - freezeCount);
+  const fridgeDays = freshness?.fridge_days ?? storage?.fridge_days ?? null;
 
   // "On the day" lines, best source first: authored day_of_summary → day_of-
   // tagged steps → the plate's assembly instructions. All existing data.
@@ -266,7 +369,7 @@ export default function PrepModeScreen() {
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle} numberOfLines={1}>{displayName}</Text>
             <Text style={styles.headerSub}>
-              PREP · {servings} {servings === 1 ? 'SERVING' : 'SERVINGS'}
+              Prep · {servings} {servings === 1 ? 'serving' : 'servings'}
             </Text>
           </View>
           <View style={styles.iconBtn} />
@@ -347,6 +450,7 @@ export default function PrepModeScreen() {
               setMethodId(pendingMethodId);
               setStepIndex(0);
               setGathered(false);
+              setChecked({});
             }}
           >
             <Ionicons name="play" size={14} color={pendingMethodId ? '#000' : '#52525b'} />
@@ -375,82 +479,124 @@ export default function PrepModeScreen() {
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle} numberOfLines={1}>{displayName}</Text>
             <Text style={styles.headerSub}>
-              PREP · {servings} {servings === 1 ? 'SERVING' : 'SERVINGS'}
+              Prep · {servings} {servings === 1 ? 'serving' : 'servings'}
             </Text>
           </View>
           <View style={styles.iconBtn} />
         </View>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 30 }}
+          contentContainerStyle={{ paddingBottom: 24 }}
         >
-          <View style={styles.body}>
-            <Text style={[styles.stepEyebrow, { color: themeColor }]}>GET EVERYTHING OUT</Text>
+          <View style={styles.gatherBody}>
+            <Text style={styles.gatherTitle}>Get everything out</Text>
             <Text style={styles.gatherLead}>
-              Lay these out first, then the steps run clean.
+              Lay it all on the bench, then the steps run clean.
             </Text>
 
             {equipment.length > 0 ? (
-              <View style={styles.chipRow}>
+              <View style={styles.gearRow}>
                 {equipment.map((e) => (
-                  <View key={e} style={styles.chip}>
-                    <Ionicons name="construct-outline" size={12} color="#a1a1aa" />
-                    <Text style={styles.chipText}>{e}</Text>
+                  <View key={e.id} style={styles.gearTile}>
+                    <Ionicons name={e.icon} size={18} color={themeColor} />
+                    <Text style={styles.gearText} numberOfLines={1}>
+                      {e.label}
+                    </Text>
                   </View>
                 ))}
               </View>
             ) : null}
 
-            <View style={styles.gatherList}>
-              {ingredientRows.map((row, i) => {
-                const qty = displayIngredient({
-                  baseAmount: row.base_amount,
-                  unit: row.unit,
-                  producesServings: meal.produces_servings ?? 1,
-                  portions: servings,
-                  planScale: 1,
-                });
-                return (
-                  <View key={`${row.ingredient_id}-${i}`}>
-                    {i > 0 ? <View style={styles.gatherDivider} /> : null}
-                    <View style={styles.ingRow}>
-                      <Text style={styles.ingName} numberOfLines={1}>
-                        {ingredientName(row.ingredient_id)}
-                      </Text>
-                      <Text style={styles.ingQty}>{qty}</Text>
-                    </View>
-                  </View>
-                );
-              })}
+            <View style={styles.gatherHead}>
+              <Text style={styles.gatherHeadLabel}>INGREDIENTS</Text>
+              <Text
+                style={[
+                  styles.gatherHeadCount,
+                  { color: checkedCount === ingredientRows.length ? themeColor : '#71717a' },
+                ]}
+              >
+                {checkedCount === ingredientRows.length
+                  ? 'all out'
+                  : `${checkedCount} of ${ingredientRows.length} out`}
+              </Text>
             </View>
+
+            {ingredientRows.map((row, i) => {
+              const qty = displayIngredient({
+                baseAmount: row.base_amount,
+                unit: row.unit,
+                producesServings: meal.produces_servings ?? 1,
+                portions: servings,
+                planScale: 1,
+              });
+              const isOut = !!checked[i];
+              return (
+                <TouchableOpacity
+                  key={`${row.ingredient_id}-${i}`}
+                  style={[
+                    styles.ingRow,
+                    i < ingredientRows.length - 1 && styles.ingRowDivider,
+                  ]}
+                  activeOpacity={0.7}
+                  onPress={() => toggleChecked(i)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isOut }}
+                  accessibilityLabel={`${ingredientName(row.ingredient_id)}, ${qty}`}
+                >
+                  <View
+                    style={[
+                      styles.tickCircle,
+                      isOut
+                        ? { backgroundColor: themeColor, borderColor: themeColor }
+                        : { borderColor: '#3f3f46' },
+                    ]}
+                  >
+                    {isOut ? <Ionicons name="checkmark" size={15} color="#000" /> : null}
+                  </View>
+                  <Text
+                    style={[styles.ingName, isOut && styles.ingNameOut]}
+                    numberOfLines={2}
+                  >
+                    {ingredientName(row.ingredient_id)}
+                  </Text>
+                  <Text style={[styles.ingQty, isOut && styles.ingQtyOut]}>{qty}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </ScrollView>
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
-          <TouchableOpacity
-            style={styles.prevBtn}
-            activeOpacity={0.7}
-            onPress={() => {
-              if (methods.length > 1) {
-                setMethodId(null);
-                setPendingMethodId(null);
-              } else {
-                navigation.goBack();
-              }
-            }}
-          >
-            <Ionicons name="chevron-back" size={16} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: themeColor, flex: 1 }]}
-            activeOpacity={0.85}
-            onPress={() => {
-              setGathered(true);
-              setStepIndex(0);
-            }}
-          >
-            <Text style={styles.primaryBtnText}>All out — start steps</Text>
-            <Ionicons name="chevron-forward" size={15} color="#000" />
-          </TouchableOpacity>
+        <View style={[styles.gatherFooter, { paddingBottom: insets.bottom + 14 }]}>
+          <Text style={styles.gatherFooterNote}>
+            {prepSteps.length} {prepSteps.length === 1 ? 'step' : 'steps'} after this
+            {activeMinutes ? ` · about ${formatTime(activeMinutes)} hands on` : ''}
+          </Text>
+          <View style={styles.footerRow}>
+            <TouchableOpacity
+              style={styles.prevBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (methods.length > 1) {
+                  setMethodId(null);
+                  setPendingMethodId(null);
+                } else {
+                  navigation.goBack();
+                }
+              }}
+            >
+              <Ionicons name="chevron-back" size={16} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: themeColor, flex: 1 }]}
+              activeOpacity={0.85}
+              onPress={() => {
+                setGathered(true);
+                setStepIndex(0);
+              }}
+            >
+              <Text style={styles.primaryBtnText}>All out, start steps</Text>
+              <Ionicons name="chevron-forward" size={15} color="#000" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -480,7 +626,7 @@ export default function PrepModeScreen() {
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>{displayName}</Text>
           <Text style={styles.headerSub}>
-            PREP · {servings} {servings === 1 ? 'SERVING' : 'SERVINGS'}
+            Prep · {servings} {servings === 1 ? 'serving' : 'servings'}
           </Text>
         </View>
         <Text style={styles.headerCount}>
@@ -513,39 +659,74 @@ export default function PrepModeScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 30, flexGrow: 1 }}
       >
         {onFinale ? (
-          <View style={styles.body}>
+          <View style={[styles.body, styles.finaleBody]}>
             <Text style={[styles.stepEyebrow, { color: themeColor }]}>STORE IT</Text>
-            <Text style={styles.stepText}>
-              Portion into {servings} {servings === 1 ? 'container' : 'containers'} once cooled.
-              {meal.produces_servings > 1 && meal.produces_servings !== servings
-                ? ` (Recipe as written makes ${meal.produces_servings}.)`
-                : ''}
+            <Text style={styles.storeHeadline}>
+              {freezeCount > 0 ? (
+                <>
+                  Let it cool, then split it{'\n'}
+                  <Text style={styles.storeHeadlineSub}>
+                    {servings} containers, two places.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  Let it cool, then fill{'\n'}
+                  {servings} {servings === 1 ? 'container' : 'containers'}.
+                </>
+              )}
             </Text>
 
-            {storage && (storage.fridge_days || storage.freeze_months) ? (
-              <View style={styles.storageCard}>
-                {storage.fridge_days ? (
-                  <View style={styles.storageRow}>
-                    <Ionicons name="cube-outline" size={15} color="#a1a1aa" />
-                    <Text style={styles.storageText}>Fridge {storage.fridge_days} days</Text>
+            {/* Where each container goes. The counts are the loudest thing on
+                the screen because the split is the only decision being made. */}
+            <View style={styles.destList}>
+              {fridgeCount > 0 ? (
+                <View style={styles.dest}>
+                  <View style={styles.destNum}>
+                    <Text style={styles.destNumText}>{fridgeCount}</Text>
                   </View>
-                ) : null}
-                {storage.freeze_months ? (
-                  <View style={styles.storageRow}>
-                    <Ionicons name="snow-outline" size={15} color="#60a5fa" />
-                    <Text style={[styles.storageText, { color: '#93c5fd' }]}>
-                      Freezer {storage.freeze_months} months
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.destWhere}>
+                      <Ionicons name="cube-outline" size={15} color="#fff" />
+                      <Text style={styles.destWhereText}>In the fridge</Text>
+                    </View>
+                    <Text style={styles.destWhen}>
+                      {fridgeDays
+                        ? `Eat ${fridgeCount === 1 ? 'this' : 'these'} by ${eatByLabel(
+                            fridgeDays
+                          )}`
+                        : 'Keep chilled until you need them'}
                     </Text>
                   </View>
-                ) : null}
-                {freezeNote ? (
-                  <Text style={styles.freezeNote}>{freezeNote}</Text>
-                ) : null}
-              </View>
-            ) : null}
+                </View>
+              ) : null}
+
+              {freezeCount > 0 ? (
+                <View style={[styles.dest, styles.destIce]}>
+                  <View style={[styles.destNum, styles.destNumIce]}>
+                    <Text style={styles.destNumText}>{freezeCount}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.destWhere}>
+                      <Ionicons name="snow-outline" size={15} color="#7dd3fc" />
+                      <Text style={[styles.destWhereText, styles.destWhereTextIce]}>
+                        In the freezer
+                      </Text>
+                    </View>
+                    <Text style={[styles.destWhen, styles.destWhenIce]}>
+                      {freshness?.freeze_dates && freshness.freeze_dates.length > 0
+                        ? `For ${joinEatDates(freshness.freeze_dates)}. Move ${
+                            freezeCount === 1 ? 'it' : 'one'
+                          } to the fridge the night before${freezeCount === 1 ? '' : ' each'}.`
+                        : 'Thaw overnight in the fridge before you need it.'}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+            </View>
 
             {onTheDayLines.length > 0 ? (
-              <View style={styles.dayOfBlock}>
+              <View style={[styles.dayOfBlock, styles.finaleDayOf]}>
                 <Text style={styles.dayOfEyebrow}>ON THE DAY</Text>
                 {onTheDayLines.map((line, i) => (
                   <Text key={i} style={styles.dayOfText}>{line}</Text>
@@ -624,8 +805,8 @@ const styles = StyleSheet.create({
   },
   iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: { color: '#fff', fontSize: 14, fontWeight: '600', letterSpacing: -0.2 },
-  headerSub: { color: '#52525b', fontSize: 10, letterSpacing: 1, marginTop: 2 },
+  headerTitle: { color: '#fff', fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
+  headerSub: { color: '#a1a1aa', fontSize: 12, letterSpacing: 0.4, marginTop: 2 },
   headerCount: { color: '#71717a', fontSize: 11, width: 36, textAlign: 'right' },
 
   strip: { flexDirection: 'row', gap: 4, paddingHorizontal: 16, paddingVertical: 6 },
@@ -648,50 +829,113 @@ const styles = StyleSheet.create({
   },
   durationText: { color: '#a1a1aa', fontSize: 12 },
 
-  gatherLead: { color: '#71717a', fontSize: 13, marginTop: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
-  chip: {
+  // Gather screen — the one screen read at arm's length across a bench, so it
+  // carries the largest type in the flow.
+  gatherBody: { paddingHorizontal: 18, paddingTop: 18 },
+  gatherTitle: { color: '#fff', fontSize: 21, fontWeight: '600', letterSpacing: -0.3 },
+  gatherLead: { color: '#a1a1aa', fontSize: 14, lineHeight: 20, marginTop: 5 },
+  gearRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
+  gearTile: {
+    flexGrow: 1,
+    flexBasis: '46%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#3f3f46',
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-  },
-  chipText: { color: '#d1d5db', fontSize: 12 },
-  gatherList: {
-    marginTop: 16,
+    gap: 8,
     backgroundColor: '#18181b',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 14,
-    paddingHorizontal: 14,
+    borderRadius: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 11,
   },
-  gatherDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#1f1f23' },
+  gearText: { flex: 1, color: '#e4e4e7', fontSize: 13 },
+  gatherHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 22,
+    marginBottom: 2,
+    paddingHorizontal: 2,
+  },
+  gatherHeadLabel: { color: '#71717a', fontSize: 12, fontWeight: '600', letterSpacing: 0.9 },
+  gatherHeadCount: { fontSize: 12 },
   ingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 2,
   },
-  ingName: { flex: 1, color: '#d1d5db', fontSize: 13 },
-  ingQty: { color: '#a1a1aa', fontSize: 13 },
+  ingRowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#1f1f23',
+  },
+  tickCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ingName: { flex: 1, color: '#fff', fontSize: 16, lineHeight: 21 },
+  ingNameOut: { color: '#52525b', textDecorationLine: 'line-through' },
+  ingQty: { color: '#fff', fontSize: 16, fontWeight: '500' },
+  ingQtyOut: { color: '#52525b', fontWeight: '400', textDecorationLine: 'line-through' },
+  gatherFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1f1f23',
+  },
+  gatherFooterNote: {
+    color: '#52525b',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingBottom: 10,
+  },
+  footerRow: { flexDirection: 'row', gap: 10 },
 
-  storageCard: {
-    marginTop: 18,
-    backgroundColor: '#18181b',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    padding: 13,
-    gap: 9,
+  // STORE IT finale
+  finaleBody: { flex: 1 },
+  storeHeadline: {
+    color: '#fff',
+    fontSize: 24,
+    lineHeight: 31,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    marginTop: 12,
   },
-  storageRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  storageText: { color: '#d1d5db', fontSize: 13 },
-  freezeNote: { color: '#93c5fd', fontSize: 11, lineHeight: 16, marginTop: 2 },
+  storeHeadlineSub: { color: '#9a9aa3' },
+  destList: { marginTop: 22, gap: 11 },
+  dest: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 18,
+    padding: 15,
+    backgroundColor: '#141417',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  destIce: {
+    backgroundColor: 'rgba(56,189,248,0.07)',
+    borderColor: 'rgba(56,189,248,0.26)',
+  },
+  destNum: {
+    width: 52,
+    height: 52,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#d4d4d8',
+  },
+  destNumIce: { backgroundColor: '#38bdf8' },
+  destNumText: { color: '#000', fontSize: 22, fontWeight: '700', letterSpacing: -0.5 },
+  destWhere: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  destWhereText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  destWhereTextIce: { color: '#7dd3fc' },
+  destWhen: { color: '#9a9aa3', fontSize: 12.5, lineHeight: 18, marginTop: 5 },
+  destWhenIce: { color: 'rgba(125,211,252,0.82)' },
+  finaleDayOf: { marginTop: 'auto', paddingBottom: 8 },
 
   dayOfBlock: {
     marginTop: 16,

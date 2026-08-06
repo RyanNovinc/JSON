@@ -37,6 +37,7 @@ import { buildFreshnessIndex } from '../utils/buildPrepSession';
 import RecipeFavorites from '../utils/recipeFavorites';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { getMealImage } from '../assets/mealImages';
+import { loadCustomMeals } from '../utils/customMealsStorage';
 
 type MealPlanDayScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanDay'>;
 type MealPlanDayScreenRouteProp = RouteProp<RootStackParamList, 'MealPlanDay'>;
@@ -54,6 +55,8 @@ const getMealImageUri = (meal: any): string | null =>
 
 interface MealCardProps {
   meal: SimplifiedMeal;
+  /** Custom-meal photo (file URI) resolved by the screen's slug index; null/absent for curated. */
+  customImageUri?: string | null;
   onPress: () => void;
   onLongPress: () => void;
   onToggleComplete: () => void;
@@ -184,7 +187,7 @@ function ProgressBar({ pct, color, trackStyle, fillStyle }: ProgressBarProps) {
   );
 }
 
-function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted, freshnessIndex, currentDate }: MealCardProps) {
+function MealCard({ meal, customImageUri, onPress, onLongPress, onToggleComplete, themeColor, mealIcon, mealColor, isCompleted, freshnessIndex, currentDate }: MealCardProps) {
   // Resolve the meal photo. Manually-logged meals carry image_filename / photo_url
   // directly. Curated meals (incl. AI-imported plans) carry only curated_meal_slug
   // + plate_id, so hydrate the image from the curated DB: per-plate image_filename
@@ -201,6 +204,11 @@ function MealCard({ meal, onPress, onLongPress, onToggleComplete, themeColor, me
       imageFilename = plate?.image_filename || cm.image_filename || null;
       uri = cm.photo_url || uri;
     }
+  }
+  // Custom meals: no curated record to hydrate from — the photo is a device
+  // file URI supplied by the screen's slug index.
+  if (!imageFilename && !uri && customImageUri) {
+    uri = customImageUri;
   }
   const localImg = imageFilename ? getMealImage(imageFilename) : null;
   const cal = (meal.calories && typeof meal.calories === 'number') ? meal.calories : 0;
@@ -457,6 +465,31 @@ export default function MealPlanDayScreen() {
       console.log('🔄 Screen focused, reloading meals for consistency');
       loadCurrentDayMeals();
     }, [loadCurrentDayMeals])
+  );
+
+  // Custom-meal photos: plan entries carry only the slug; the images live in
+  // AsyncStorage. Index slug → file URI on focus and hand it to the cards.
+  const [customImagesBySlug, setCustomImagesBySlug] = useState<Record<string, string>>({});
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          const customs = await loadCustomMeals();
+          if (!active) return;
+          const map: Record<string, string> = {};
+          customs.forEach((m) => {
+            if (m.image_uri) map[m.slug] = m.image_uri;
+          });
+          setCustomImagesBySlug(map);
+        } catch {
+          if (active) setCustomImagesBySlug({});
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
   );
 
   // Load meal completions when viewing date changes
@@ -1311,10 +1344,12 @@ export default function MealPlanDayScreen() {
             {plannedRows.map(({ meal, index }) => {
               const mealKey = `${index}_${(meal as any).id || meal.name}`;
               const isCompleted = completedMeals[mealKey] || false;
+              const cSlug = (meal as any).curated_meal_slug || (meal as any).slug || '';
               return (
                 <MealCard
                   key={index}
                   meal={meal}
+                  customImageUri={customImagesBySlug[cSlug] ?? null}
                   onPress={() => handleMealPress(meal)}
                   onLongPress={() => handleMealLongPress(meal, index)}
                   onToggleComplete={() => quickToggleMealCompletion(meal, index)}
@@ -1337,10 +1372,12 @@ export default function MealPlanDayScreen() {
             {offPlanRows.map(({ meal, index }) => {
               const mealKey = `${index}_${(meal as any).id || meal.name}`;
               const isCompleted = completedMeals[mealKey] || false;
+              const cSlug = (meal as any).curated_meal_slug || (meal as any).slug || '';
               return (
                 <MealCard
                   key={index}
                   meal={meal}
+                  customImageUri={customImagesBySlug[cSlug] ?? null}
                   onPress={() => handleMealPress(meal)}
                   onLongPress={() => handleMealLongPress(meal, index)}
                   onToggleComplete={() => quickToggleMealCompletion(meal, index)}

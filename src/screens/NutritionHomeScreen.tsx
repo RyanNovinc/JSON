@@ -34,6 +34,8 @@ import { createShare, ShareError } from '../services/shareService';
 import ExamplePlanCard from '../onboarding/ExamplePlanCard';
 import { startNutritionFlow } from '../utils/questionnaireRouting';
 import { CURATED_MEALS } from '../data/curated_meals';
+import { CustomMealView } from '../types/custom_meals';
+import { loadCustomMealViews } from '../utils/customMealsStorage';
 import { CuratedMeal } from '../types/curated_meals';
 import { getMealImage } from '../assets/mealImages';
 import { CookbookCaptureCard } from '../components/CookbookCaptureCard';
@@ -668,6 +670,23 @@ export default function NutritionHomeScreen({ route }: any) {
     }, [])
   );
 
+  // ===== User-created meals ("Your meals" shelf) =====
+  // Reloaded on focus so a meal created or edited via AddCustomMeal shows up
+  // the moment this screen returns to the foreground.
+  const [customViews, setCustomViews] = useState<CustomMealView[]>([]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const views = await loadCustomMealViews();
+        if (!cancelled) setCustomViews(views);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
   useEffect(() => {
     if (route?.params?.refresh) {
       // refresh handled via MealPlanningContext
@@ -1080,6 +1099,8 @@ export default function NutritionHomeScreen({ route }: any) {
   // ============================================================================
 
   const handleMealCardPress = (meal: CuratedMeal) => {
+    // RecipeDetail resolves custom_ slugs from storage too, so every card —
+    // curated or custom — goes through the same door.
     navigation.navigate('RecipeDetail' as any, { mealSlug: meal.slug });
   };
 
@@ -1117,7 +1138,11 @@ export default function NutritionHomeScreen({ route }: any) {
    */
   const renderFeedCard = (meal: CuratedMeal, showWorkoutBadge: boolean = false) => {
     const { kcal, protein, carbs, fat, totalMinutes } = getCardSummary(meal);
-    const imageSource = getMealImage(meal.plates?.[0]?.image_filename ?? meal.image_filename);
+    const isCustom = (meal as any).custom === true;
+    const customUri = (meal as any).image_uri as string | undefined;
+    const imageSource = customUri
+      ? { uri: customUri }
+      : getMealImage(meal.plates?.[0]?.image_filename ?? meal.image_filename);
     const workoutLabel = showWorkoutBadge ? getWorkoutTagLabel(meal) : null;
 
     return (
@@ -1144,11 +1169,11 @@ export default function NutritionHomeScreen({ route }: any) {
           {/* PRE / POST badge — overlaid on the image so it adds zero vertical
               space and the workout shelf stays the same height as the others.
               Accent uses themeColor so it tracks the active theme (incl. pink). */}
-          {workoutLabel && (
+          {(workoutLabel || isCustom) && (
             <View style={styles.feedCardBadge}>
               <View style={[styles.feedCardBadgeDot, { backgroundColor: themeColor }]} />
               <Text style={[styles.feedCardBadgeText, { color: themeColor }]}>
-                {workoutLabel}
+                {workoutLabel ?? 'CUSTOM'}
               </Text>
             </View>
           )}
@@ -1315,6 +1340,9 @@ export default function NutritionHomeScreen({ route }: any) {
                 clearly interested in the food. Same component instance rules
                 apply (dismiss/subscribe hides it everywhere permanently). */}
             <CookbookCaptureCard />
+
+            {/* Your meals — user-created customs + add entry point */}
+            {renderYourMealsSection()}
 
             {/* Category sections, even without a plan */}
             {renderAllSections()}
@@ -1530,6 +1558,9 @@ export default function NutritionHomeScreen({ route }: any) {
             {/* as a PDF" lands with context. Populated state only;    */}
             {/* the empty state keeps renderAllSections() unchanged.   */}
             {/* ====================================================== */}
+            {/* Your meals — user-created customs + add entry point */}
+            {renderYourMealsSection()}
+
             {orderedSections.length > 0 &&
               renderCategorySection(
                 orderedSections[0],
@@ -1876,6 +1907,47 @@ export default function NutritionHomeScreen({ route }: any) {
    * Used as-is by the EMPTY state; the populated state interleaves the
    * cookbook capture card after the first shelf instead (see above).
    */
+  /**
+   * "Your meals" shelf — user-created custom meals with the add card leading.
+   * Always rendered (even with zero custom meals) so the entry point is
+   * permanently discoverable; the add card alone is the empty state. Custom
+   * cards reuse renderFeedCard, which handles the image URI, CUSTOM badge
+   * and the edit-form tap route.
+   */
+  function renderYourMealsSection() {
+    return (
+      <View key="your-meals" style={styles.feedSection}>
+        <View style={styles.feedSectionHeader}>
+          <Text style={styles.feedSectionTitle}>Your meals</Text>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.feedScrollContent}
+        >
+          <TouchableOpacity
+            key="add-your-own"
+            style={[styles.feedCard, styles.addMealCard]}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('AddCustomMeal' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Add your own meal"
+            accessibilityHint="Opens a form to create a custom meal"
+          >
+            <View style={[styles.addMealCircle, { backgroundColor: `${themeColor}26` }]}>
+              <Ionicons name="add" size={22} color={themeColor} />
+            </View>
+            <Text style={styles.addMealText}>Add your own</Text>
+            <Text style={styles.addMealSub}>
+              Photo, macros and steps — pickable in your plans
+            </Text>
+          </TouchableOpacity>
+          {customViews.map((meal) => renderFeedCard(meal))}
+        </ScrollView>
+      </View>
+    );
+  }
+
   function renderAllSections() {
     return orderedSections.map((section, idx) =>
       renderCategorySection(section, idx === 0 && section.key === daypart.key)
@@ -2347,6 +2419,39 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
     marginRight: 12,
+  },
+  // "Add your own" lead card on the Your meals shelf. Stretches to the row's
+  // height when custom cards sit beside it; minHeight keeps it a real card
+  // when it stands alone.
+  addMealCard: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#3f3f46',
+    backgroundColor: '#101013',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    gap: 8,
+    minHeight: 200,
+  },
+  addMealCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addMealText: {
+    color: '#fafafa',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  addMealSub: {
+    color: '#71717a',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 17,
   },
   feedCardImageWrap: {
     width: '100%',

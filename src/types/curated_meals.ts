@@ -3,6 +3,13 @@ import { IngredientId, CanonicalUnit } from './ingredients';
 export interface RecipeStep {
   summary: string;
   substeps: string[];
+  /**
+   * When a step belongs to mealtime rather than prep day. PrepMode skips
+   * 'day_of' steps during a prep session and surfaces them on the Store It
+   * screen under ON THE DAY. Absent means 'prep' (the default), so untagged
+   * meals behave exactly as before.
+   */
+  phase?: 'prep' | 'day_of';
 }
 
 export type MealSlug = 

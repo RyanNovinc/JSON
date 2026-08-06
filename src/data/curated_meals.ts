@@ -84,6 +84,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary: 'Garnish with fresh coriander leaves.',
+              phase: 'day_of',
               substeps: ['Garnish with fresh coriander leaves.'],
             },
           ],
@@ -108,6 +109,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary: 'Garnish with fresh coriander leaves.',
+              phase: 'day_of',
               substeps: ['Garnish with fresh coriander leaves.'],
             },
           ],
@@ -188,6 +190,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary: 'Garnish with fresh coriander leaves.',
+              phase: 'day_of',
               substeps: ['Garnish with fresh coriander leaves.'],
             },
           ],
@@ -222,6 +225,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary: 'Garnish with fresh coriander leaves.',
+              phase: 'day_of',
               substeps: ['Garnish with fresh coriander leaves.'],
             },
           ],
@@ -5875,8 +5879,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         instructions: [
           { summary: 'Saute the diced onion, capsicum, and crushed garlic in the olive oil over medium heat for 5-7 minutes until soft.', substeps: ['Saute the diced onion, capsicum, and crushed garlic in the olive oil over medium heat for 5-7 minutes until soft.'] },
           { summary: 'Add the crushed tomatoes, cumin, paprika, salt, and pepper, and simmer for 8-10 minutes until thickened.', substeps: ['Add the crushed tomatoes, cumin, paprika, salt, and pepper, and simmer for 8-10 minutes until thickened.'] },
-          { summary: 'Make 4 wells in the sauce, crack an egg into each, cover, and cook 5-7 minutes until the whites are set but yolks still runny.', substeps: ['Make 4 wells in the sauce, crack an egg into each, cover, and cook 5-7 minutes until the whites are set but yolks still runny.'] },
-          { summary: 'Crumble the feta over the top and serve straight from the pan with the sourdough.', substeps: ['Crumble the feta over the top and serve straight from the pan with the sourdough.'] },
+          { summary: 'Make 4 wells in the sauce, crack an egg into each, cover, and cook 5-7 minutes until the whites are set but yolks still runny.',
+            phase: 'day_of', substeps: ['Make 4 wells in the sauce, crack an egg into each, cover, and cook 5-7 minutes until the whites are set but yolks still runny.'] },
+          { summary: 'Crumble the feta over the top and serve straight from the pan with the sourdough.',
+            phase: 'day_of', substeps: ['Crumble the feta over the top and serve straight from the pan with the sourdough.'] },
         ],
       },
     ],
@@ -6256,7 +6262,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         instructions: [
           { summary: 'Blend the milk, protein powder, pudding mix, and vanilla until completely smooth.', substeps: ['Blend the milk, protein powder, pudding mix, and vanilla until completely smooth.'] },
           { summary: 'Pour into a shallow freezer-safe container and freeze for at least 4-6 hours until firm.', substeps: ['Pour into a shallow freezer-safe container and freeze for at least 4-6 hours until firm.'] },
-          { summary: 'Let it sit at room temperature for 5-10 minutes to soften, then scoop and serve.', substeps: ['Let it sit at room temperature for 5-10 minutes to soften, then scoop and serve.'] },
+          { summary: 'Let it sit at room temperature for 5-10 minutes to soften, then scoop and serve.',
+            phase: 'day_of', substeps: ['Let it sit at room temperature for 5-10 minutes to soften, then scoop and serve.'] },
         ],
       },
     ],
@@ -6670,7 +6677,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Make the base: mix the oat flour, peanut butter, and honey into a crumbly dough and press into a dish or 4 ramekins, then chill.', substeps: ['Make the base: mix the oat flour, peanut butter, and honey into a crumbly dough and press into a dish or 4 ramekins, then chill.'] },
           { summary: 'Blend the cream cheese, cottage cheese, Greek yoghurt, protein powder, maple syrup, and vanilla until completely smooth and thick.', substeps: ['Blend the cream cheese, cottage cheese, Greek yoghurt, protein powder, maple syrup, and vanilla until completely smooth and thick.'] },
           { summary: 'Spread the filling over the base and chill at least 4 hours (or freeze 1 hour) until set.', substeps: ['Spread the filling over the base and chill at least 4 hours (or freeze 1 hour) until set.'] },
-          { summary: 'Top with berries and serve.', substeps: ['Top with berries and serve.'] },
+          { summary: 'Top with berries and serve.',
+            phase: 'day_of', substeps: ['Top with berries and serve.'] },
         ],
       },
     ],
@@ -6728,7 +6736,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
         instructions: [
           { summary: 'Blend the cottage cheese, protein powder, cocoa, maple syrup, milk, vanilla, and salt until completely smooth and mousse-like.', substeps: ['Blend the cottage cheese, protein powder, cocoa, maple syrup, milk, vanilla, and salt until completely smooth and mousse-like.'] },
           { summary: 'Spoon into a serving dish and chill for 30 minutes to thicken.', substeps: ['Spoon into a serving dish and chill for 30 minutes to thicken.'] },
-          { summary: 'Top with chocolate chips and serve.', substeps: ['Top with chocolate chips and serve.'] },
+          { summary: 'Top with chocolate chips and serve.',
+            phase: 'day_of', substeps: ['Top with chocolate chips and serve.'] },
         ],
       },
     ],
@@ -6844,7 +6853,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Whisk the flour, eggs, milk, sugar, salt, and half the melted butter until smooth and thin.', substeps: ['Whisk the flour, eggs, milk, sugar, salt, and half the melted butter until smooth and thin.'] },
           { summary: 'Rest the batter 10 minutes, then heat a non-stick pan over medium heat.', substeps: ['Rest the batter 10 minutes, then heat a non-stick pan over medium heat.'] },
           { summary: 'Brush the pan with butter, pour a thin layer of batter, swirl to coat, and cook 1-2 minutes until golden.', substeps: ['Brush the pan with butter, pour a thin layer of batter, swirl to coat, and cook 1-2 minutes until golden.'] },
-          { summary: 'Flip carefully and cook another 30 seconds, then spread with jam, fold, and serve warm.', substeps: ['Flip carefully and cook another 30 seconds, then spread with jam, fold, and serve warm.'] },
+          { summary: 'Flip carefully and cook another 30 seconds, then repeat with the rest of the batter, stacking the crepes with baking paper between so they do not stick.', substeps: ['Flip carefully and cook another 30 seconds, then repeat with the rest of the batter, stacking the crepes with baking paper between so they do not stick.'] },
+          {
+            summary:
+              'Spread with jam, fold, and serve warm.',
+            phase: 'day_of',
+            substeps: ['Spread with jam, fold, and serve warm.'],
+          },
         ],
       },
     ],
@@ -7794,6 +7809,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve over the rice, topped with the spring onion and sesame seeds.',
+              phase: 'day_of',
               substeps: [
                 'Serve over the rice, topped with the spring onion and sesame seeds.',
               ],
@@ -7933,6 +7949,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve over the rice.',
+              phase: 'day_of',
               substeps: [
                 'Serve over the rice.',
               ],
@@ -8076,6 +8093,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve over the rice.',
+              phase: 'day_of',
               substeps: [
                 'Serve over the rice.',
               ],
@@ -8102,7 +8120,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Cook the jasmine rice.', substeps: ['Cook the jasmine rice and keep warm.'] },
             { summary: 'Mix the sauce: oyster sauce, soy, fish sauce, sugar.', substeps: ['Stir together the oyster sauce, soy sauce, fish sauce, and sugar.'] },
             { summary: 'Stir-fry garlic and chilli, then the chicken mince over high heat until browned.', substeps: ['Heat the oil in a wok over high heat.', 'Fry the garlic and chilli for a few seconds.', 'Add the chicken mince and stir-fry until browned and cooked through, adding the green beans for the last 2-3 minutes.'] },
-            { summary: 'Add the sauce, toss, then fold through the basil off the heat. Serve over rice.', substeps: ['Pour in the sauce and toss for a minute to coat.', 'Turn off the heat and fold through the Thai basil until just wilted.', 'Serve over the rice.'] },
+            { summary: 'Add the sauce, toss, then fold through the basil off the heat.', substeps: ['Add the sauce, toss, then fold through the basil off the heat.'] },
           ],
         },
       },
@@ -8231,6 +8249,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve over the rice, topped with the spring onion and sesame seeds.',
+              phase: 'day_of',
               substeps: [
                 'Serve over the rice, topped with the spring onion and sesame seeds.',
               ],
@@ -8264,7 +8283,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Toss the beef in the marinade and rest 30 minutes to overnight in the fridge.', substeps: ['Toss the beef in the marinade and rest 30 minutes to overnight in the fridge.'] },
             { summary: 'Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.', substeps: ['Rinse the jasmine rice until the water runs clear, then cook per packet and keep warm.'] },
             { summary: 'Sear the beef in a little olive oil in a hot pan, in batches so it caramelises rather than stews, for 2-3 minutes.', substeps: ['Sear the beef in a little olive oil in a hot pan, in batches so it caramelises rather than stews, for 2-3 minutes.'] },
-            { summary: 'Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.', substeps: ['Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.'] },
+            { summary: 'Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.',
+            phase: 'day_of', substeps: ['Serve the beef over jasmine rice, garnished with spring onion and the remaining sesame seeds.'] },
           ],
         },
       },
@@ -8493,6 +8513,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve over the rice with the lime in wedges for squeezing.',
+              phase: 'day_of',
               substeps: [
                 'Serve over the rice with the lime in wedges for squeezing.',
               ],
@@ -8526,7 +8547,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'In the same pan, add remaining oil. Sauté onions and peppers with remaining spice mix for 5-6 minutes until softened.', substeps: ['In the same pan, add remaining oil. Sauté onions and peppers with remaining spice mix for 5-6 minutes until softened.'] },
             { summary: 'Add garlic and cook 1 minute until fragrant.', substeps: ['Add garlic and cook 1 minute until fragrant.'] },
             { summary: 'Return chicken to pan, add black beans, and warm through for 2-3 minutes.', substeps: ['Return chicken to pan, add black beans, and warm through for 2-3 minutes.'] },
-            { summary: 'Serve over rice with fresh lime juice and lime wedges.', substeps: ['Serve over rice with fresh lime juice and lime wedges.'] },
+            { summary: 'Serve over rice with fresh lime juice and lime wedges.',
+            phase: 'day_of', substeps: ['Serve over rice with fresh lime juice and lime wedges.'] },
           ],
         },
       },
@@ -8637,6 +8659,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Assemble with the rice, cheese, coriander and a squeeze of lime.',
+              phase: 'day_of',
               substeps: [
                 'Assemble with the rice, cheese, coriander and a squeeze of lime.',
               ],
@@ -8665,7 +8688,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Cook the rice; stir through lime and coriander.', substeps: ['Cook the jasmine rice, then stir through lime juice and chopped coriander.'] },
             { summary: 'Spice and cook the chicken (cumin, smoked paprika, chilli, cayenne).', substeps: ['Toss the diced chicken thigh with cumin, smoked paprika, chilli powder, cayenne, and salt.', 'Cook in the oil over high heat until browned and cooked through.'] },
             { summary: 'Warm the beans and make a quick salsa.', substeps: ['Warm the drained black beans.', 'Chop tomato and red onion with a squeeze of lime for a quick salsa.'] },
-            { summary: 'Assemble per plate (burrito, extra hot, or bowl).', substeps: ['See the plate-specific assembly steps.'] },
+            { summary: 'Assemble per plate (burrito, extra hot, or bowl).',
+            phase: 'day_of', substeps: ['See the plate-specific assembly steps.'] },
           ],
         },
       },
@@ -8810,6 +8834,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Stir the remaining garlic and lemon into the rest of the yoghurt for the sauce.',
+              phase: 'day_of',
               substeps: [
                 'Stir the remaining garlic and lemon into the rest of the yoghurt for the sauce.',
               ],
@@ -8817,6 +8842,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve with the tomatoes, cucumber, onion and the garlic yoghurt.',
+              phase: 'day_of',
               substeps: [
                 'Serve with the tomatoes, cucumber, onion and the garlic yoghurt.',
               ],
@@ -8845,8 +8871,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Make marinade with yogurt, garlic, lemon juice, spices, oil, salt and pepper', substeps: [] },
             { summary: 'Marinate chicken for at least 30 minutes', substeps: [] },
             { summary: 'Cook chicken in hot pan until done, rest and slice', substeps: [] },
-            { summary: 'Prepare vegetables - dice tomatoes, cucumber, slice onion', substeps: [] },
-            { summary: 'Assemble wraps or bowls with chicken, vegetables and remaining yogurt sauce', substeps: [] },
+            { summary: 'Prepare vegetables - dice tomatoes, cucumber, slice onion',
+            phase: 'day_of', substeps: [] },
+            { summary: 'Assemble wraps or bowls with chicken, vegetables and remaining yogurt sauce',
+            phase: 'day_of', substeps: [] },
           ],
         },
       },
@@ -8969,6 +8997,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve over the rice with the lime in wedges for squeezing.',
+              phase: 'day_of',
               substeps: [
                 'Serve over the rice with the lime in wedges for squeezing.',
               ],
@@ -9002,7 +9031,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Sear the chicken in a hot pan or wok until browned, then remove.', substeps: ['Sear the chicken in a hot pan or wok until browned, then remove.'] },
             { summary: 'Char the onion and garlic in the same pan until soft with golden edges.', substeps: ['Char the onion and garlic in the same pan until soft with golden edges.'] },
             { summary: 'Return the chicken, pour in the sauce, and simmer until glossy and clinging; finish with a squeeze of lime.', substeps: ['Return the chicken, pour in the sauce, and simmer until glossy and clinging; finish with a squeeze of lime.'] },
-            { summary: 'Serve over the jasmine rice, garnished with crushed peanuts and coriander.', substeps: ['Serve over the jasmine rice, garnished with crushed peanuts and coriander.'] },
+            { summary: 'Serve over the jasmine rice, garnished with crushed peanuts and coriander.',
+            phase: 'day_of', substeps: ['Serve over the jasmine rice, garnished with crushed peanuts and coriander.'] },
           ],
         },
       },
@@ -9110,6 +9140,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve over the rice, topped with the sesame seeds and spring onion.',
+              phase: 'day_of',
               substeps: [
                 'Serve over the rice, topped with the sesame seeds and spring onion.',
               ],
@@ -9140,7 +9171,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Shallow-fry / pan-crisp the chicken in oil over medium-high until golden and cooked through, then drain.', substeps: ['Shallow-fry / pan-crisp the chicken in oil over medium-high until golden and cooked through, then drain.'] },
             { summary: 'Make the glaze: simmer honey, soy, rice vinegar, sesame oil, garlic, and a cornstarch slurry until glossy and thickened.', substeps: ['Make the glaze: simmer honey, soy, rice vinegar, sesame oil, garlic, and a cornstarch slurry until glossy and thickened.'] },
             { summary: 'Toss the crispy chicken through the glaze just before serving to keep it crisper.', substeps: ['Toss the crispy chicken through the glaze just before serving to keep it crisper.'] },
-            { summary: 'Serve over rice, garnished with sesame seeds and spring onion.', substeps: ['Serve over rice, garnished with sesame seeds and spring onion.'] },
+            { summary: 'Serve over rice, garnished with sesame seeds and spring onion.',
+            phase: 'day_of', substeps: ['Serve over rice, garnished with sesame seeds and spring onion.'] },
           ],
         },
       },
@@ -9316,17 +9348,19 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary:
-                'Meanwhile, cook the spaghetti in salted boiling water per the packet, and warm the jar sauce in a large deep pan (swirl a splash of water in the jar to get the last of it out).',
-              substeps: [
-                'Meanwhile, cook the spaghetti in salted boiling water per the packet, and warm the jar sauce in a large deep pan (swirl a splash of water in the jar to get the last of it out).',
-              ],
+                'Warm the jar sauce in a large deep pan, swirling a splash of water in each jar to get the last of it out.',
+              substeps: ['Warm the jar sauce in a large deep pan, swirling a splash of water in each jar to get the last of it out.'],
             },
             {
               summary:
-                'Simmer the baked meatballs in the sauce for 3-4 minutes so they soak it up. Serve over the spaghetti with the remaining parmesan.',
-              substeps: [
-                'Simmer the baked meatballs in the sauce for 3-4 minutes so they soak it up. Serve over the spaghetti with the remaining parmesan.',
-              ],
+                'Simmer the baked meatballs in the sauce for 3-4 minutes so they soak it up.',
+              substeps: ['Simmer the baked meatballs in the sauce for 3-4 minutes so they soak it up.'],
+            },
+            {
+              summary:
+                'Cook the spaghetti fresh in salted boiling water per the packet, and serve the meatballs and sauce over it with the remaining parmesan.',
+              phase: 'day_of',
+              substeps: ['Cook the spaghetti fresh in salted boiling water per the packet, and serve the meatballs and sauce over it with the remaining parmesan.'],
             },
           ],
         },
@@ -9356,7 +9390,13 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Bake meatballs at 200°C for 15-18 minutes until browned and cooked through.', substeps: ['Bake meatballs at 200°C for 15-18 minutes until browned and cooked through.'] },
             { summary: 'Meanwhile, make sauce: sauté diced onion in olive oil until soft, add garlic for 1 minute.', substeps: ['Meanwhile, make sauce: sauté diced onion in olive oil until soft, add garlic for 1 minute.'] },
             { summary: 'Add tomato paste, cook 2 minutes, then add crushed tomatoes, oregano, basil, season and simmer 10-15 minutes.', substeps: ['Add tomato paste, cook 2 minutes, then add crushed tomatoes, oregano, basil, season and simmer 10-15 minutes.'] },
-            { summary: 'Add baked meatballs to sauce, simmer 5 minutes. Serve over cooked spaghetti with remaining parmesan.', substeps: ['Add baked meatballs to sauce, simmer 5 minutes. Serve over cooked spaghetti with remaining parmesan.'] },
+            { summary: 'Add baked meatballs to sauce and simmer 5 minutes.', substeps: ['Add baked meatballs to sauce and simmer 5 minutes.'] },
+          {
+            summary:
+              'Cook spaghetti fresh and serve the meatballs and sauce over it with the remaining parmesan.',
+            phase: 'day_of',
+            substeps: ['Cook spaghetti fresh and serve the meatballs and sauce over it with the remaining parmesan.'],
+          },
           ],
         },
       },
@@ -9529,6 +9569,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Stir the remaining garlic and a squeeze of lemon into the yoghurt for the sauce.',
+              phase: 'day_of',
               substeps: [
                 'Stir the remaining garlic and a squeeze of lemon into the yoghurt for the sauce.',
               ],
@@ -9536,6 +9577,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Serve with the tomatoes, cucumber, remaining parsley and the garlic yoghurt.',
+              phase: 'day_of',
               substeps: [
                 'Serve with the tomatoes, cucumber, remaining parsley and the garlic yoghurt.',
               ],
@@ -9564,8 +9606,10 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Mix the kofta: lamb, grated onion, garlic, herbs, spice blend (incl. cinnamon), salt, pepper (+ soaked breadcrumbs). Do not overmix.', substeps: ['Combine the lamb mince with grated onion, minced garlic, chopped parsley/mint, cumin, coriander, paprika, cinnamon, salt, and pepper.', 'Add soaked breadcrumbs if using; mix just until combined — do not overmix.'] },
             { summary: 'Form into ovals/patties and chill 10 min to hold shape.', substeps: ['Form into ovals or patties.', 'Chill 10 minutes to hold their shape.'] },
             { summary: 'Grill or pan-sear 3-4 min per side until browned and cooked through; rest.', substeps: ['Heat the oil over medium-high.', 'Sear 3-4 minutes per side until browned and cooked through; rest.'] },
-            { summary: 'Make the garlic-yoghurt sauce and the salad.', substeps: ['Mix the yoghurt with garlic, lemon, and a pinch of salt.', 'Chop the tomato, cucumber, and red onion for the salad.'] },
-            { summary: 'Assemble per plate (rice bowl or wrap).', substeps: ['See the plate-specific assembly steps.'] },
+            { summary: 'Make the garlic-yoghurt sauce and the salad.',
+            phase: 'day_of', substeps: ['Mix the yoghurt with garlic, lemon, and a pinch of salt.', 'Chop the tomato, cucumber, and red onion for the salad.'] },
+            { summary: 'Assemble per plate (rice bowl or wrap).',
+            phase: 'day_of', substeps: ['See the plate-specific assembly steps.'] },
           ],
         },
       },
@@ -9680,7 +9724,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Toss the halved potatoes, onion, and peppers with oil and the seasoning, and spread on the tray in a single layer (don\'t crowd — crowding steams instead of browns).', substeps: ['Toss the halved potatoes, onion, and peppers with oil and the seasoning, and spread on the tray in a single layer (don\'t crowd — crowding steams instead of browns).'] },
           { summary: 'Add the sausages (whole or sliced) to the tray.', substeps: ['Add the sausages (whole or sliced) to the tray.'] },
           { summary: 'Roast about 20 minutes, then turn everything and add the broccoli; roast another 15-20 minutes until the potatoes are tender and the sausage is browned.', substeps: ['Roast about 20 minutes, then turn everything and add the broccoli; roast another 15-20 minutes until the potatoes are tender and the sausage is browned.'] },
-          { summary: 'Finish with parsley (or parmesan / a fried egg if using).', substeps: ['Finish with parsley (or parmesan / a fried egg if using).'] },
+          { summary: 'Finish with parsley (or parmesan / a fried egg if using).',
+            phase: 'day_of', substeps: ['Finish with parsley (or parmesan / a fried egg if using).'] },
         ],
       },
     ],
@@ -9759,10 +9804,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary:
-                'Toss the noodles through the tray juices, then top with the salmon, broccoli, sesame seeds and spring onion.',
-              substeps: [
-                'Toss the noodles through the tray juices, then top with the salmon, broccoli, sesame seeds and spring onion.',
-              ],
+                'Toss the noodles through the tray juices, then top with the salmon and broccoli.',
+              substeps: ['Toss the noodles through the tray juices, then top with the salmon and broccoli.'],
             },
           ],
         },
@@ -9789,7 +9832,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Make the glaze: honey, soy, garlic, ginger, sesame oil, and a splash of rice vinegar.', substeps: ['Make the glaze: honey, soy, garlic, ginger, sesame oil, and a splash of rice vinegar.'] },
             { summary: 'Toss the salmon in some glaze and roast on a sheet pan about 12-14 minutes at 200°C (or pan-sear), basting with more glaze partway. Roast the broccoli alongside.', substeps: ['Toss the salmon in some glaze and roast on a sheet pan about 12-14 minutes at 200°C (or pan-sear), basting with more glaze partway. Roast the broccoli alongside.'] },
             { summary: 'Cook the noodles, then toss with a little sesame oil and the remaining glaze.', substeps: ['Cook the noodles, then toss with a little sesame oil and the remaining glaze.'] },
-            { summary: 'Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.', substeps: ['Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.'] },
+            { summary: 'Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.',
+            phase: 'day_of', substeps: ['Build the bowl: noodles, salmon, broccoli; garnish with sesame seeds and spring onion.'] },
           ],
         },
       },
@@ -9893,17 +9937,14 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             },
             {
               summary:
-                'While it rests, warm the beans and corn, and chop the tomatoes and onion.',
-              substeps: [
-                'While it rests, warm the beans and corn, and chop the tomatoes and onion.',
-              ],
+                'While it rests, warm the beans and corn.',
+              substeps: ['While it rests, warm the beans and corn.'],
             },
             {
               summary:
-                'Build the bowls: rice, beans, corn, tomatoes, onion, cheese, coriander, steak, and the lime squeezed over everything.',
-              substeps: [
-                'Build the bowls: rice, beans, corn, tomatoes, onion, cheese, coriander, steak, and the lime squeezed over everything.',
-              ],
+                'Chop the tomatoes and onion, then build the bowls: rice, beans, corn, tomatoes, onion, cheese, coriander, steak, and the lime squeezed over everything.',
+              phase: 'day_of',
+              substeps: ['Chop the tomatoes and onion, then build the bowls: rice, beans, corn, tomatoes, onion, cheese, coriander, steak, and the lime squeezed over everything.'],
             },
           ],
         },
@@ -9931,9 +9972,11 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           stovetop: [
             { summary: 'Make the marinade: lime and orange juice, garlic, cumin, chilli powder, oil, salt (and an optional pinch of sugar). Marinate the steak 2-4 hours — not more than 8, as the citrus turns it mushy.', substeps: ['Make the marinade: lime and orange juice, garlic, cumin, chilli powder, oil, salt (and an optional pinch of sugar). Marinate the steak 2-4 hours — not more than 8, as the citrus turns it mushy.'] },
             { summary: 'Cook the rice, then stir through lime juice, chopped coriander, and salt.', substeps: ['Cook the rice, then stir through lime juice, chopped coriander, and salt.'] },
-            { summary: 'Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).', substeps: ['Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).'] },
+            { summary: 'Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).',
+            phase: 'day_of', substeps: ['Warm the beans and make a quick pico (chopped tomato, red onion, coriander, lime).'] },
             { summary: 'Grill or sear the steak hot until charred, about 4-7 minutes per side to your doneness, then rest 5-10 minutes and slice thin against the grain (the key tenderness step).', substeps: ['Grill or sear the steak hot until charred, about 4-7 minutes per side to your doneness, then rest 5-10 minutes and slice thin against the grain (the key tenderness step).'] },
-            { summary: 'Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.', substeps: ['Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.'] },
+            { summary: 'Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.',
+            phase: 'day_of', substeps: ['Build the bowl: rice, sliced steak, beans, corn, pico, and cheese.'] },
           ],
         },
       },
@@ -10071,7 +10114,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Slice the chicken breast thin, or pound to ~1/2 cm.', substeps: ['Slice the chicken breast thin, or pound to about 1/2 cm even thickness.'] },
           { summary: 'Crumb: seasoned flour -> beaten egg -> breadcrumbs, pressing on, then rest 15-20 min so the coating sets.', substeps: ['Set up three bowls: seasoned flour, beaten egg, breadcrumbs.', 'Coat each cutlet flour -> egg -> crumbs, pressing the crumbs on.', 'Rest 15-20 minutes so the coating sets.'] },
           { summary: 'Shallow-fry in oil over medium-high, 3-4 min per side, until golden and 73C/165F inside; drain on a rack.', substeps: ['Heat oil in a pan over medium-high.', 'Fry 3-4 minutes per side until golden and cooked through (73C/165F).', 'Drain on a rack. Leaner option: oven-bake at 200C with oil spray ~20 min, turning once.'] },
-          { summary: 'Assemble per plate: plate, roll, or parma.', substeps: ['See the plate-specific assembly steps.'] },
+          { summary: 'Assemble per plate: plate, roll, or parma.',
+            phase: 'day_of', substeps: ['See the plate-specific assembly steps.'] },
         ],
       },
     ],
@@ -10153,6 +10197,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Meanwhile, cook the gnocchi in salted boiling water per the packet — they are done about a minute after they float. Drain, keeping a splash of the cooking water.',
+              phase: 'day_of',
               substeps: [
                 'Meanwhile, cook the gnocchi in salted boiling water per the packet — they are done about a minute after they float. Drain, keeping a splash of the cooking water.',
               ],
@@ -10160,6 +10205,7 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             {
               summary:
                 'Toss the gnocchi through the ragù with the splash of cooking water to loosen. Serve topped with the parmesan.',
+              phase: 'day_of',
               substeps: [
                 'Toss the gnocchi through the ragù with the splash of cooking water to loosen. Serve topped with the parmesan.',
               ],
@@ -10196,7 +10242,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
             { summary: 'Deglaze (optional wine), add tomatoes, stock, herbs; return the beef.', substeps: ['Deglaze with the wine if using.', 'Add the crushed tomatoes, stock, oregano, thyme, and bay; return the beef.'] },
             { summary: 'Cover and braise low until the beef shreds — oven 160°C ~2.5 hrs (or stovetop low / slow-cooker 8 hrs low).', substeps: ['Cover and braise low until fork-tender and shreddable — oven 160°C about 2.5 hrs, stovetop low, or slow-cooker 8 hrs low.'] },
             { summary: 'Shred the beef, return to the sauce, skim fat if you like, simmer 15-20 min to thicken.', substeps: ['Shred the beef with two forks and return it to the sauce.', 'Skim surface fat if you like, then simmer uncovered 15-20 minutes to thicken.'] },
-            { summary: 'Cook the gnocchi to packet and toss through with a splash of pasta water; finish with parmesan and basil.', substeps: ['Boil the gnocchi until they float (~2-3 min).', 'Toss through the ragù with a splash of pasta water; finish with parmesan and basil.'] },
+            { summary: 'Cook the gnocchi to packet and toss through with a splash of pasta water; finish with parmesan and basil.',
+            phase: 'day_of', substeps: ['Boil the gnocchi until they float (~2-3 min).', 'Toss through the ragù with a splash of pasta water; finish with parmesan and basil.'] },
           ],
         },
       },
@@ -10311,7 +10358,8 @@ export const CURATED_MEALS: Record<MealSlug, CuratedMeal> = {
           { summary: 'Mix the mince with grated onion, garlic, paprika, salt, pepper, bicarb (and a splash of sparkling water), then rest.', substeps: ['Combine the beef and lamb mince with grated onion, crushed garlic, paprika, salt, pepper, and bicarb soda.', 'Add a splash of sparkling water to lighten if you like; mix well.', 'Rest in the fridge 1 hr to overnight — better texture.'] },
           { summary: 'With damp hands, roll into small fingers ~8 cm long.', substeps: ['With damp hands, roll the mix into small fingers about 8 cm long.'] },
           { summary: 'Grill or pan-sear over medium-high ~3-4 min per side, turning once, until browned with a crust but juicy. Do not press.', substeps: ['Grill (charcoal best) or pan-sear/griddle over medium-high.', 'Cook ~3-4 minutes per side, turning once, until browned with a crust but juicy inside. Do not press them.'] },
-          { summary: 'Serve per plate (flatbread or rice plate) with onion and ajvar.', substeps: ['See the plate-specific assembly steps.'] },
+          { summary: 'Serve per plate (flatbread or rice plate) with onion and ajvar.',
+            phase: 'day_of', substeps: ['See the plate-specific assembly steps.'] },
         ],
       },
     ],

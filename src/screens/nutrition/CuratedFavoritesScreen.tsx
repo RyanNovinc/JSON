@@ -110,13 +110,15 @@ import {
 import { Image } from 'expo-image';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppModal from '../../components/AppModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { CURATED_MEALS } from '../../data/curated_meals';
 import { CuratedMeal } from '../../types/curated_meals';
+import { CustomMealView } from '../../types/custom_meals';
+import { loadCustomMealViews } from '../../utils/customMealsStorage';
 import { getMealImage } from '../../assets/mealImages';
 import {
   loadCuratedFavoritesV2,
@@ -232,6 +234,8 @@ function effortMinutes(m: CuratedMeal): number {
  *  plate's additions, deduped by ingredient_id. Data-derived — flags the
  *  "fast blend, 12-jar shop" meals the time tag can't see. */
 function ingredientCount(m: CuratedMeal): number {
+  // Custom meals carry free-text rows with no ingredient_ids — count those.
+  if ((m as any).custom) return ((m as any).custom_ingredients?.length ?? 0);
   const ids = new Set<string>();
   const add = (arr: any[] | undefined) =>
     (arr ?? []).forEach((i: any) => i?.ingredient_id && ids.add(i.ingredient_id));
@@ -323,6 +327,8 @@ interface PickUnit {
   slug: string;
   name: string;
   imageFilename?: string;
+  /** Custom meals: device file URI. Wins over imageFilename when present. */
+  imageUri?: string;
 }
 
 function unitsForTab(
@@ -341,6 +347,7 @@ function unitsForTab(
         slug: meal.slug,
         name: meal.display_name,
         imageFilename: meal.image_filename,
+        imageUri: (meal as any).image_uri,
       });
     }
     for (const plate of meal.plates ?? []) {
@@ -349,6 +356,7 @@ function unitsForTab(
           slug: meal.slug,
           name: meal.display_name,
           imageFilename: (plate as any).image_filename ?? meal.image_filename,
+          imageUri: (meal as any).image_uri,
         });
       }
     }
@@ -442,7 +450,11 @@ function WeekStrip({
   }, [hash]);
 
   const renderDot = (unit: PickUnit | null, i: number, size: number, overlap: boolean) => {
-    const img = unit ? getMealImage(unit.imageFilename) : null;
+    const img = unit
+      ? unit.imageUri
+        ? { uri: unit.imageUri }
+        : getMealImage(unit.imageFilename)
+      : null;
     return (
       <View
         key={i}
@@ -515,7 +527,11 @@ const MealCard = React.memo(function MealCard({
   onWaysPress,
   onInfoPress,
 }: MealCardProps) {
-  const imageSource = getMealImage(meal.image_filename ?? meal.plates?.[0]?.image_filename);
+  const customUri = (meal as any).image_uri as string | undefined;
+  const isCustom = (meal as any).custom === true;
+  const imageSource = customUri
+    ? { uri: customUri }
+    : getMealImage(meal.image_filename ?? meal.plates?.[0]?.image_filename);
   const multi = isMultiPlate(meal);
   const height = Math.round((width * 4) / 3);
 
@@ -565,6 +581,15 @@ const MealCard = React.memo(function MealCard({
           )}
 
           {isSel && <View style={styles.selectedScrim} pointerEvents="none" />}
+
+          {isCustom && (
+            <View
+              style={[styles.customBadge, { backgroundColor: themeColor }]}
+              pointerEvents="none"
+            >
+              <Text style={styles.customBadgeText}>Custom</Text>
+            </View>
+          )}
 
           <View
             style={[
@@ -648,6 +673,37 @@ const MealCard = React.memo(function MealCard({
     </View>
   );
 });
+
+// =============================================================================
+// AddMealTile — trailing "Add your own" tile in every tab's grid
+// =============================================================================
+
+function AddMealTile({
+  width,
+  themeColor,
+  onPress,
+}: {
+  width: number;
+  themeColor: string;
+  onPress: () => void;
+}) {
+  const height = Math.round((width * 4) / 3);
+  return (
+    <RNTouchableOpacity
+      style={[styles.addTile, { width, height }]}
+      activeOpacity={0.8}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Add your own meal"
+      accessibilityHint="Opens a form to create a custom meal"
+    >
+      <View style={[styles.addTileCircle, { backgroundColor: `${themeColor}26` }]}>
+        <Ionicons name="add" size={20} color={themeColor} />
+      </View>
+      <Text style={styles.addTileText}>Add your own</Text>
+    </RNTouchableOpacity>
+  );
+}
 
 // =============================================================================
 // BottomSheet shell — shared spring/backdrop for PlateSheet + ConfirmSheet
@@ -865,7 +921,27 @@ export default function CuratedFavoritesScreen() {
     return { columns: cols, cardWidth: (available - GRID_GAP * (cols - 1)) / cols };
   }, [windowWidth]);
 
-  const allMeals = useMemo(() => Object.values(CURATED_MEALS) as CuratedMeal[], []);
+  // User-created meals — reloaded on focus so a meal created via the add
+  // tile appears the moment this screen returns to the foreground, and an
+  // edit/delete made elsewhere is reflected here.
+  const [customViews, setCustomViews] = useState<CustomMealView[]>([]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const views = await loadCustomMealViews();
+        if (!cancelled) setCustomViews(views);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  const allMeals = useMemo(
+    () => [...(Object.values(CURATED_MEALS) as CuratedMeal[]), ...customViews],
+    [customViews]
+  );
 
   // ---- answers (route params during questionnaire; storage when standalone) ----
   const paramAnswers = route.params?.answersSoFar;
@@ -1244,9 +1320,16 @@ export default function CuratedFavoritesScreen() {
 
   const plateSheetMeal = allMeals.find((m) => m.slug === plateSheetSlug) ?? null;
 
-  const rows: CuratedMeal[][] = [];
-  for (let i = 0; i < activeMeals.length; i += columns) {
-    rows.push(activeMeals.slice(i, i + columns));
+  // Grid items: the tab's meals plus one trailing add-your-own tile. The
+  // sentinel flows through the same row chunking so the tile sits in the
+  // grid like any card.
+  type GridItem = CuratedMeal | { addTile: true };
+  const rows: GridItem[][] = [];
+  {
+    const items: GridItem[] = [...activeMeals, { addTile: true }];
+    for (let i = 0; i < items.length; i += columns) {
+      rows.push(items.slice(i, i + columns));
+    }
   }
 
   const sheetPaddingBottom = Math.max(insets.bottom, 14) + 10;
@@ -1422,21 +1505,39 @@ export default function CuratedFavoritesScreen() {
           <View style={styles.grid}>
             {rows.map((pair, ri) => (
               <View key={`r${ri}`} style={styles.gridRow}>
-                {pair.map((m) => (
-                  <MealCard
-                    key={m.slug}
-                    meal={m}
-                    width={cardWidth}
-                    selected={viewSelected}
-                    themeColor={themeColor}
-                    onPress={() => onCardPress(m)}
-                    onWaysPress={() => setPlateSheetSlug(m.slug)}
-                    onInfoPress={() => {
-                      Analytics.track('curated_meal_viewed', { meal_id: m.slug });
-                      navigation.navigate('MealDetail', { slug: m.slug });
-                    }}
-                  />
-                ))}
+                {pair.map((item) =>
+                  'addTile' in item ? (
+                    <AddMealTile
+                      key="add-tile"
+                      width={cardWidth}
+                      themeColor={themeColor}
+                      onPress={() => navigation.navigate('AddCustomMeal')}
+                    />
+                  ) : (
+                    <MealCard
+                      key={item.slug}
+                      meal={item}
+                      width={cardWidth}
+                      selected={viewSelected}
+                      themeColor={themeColor}
+                      onPress={() => onCardPress(item)}
+                      onWaysPress={() => setPlateSheetSlug(item.slug)}
+                      onInfoPress={() => {
+                        if ((item as any).custom) {
+                          // Custom meals: ⓘ opens the edit form — it shows
+                          // everything the detail sheet would, and it's YOUR
+                          // meal, so editing is the natural action here.
+                          navigation.navigate('AddCustomMeal', {
+                            editSlug: item.slug,
+                          });
+                          return;
+                        }
+                        Analytics.track('curated_meal_viewed', { meal_id: item.slug });
+                        navigation.navigate('MealDetail', { slug: item.slug });
+                      }}
+                    />
+                  )
+                )}
                 {/* Pad the last row so its cards keep the grid's alignment
                     instead of stretching. With a variable column count a short
                     row can be missing more than one slot, not just one. */}
@@ -1533,7 +1634,11 @@ export default function CuratedFavoritesScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={[styles.miniDots, rhythm === 'mix' && { gap: 0 }]}>
                       {mini.map((u, i) => {
-                        const img = u ? getMealImage(u.imageFilename) : null;
+                        const img = u
+                          ? u.imageUri
+                            ? { uri: u.imageUri }
+                            : getMealImage(u.imageFilename)
+                          : null;
                         return (
                           <View
                             key={i}
@@ -1572,7 +1677,9 @@ export default function CuratedFavoritesScreen() {
               {verdict.fixes.length > 0 && (
                 <View style={styles.fixRow}>
                   {verdict.fixes.map((fix: CertifiedFix) => {
-                    const img = getMealImage(fix.imageFilename);
+                    const fixMeal = allMeals.find((m) => m.slug === fix.slug);
+                    const fixUri = (fixMeal as any)?.image_uri as string | undefined;
+                    const img = fixUri ? { uri: fixUri } : getMealImage(fix.imageFilename);
                     return (
                       <TouchableOpacity
                         key={`${fix.slug}:${fix.plateId}`}
@@ -1820,6 +1927,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
     elevation: 10,
+  },
+  // "Custom" provenance pill — sits right of the ⓘ badge, clear of the
+  // check badge in the opposite corner.
+  customBadge: {
+    position: 'absolute',
+    top: 15,
+    left: 44,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  customBadgeText: {
+    color: '#0a0a0b',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  addTile: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#3f3f46',
+    backgroundColor: '#101013',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  addTileCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addTileText: {
+    color: '#a1a1aa',
+    fontSize: 12,
   },
 
   emptyState: {
