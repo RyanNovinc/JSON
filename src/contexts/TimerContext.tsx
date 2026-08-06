@@ -1695,7 +1695,23 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         titleColor: '#ffffff',
         subtitleColor: '#cccccc',
         progressViewTint: timer.themeColor || '#007AFF',
+        // Also drives the big Lock Screen countdown, not just the bar's own label.
+        progressViewLabelColor: timer.themeColor || '#007AFF',
         timerType: 'digital' as const,
+
+        // Lock Screen image sizing. Without these the widget falls back to
+        // contentFit 'cover' with a hardcoded 64pt height and NO width constraint, so
+        // the mark stretches across the whole row and gets cropped top and bottom.
+        // 70x20 matches the artwork's 3.49 aspect, so 'contain' neither crops nor
+        // distorts. None of this affects the Dynamic Island, which hard-codes 23x23.
+        contentFit: 'contain' as const,
+        imageSize: { width: 70, height: 20 },
+        imagePosition: 'right' as const,
+        imageAlign: 'center' as const,
+
+        // Apple's standard layout margin for Lock Screen Live Activities. The library
+        // defaults to 24.
+        padding: 14,
       };
 
       if (!timer.liveActivityId) {

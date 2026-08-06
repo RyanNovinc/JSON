@@ -207,11 +207,37 @@ import WidgetKit
                 .modifier(ConditionalForegroundViewModifier(color: attributes.subtitleColor))
             }
 
+            // PATCHED (JSON.fit). Upstream exposed the countdown only as the small caption
+            // label inside ProgressView(timerInterval:), which left the single most important
+            // number on a rest-timer card as the smallest text on it. Apple's HIG asks for the
+            // key information to be scaled largest, so it gets its own view here.
+            //
+            // Text(timerInterval:) is a self-updating SwiftUI view: it ticks without the app
+            // running and without any push, which is the only way to show a live number in a
+            // widget process. monospacedDigit stops the layout jittering as digits change.
+            // Colour comes from progressViewLabelColor, which now drives this rather than the
+            // bar's own label (that label is suppressed below).
+            if let date = contentState.timerEndDateInMilliseconds {
+              Text(timerInterval: Date.toTimerInterval(miliseconds: date))
+                .font(.system(size: 46, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
+                .padding(.top, 2)
+            }
+
             if effectiveStretch {
               if let date = contentState.timerEndDateInMilliseconds {
-                ProgressView(timerInterval: Date.toTimerInterval(miliseconds: date))
+                // PATCHED (JSON.fit): empty labels. The big countdown above is now the
+                // readable number; leaving the default labels in place printed the same
+                // time again in caption size directly under it.
+                ProgressView(
+                  timerInterval: Date.toTimerInterval(miliseconds: date),
+                  label: { EmptyView() },
+                  currentValueLabel: { EmptyView() }
+                )
                   .tint(progressViewTint)
-                  .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
               } else if let progress = contentState.progress {
                 ProgressView(value: progress)
                   .tint(progressViewTint)
@@ -230,9 +256,13 @@ import WidgetKit
 
         if !effectiveStretch {
           if let date = contentState.timerEndDateInMilliseconds {
-            ProgressView(timerInterval: Date.toTimerInterval(miliseconds: date))
+            // PATCHED (JSON.fit): empty labels — see the note above.
+            ProgressView(
+              timerInterval: Date.toTimerInterval(miliseconds: date),
+              label: { EmptyView() },
+              currentValueLabel: { EmptyView() }
+            )
               .tint(progressViewTint)
-              .modifier(ConditionalForegroundViewModifier(color: attributes.progressViewLabelColor))
           } else if let progress = contentState.progress {
             ProgressView(value: progress)
               .tint(progressViewTint)

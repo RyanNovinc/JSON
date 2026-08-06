@@ -1,0 +1,29 @@
+diff --git a/node_modules/expo-av/ios/EXAV/EXAV.m b/node_modules/expo-av/ios/EXAV/EXAV.m
+index 7153d28..734b1ee 100644
+--- a/node_modules/expo-av/ios/EXAV/EXAV.m
++++ b/node_modules/expo-av/ios/EXAV/EXAV.m
+@@ -680,6 +680,24 @@ EX_EXPORT_METHOD_AS(setAudioIsEnabled,
+   
+   if (!value) {
+     [self _deactivateAudioSession];
++    // PATCH(JSON.fit): upstream removed real audio session deactivation in
++    // expo/expo#16578 to keep pauseAsync fast, which leaves DuckOthers ducking
++    // applied to other apps' audio forever on iOS (expo/expo#29077 — closed
++    // unfixed; expo-audio inherits the same defect, expo/expo#33124). Restore
++    // the OS-level deactivation HERE ONLY — the explicit JS
++    // Audio.setIsEnabledAsync(false) call — so every ordinary pause/stop/unload
++    // keeps upstream's fast path and the frame-drop rationale for the removal
++    // stays respected. NotifyOthersOnDeactivation additionally lets audio that
++    // was fully interrupted (not just ducked) resume. A failure here is logged
++    // and swallowed: the cost is one rest's worth of ducked music, and the next
++    // playback re-activates the session cleanly either way.
++    NSError *sessionError = nil;
++    [[AVAudioSession sharedInstance] setActive:NO
++                                   withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
++                                         error:&sessionError];
++    if (sessionError) {
++      NSLog(@"[expo-av patch] Audio session deactivation failed: %@", sessionError.localizedDescription);
++    }
+   }
+   resolve(nil);
+ }
