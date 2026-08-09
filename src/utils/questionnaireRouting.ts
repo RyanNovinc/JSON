@@ -3,6 +3,7 @@ import {
   hasCompleteNutritionAnswers,
   loadNutritionAnswers,
   mergeNutritionAnswers,
+  clearNutritionAnswers,
 } from './nutritionQuestionnaireStorage';
 import { hasGoalsProfile, loadGoalsProfile } from './goalsProfileStorage';
 import { derivePhase } from './goalsProfile';
@@ -17,12 +18,31 @@ export {
 export type { SyntheticNutritionAnswers } from './syntheticNutritionAnswers';
 
 import { deriveSyntheticNutritionAnswers } from './syntheticNutritionAnswers';
+import type { GoalsProfile } from './goalsProfile';
+
+/**
+ * The four fields N3 used to ask for, read off the profile instead.
+ *
+ * They moved to the shared intake because BOTH plans need them — the workout
+ * side needs height and sex for the plausibility check and the body-fat band,
+ * not just the meal side for BMR. Seeding them into the nutrition draft keeps
+ * every existing reader working unchanged.
+ */
+function profileNutritionFields(profile: GoalsProfile): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (profile.sex) out.gender = profile.sex;
+  if (profile.ageYears != null) out.age = profile.ageYears;
+  if (profile.heightCm != null) out.height = profile.heightCm;
+  if (profile.currentWeightKg) out.weight = profile.currentWeightKg;
+  if (profile.activityLevel) out.activityLevel = profile.activityLevel;
+  return out;
+}
 
 // ── Continuation helpers ───────────────────────────────────────────────────
 //
 // Called by ConfirmStatsScreen once a returning user's stats are
 // confirmed. Not used on the first-run path — GoalsIntakeScreen navigates
-// straight into Q1PrimaryGoal/N1Goal itself, since a first-run user has by
+// straight into the plan questions itself, since a first-run user has by
 // definition never completed these questions before.
 
 export async function continueWorkoutFlow(
@@ -33,7 +53,8 @@ export async function continueWorkoutFlow(
     navigation.navigate('QuestionnaireSummary');
   } else {
     const saved = await loadQuestionnaireAnswers();
-    navigation.navigate('Q1PrimaryGoal', { answersSoFar: saved || {}, ...extraParams });
+    // Q3 is the first workout question since Q1 (primary goal) left the flow.
+    navigation.navigate('Q3DaysPerWeek', { answersSoFar: saved || {}, ...extraParams });
   }
 }
 
@@ -46,36 +67,78 @@ export async function continueNutritionFlow(
     return;
   }
 
+  // N1 (goal), N2 (rate), N3 (about you) and N4 (activity) all left the flow.
+  // Everything they asked for now comes from GoalsProfile and the roadmap:
+  //
+  //   goal + rate  — properties of the derived PHASE. Asking once froze a
+  //                  number that changes at every phase transition, and
+  //                  produced the contradiction of a plan recommending a
+  //                  recomp next to a question asking how fast to gain.
+  //   sex/age/height/weight/activity — facts about the person, collected by
+  //                  the shared intake and useful to both plans.
+  //
+  // There is no longer a branch here: the draft is seeded the same way for
+  // everyone, so there is no "which path did this user take" state to reason
+  // about. That branching was the source of a whole class of bugs in this
+  // flow, including one where a user finished all eleven questions and was
+  // then told "Missing details".
   const saved = await loadNutritionAnswers();
+  const profile = await loadGoalsProfile();
 
-  // When GoalsProfile provides a direction and no N1 answer is saved yet, skip
-  // N1 (goal) and N2 (rate) — the phase-aware macro path in assembleMealPlanPromptV2
-  // derives both from the profile. We persist synthetic answers so that
-  // hasCompleteNutritionAnswers() can reach `true` without the user seeing those screens.
-  if (!saved?.goal) {
-    const profile = await loadGoalsProfile();
-    if (profile?.goalWeightKg) {
-      const phase = derivePhase(profile);
-      const synth = deriveSyntheticNutritionAnswers(phase);
-      // mergeNutritionAnswers re-reads and writes the draft itself, and returns
-      // the merged result. It also refuses to write a non-object, so a bad
-      // synth can no longer disappear into saveNutritionAnswers' catch block.
-      const merged = await mergeNutritionAnswers(synth);
-      // N1 and N2 are being skipped — shift the step count down by 2 so
-      // N3 onward still number continuously (see the flowStepOffset
-      // convention: the same shift is applied uniformly to every
-      // downstream screen's hardcoded currentStep/totalSteps literals).
-      const baseOffset = (extraParams as any).flowStepOffset ?? 0;
-      navigation.navigate('N3AboutYou', {
-        answersSoFar: merged,
-        ...extraParams,
-        flowStepOffset: baseOffset - 2,
-      });
-      return;
-    }
-  }
+  const seed: Record<string, any> = profile
+    ? { ...deriveSyntheticNutritionAnswers(derivePhase(profile)), ...profileNutritionFields(profile) }
+    : {};
 
-  navigation.navigate('N1Goal', { answersSoFar: saved || {}, ...extraParams });
+  // Never overwrite an answer the user gave themselves.
+  if (saved?.goal) delete seed.goal;
+  if (saved?.targetRatePercentage != null) delete seed.targetRatePercentage;
+
+  const merged = Object.keys(seed).length ? await mergeNutritionAnswers(seed) : saved;
+
+  // N5 is the first remaining screen. Its literals still assume it is the 5th
+  // of 12, so the offset drops by 4 and every downstream screen keeps its own
+  // hardcoded numbers untouched.
+  const baseOffset = (extraParams as any).flowStepOffset ?? 0;
+  navigation.navigate('N5DietType', {
+    answersSoFar: merged ?? {},
+    ...extraParams,
+    flowStepOffset: baseOffset - 4,
+  });
+}
+
+/**
+ * Restart the nutrition questionnaire from scratch.
+ *
+ * This CANNOT go through continueNutritionFlow, and the reason is subtle
+ * enough to be worth stating. hasCompleteNutritionAnswers reads
+ * resolveNutritionAnswers, which layers the draft on top of the FINALIZED
+ * results — and clearing the draft does not clear those. So a user who has
+ * already generated a plan still resolves as "complete" the instant after
+ * they hit restart, and continueNutritionFlow bounces them straight back to
+ * the summary. That is a loop: Restart -> Quick check -> Continue -> Summary.
+ *
+ * The old code avoided it by accident, by navigating directly to N1Goal and
+ * never consulting the check. This does the same thing deliberately, and adds
+ * the profile seed that the removed screens (N1-N4) used to supply — without
+ * it, the user reaches the end and is told "Missing details".
+ *
+ * The finalized results are deliberately left alone: they are what the current
+ * plan is built from, and wiping them when someone merely opens a restart they
+ * may abandon would destroy a working plan. Finalizing again overwrites them.
+ */
+export async function restartNutritionFlow(navigation: any): Promise<void> {
+  await clearNutritionAnswers();
+
+  const profile = await loadGoalsProfile();
+  const seed = profile
+    ? { ...deriveSyntheticNutritionAnswers(derivePhase(profile)), ...profileNutritionFields(profile) }
+    : {};
+  const merged = Object.keys(seed).length ? await mergeNutritionAnswers(seed) : {};
+
+  navigation.navigate('N5DietType', {
+    answersSoFar: merged ?? {},
+    flowStepOffset: -4,
+  });
 }
 
 // ── Public entry points ────────────────────────────────────────────────────

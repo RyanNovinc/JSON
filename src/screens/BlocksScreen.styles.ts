@@ -85,6 +85,54 @@ export const styles = StyleSheet.create({
   sectionLabelAccent: {
     color: '#22d3ee',
   },
+  // Section header with a trailing count. This screen's rows and cards carry
+  // their own horizontal margins (listContent has none), so the row repeats
+  // sectionLabel's paddingHorizontal: 18 rather than inheriting it.
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    marginBottom: 8,
+  },
+  sectionHeaderLabel: {
+    marginBottom: 0,
+    paddingHorizontal: 0,
+  },
+  sectionHeaderCount: {
+    fontSize: 10,
+    color: '#3a3a44',
+    letterSpacing: 0.8,
+    fontFamily: 'DMMono-Regular',
+  },
+  sectionSpacer: {
+    height: 22,
+  },
+
+  // ── Done rows (quiet strip at the bottom) ────────────────────────
+  // A finished block keeps its name and how long it ran, and stays tappable,
+  // but drops the card treatment so it cannot compete with what is still ahead.
+  blockDoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 18,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  blockDoneName: {
+    flex: 1,
+    fontSize: 13,
+    color: '#71717a',
+    fontFamily: 'Outfit-Medium',
+  },
+  blockDoneMeta: {
+    fontSize: 10,
+    color: '#55555f',
+    fontFamily: 'DMMono-Regular',
+    letterSpacing: 0.3,
+  },
 
   // ── ACTIVE hero card ─────────────────────────────────────────────
   heroCard: {

@@ -54,6 +54,7 @@ import { computeMacros, finalizeNutrition } from '../../../utils/nutritionMacros
 import { loadCuratedFavoritesV2, picksCount } from '../../../utils/curatedFavoritesStorage';
 import { WorkoutStorage } from '../../../utils/storage';
 import GoalsProfileSummaryCard from '../../../components/GoalsProfileSummaryCard';
+import { restartNutritionFlow } from '../../../utils/questionnaireRouting';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
 
@@ -106,23 +107,19 @@ interface RowConfig {
 }
 
 const ROWS: RowConfig[] = [
+  // Goal and Rate rows removed 9 Aug 2026 along with N1 and N2. Both are
+  // properties of the roadmap PHASE, not one-time answers: the phase decides
+  // gaining vs losing, and the rate changes at every phase transition. Showing
+  // them here as editable rows invited the same contradiction that started this
+  // work — a plan saying "recomp first" next to a row saying "gain 0.5%/week".
+  // They live on the route screen now.
   {
-    label: 'Goal',
-    route: 'N1Goal',
-    format: (a) => (a.goal ? GOAL_LABELS[a.goal] ?? a.goal : '—'),
-  },
-  {
-    label: 'Rate',
-    route: 'N2Rate',
-    show: (a) => a.goal !== 'maintain',
-    format: (a) =>
-      a.targetRatePercentage != null
-        ? `${a.targetRatePercentage}% of bodyweight / week`
-        : '—',
-  },
-  {
+    // Points at Goals & Stats, not N3: sex, age, height and weight moved onto
+    // GoalsProfile with the shared intake, and N3 left the flow on 9 Aug 2026.
+    // Editing them here would have written to the nutrition draft only, so the
+    // profile and the plan would disagree the moment the draft was cleared.
     label: 'About you',
-    route: 'N3AboutYou',
+    route: 'GoalsStats',
     format: (a) => {
       const parts = [
         a.age != null ? `${a.age}` : null,
@@ -132,12 +129,6 @@ const ROWS: RowConfig[] = [
       ].filter(Boolean);
       return parts.length ? parts.join(' · ') : '—';
     },
-  },
-  {
-    label: 'Activity',
-    route: 'N4Activity',
-    format: (a) =>
-      a.activityLevel ? ACTIVITY_LABELS[a.activityLevel] ?? a.activityLevel : '—',
   },
   {
     label: 'Diet',
@@ -381,8 +372,12 @@ export default function NutritionSummaryScreen() {
           text: 'Restart',
           style: 'destructive',
           onPress: async () => {
-            await clearNutritionAnswers();
-            navigation.navigate('N1Goal');
+            // restartNutritionFlow, not startNutritionFlow: the latter runs the
+            // completeness check, which still passes because the FINALIZED
+            // results survive a draft clear — so it bounced straight back here.
+            // The restart helper clears, seeds from the roadmap, and goes
+            // directly to the first remaining question.
+            await restartNutritionFlow(navigation);
           },
         },
       ]

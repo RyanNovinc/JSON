@@ -1,54 +1,53 @@
 // src/components/import/MealPlanConfirmationModal.tsx
 //
-// Nutrition twin of ImportConfirmationModal. Same overlay, scale-in card,
-// eyebrow + name + stat card + primary button — but meal-plan shaped:
-// "Meal plan ready" with Duration / Total meals / Start date, and a single
-// "Start meal plan" action. No combined/add-more views (a meal plan is one
-// object, unlike workout blocks which accumulate).
+// Full replacement. Same props as before, so no caller changes: it is still
+// driven entirely by useMealPlanImport via NutritionPromptReadyScreen.
 //
-// Presentational only: all state + handlers come in as props from
-// useMealPlanImport, exactly like the workout modal pairs with useWorkoutImport.
+// What changed from the previous version:
+//   - a photo hero built from the plan's own meals (ImportHeroMeal)
+//   - the stacked summary rows collapsed into one horizontal stat strip
+//   - an "inside" chip row naming actual meals, not just counts
+//   - the X moved onto the hero, with a labelled "Close" under the CTA, so
+//     dismissing is not dependent on spotting an unlabelled icon
+//
+// AppModal, not a raw Modal: on Android a raw <Modal> is a detached native
+// window that does not inherit the app's GestureHandlerRootView, so RNGH
+// touchables inside it receive no touches at all.
 
-import React from 'react';
-import { View, Text, StyleSheet, Animated, ScrollView } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
-// Both TouchableOpacity buttons here come from react-native-gesture-handler (above). On
-// Android a raw <Modal> is a detached native window that does not inherit the app's
-// GestureHandlerRootView, so RNGH touchables inside it receive NO touches — confirm and
-// cancel were silently dead. AppModal re-roots the gesture handler (and safe-area) contexts.
-import AppModal from '../AppModal';
 import { Ionicons } from '@expo/vector-icons';
-import type { SimplifiedMealPlan } from '../../types/nutrition';
+import AppModal from '../AppModal';
+import ImportHeroMeal from './ImportHeroMeal';
 
-interface MealPlanConfirmationModalProps {
+interface Props {
   visible: boolean;
-  parsedMealPlan: SimplifiedMealPlan | null;
+  parsedMealPlan: any;
   generationTime: number | null;
   modalScale: Animated.Value;
   modalOpacity: Animated.Value;
   themeColor: string;
-  onConfirm: () => void; // confirmImport — "Start meal plan"
-  onCancel: () => void; // cancelConfirmation — dismiss
+  onConfirm: () => void;
+  onCancel: () => void;
 }
 
-function totalMeals(plan: SimplifiedMealPlan | null): number {
-  if (!plan?.dailyMeals) return 0;
-  return Object.values(plan.dailyMeals).reduce(
-    (total, day: any) => total + (day.meals?.length || 0),
-    0
-  );
+/** Defensive flatten, same contract as ImportHeroMeal's. */
+function flattenMeals(plan: any): any[] {
+  const daily = plan?.dailyMeals;
+  if (!daily) return [];
+  const days: any[] = Array.isArray(daily) ? daily : Object.values(daily);
+  return days.flatMap((day: any) => {
+    if (Array.isArray(day)) return day;
+    if (Array.isArray(day?.meals)) return day.meals;
+    return [];
+  });
 }
 
-function dayCount(plan: SimplifiedMealPlan | null): number {
-  if (!plan?.dailyMeals) return 0;
-  return Object.keys(plan.dailyMeals).length;
-}
-
-function startDateLabel(plan: SimplifiedMealPlan | null): string {
-  if (!plan?.startDate) return '—';
-  const d = new Date(plan.startDate);
-  if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString();
+function dayCount(plan: any): number {
+  const daily = plan?.dailyMeals;
+  if (!daily) return 0;
+  return Array.isArray(daily) ? daily.length : Object.keys(daily).length;
 }
 
 export default function MealPlanConfirmationModal({
@@ -60,16 +59,64 @@ export default function MealPlanConfirmationModal({
   themeColor,
   onConfirm,
   onCancel,
-}: MealPlanConfirmationModalProps) {
-  const days = dayCount(parsedMealPlan);
-  const meals = totalMeals(parsedMealPlan);
+}: Props) {
+  const stats = useMemo(() => {
+    const meals = flattenMeals(parsedMealPlan);
+    const days = dayCount(parsedMealPlan) || 1;
+
+    const totalCalories = meals.reduce(
+      (sum: number, m: any) => sum + (Number(m?.calories) || 0),
+      0
+    );
+    const totalProtein = meals.reduce(
+      (sum: number, m: any) => sum + (Number(m?.macros?.protein) || 0),
+      0
+    );
+
+    // Per day, not per plan: a 7 day total reads as a nonsense calorie number.
+    return {
+      meals,
+      days,
+      kcalPerDay: Math.round(totalCalories / days),
+      proteinPerDay: Math.round(totalProtein / days),
+      mealCount: meals.length,
+    };
+  }, [parsedMealPlan]);
+
+  // Distinct meal names, so a plan that repeats breakfast all week does not fill
+  // the chip row with one meal.
+  const chips = useMemo(() => {
+    const names: string[] = [];
+    for (const m of stats.meals) {
+      const n = m?.name;
+      if (n && !names.includes(n)) names.push(n);
+      if (names.length >= 6) break;
+    }
+    return names;
+  }, [stats.meals]);
+
+  const visibleChips = chips.slice(0, 2);
+  const extraChips = Math.max(0, chips.length - visibleChips.length);
+
+  const planName = parsedMealPlan?.name || 'Your meal plan';
+  const subtitle = [
+    stats.days ? `${stats.days} ${stats.days === 1 ? 'day' : 'days'}` : null,
+    stats.days ? `${Math.round(stats.mealCount / stats.days)} meals a day` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <AppModal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
+    <AppModal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onCancel}
+    >
       <Animated.View style={[styles.overlay, { opacity: modalOpacity }]}>
         <Animated.View
           style={[
-            styles.content,
+            styles.card,
             {
               transform: [{ scale: modalScale }],
               opacity: modalOpacity,
@@ -78,76 +125,98 @@ export default function MealPlanConfirmationModal({
             },
           ]}
         >
-          {/* Top-left close */}
-          <View style={styles.navButtonWrapper}>
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={onCancel}
-              activeOpacity={0.8}
-              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-            >
-              <Ionicons name="close" size={22} color="#71717a" />
-            </TouchableOpacity>
-          </View>
+          <View>
+            <ImportHeroMeal plan={parsedMealPlan} themeColor={themeColor} />
 
-          <ScrollView
-            contentContainerStyle={styles.confirmBody}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Badge */}
-            <View style={styles.badgeRow}>
+            <View style={styles.heroOverlay} pointerEvents="box-none">
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onCancel}
+                hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                activeOpacity={0.8}
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={18} color="#e4e4e7" />
+              </TouchableOpacity>
+
               {generationTime != null && (
-                <View
-                  style={[
-                    styles.timeBadge,
-                    { backgroundColor: themeColor + '1A', borderColor: themeColor },
-                  ]}
-                >
+                <View style={[styles.timeBadge, { borderColor: themeColor }]}>
                   <Text style={[styles.timeBadgeText, { color: themeColor }]}>
-                    Generated in {generationTime.toFixed(2)}s
+                    Ready in {generationTime.toFixed(1)}s
                   </Text>
                 </View>
               )}
             </View>
+          </View>
 
-            <Text style={styles.eyebrow}>MEAL PLAN READY</Text>
-            <Text style={styles.planName}>
-              {parsedMealPlan?.name || 'Your Meal Plan'}
-            </Text>
+          <ScrollView style={styles.scroll} showsVerticalScrollIndicator>
+            <View style={styles.titleBlock}>
+              <Text style={[styles.eyebrow, { color: themeColor }]}>MEAL PLAN</Text>
+              <Text style={styles.planName}>{planName}</Text>
+              {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+            </View>
 
-            <View style={styles.statCard}>
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Duration</Text>
+            <View style={styles.statStrip}>
+              <View style={styles.stat}>
                 <Text style={[styles.statValue, { color: themeColor }]}>
-                  {days} {days === 1 ? 'day' : 'days'}
+                  {stats.kcalPerDay.toLocaleString()}
                 </Text>
+                <Text style={styles.statLabel}>kcal / day</Text>
               </View>
               <View style={styles.statDivider} />
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Total meals</Text>
+              <View style={styles.stat}>
                 <Text style={[styles.statValue, { color: themeColor }]}>
-                  {meals} {meals === 1 ? 'meal' : 'meals'}
+                  {stats.proteinPerDay}g
                 </Text>
+                <Text style={styles.statLabel}>protein</Text>
               </View>
               <View style={styles.statDivider} />
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>Start date</Text>
+              <View style={styles.stat}>
                 <Text style={[styles.statValue, { color: themeColor }]}>
-                  {startDateLabel(parsedMealPlan)}
+                  {stats.mealCount}
                 </Text>
+                <Text style={styles.statLabel}>meals</Text>
               </View>
             </View>
 
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: themeColor }]}
-                onPress={onConfirm}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.primaryButtonTextLg}>Start meal plan</Text>
-              </TouchableOpacity>
-            </View>
+            {visibleChips.length > 0 && (
+              <View style={styles.insideBlock}>
+                <Text style={styles.insideLabel}>INSIDE</Text>
+                <View style={styles.chipRow}>
+                  {visibleChips.map((name) => (
+                    <View key={name} style={styles.chip}>
+                      <Text style={styles.chipText} numberOfLines={1}>
+                        {name}
+                      </Text>
+                    </View>
+                  ))}
+                  {extraChips > 0 && (
+                    <View style={styles.chip}>
+                      <Text style={styles.chipText}>+{extraChips} more</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
           </ScrollView>
+
+          <View style={styles.actionSection}>
+            <TouchableOpacity
+              style={[styles.cta, { backgroundColor: themeColor }]}
+              onPress={onConfirm}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.ctaText}>Start this plan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={onCancel}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            >
+              <Text style={styles.dismissText}>Not this one? Close</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       </Animated.View>
     </AppModal>
@@ -162,86 +231,155 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
   },
-  content: {
+  card: {
     backgroundColor: '#0a0a0b',
     borderRadius: 20,
     borderWidth: 1,
-    width: '100%',
+    width: '90%',
     maxWidth: 420,
-    maxHeight: '82%',
+    height: '65%',
+    alignSelf: 'center',
+    justifyContent: 'flex-start',
     overflow: 'hidden',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 28,
-    elevation: 28,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
   },
-  navButtonWrapper: { position: 'absolute', top: 16, left: 16, zIndex: 5 },
-  navButton: {
-    width: 40,
-    height: 40,
+  // Sits over the hero. box-none on the wrapper so only the controls take touches.
+  heroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 132,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeBadge: {
+    backgroundColor: 'rgba(10,10,11,0.7)',
+    borderWidth: 1,
     borderRadius: 20,
-    backgroundColor: '#18181b',
-    borderWidth: 0.5,
-    borderColor: '#27272a',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  confirmBody: { paddingTop: 24, paddingHorizontal: 24, paddingBottom: 24 },
-  badgeRow: {
-    minHeight: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+  timeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
-  timeBadge: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  timeBadgeText: { fontSize: 11, fontWeight: '600', letterSpacing: 1 },
+  // Shrinks inside the fixed-height card so the pinned footer stays on screen.
+  scroll: {
+    flexShrink: 1,
+    alignSelf: 'stretch',
+  },
+  titleBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 18,
+  },
   eyebrow: {
-    fontSize: 13,
-    color: '#a1a1aa',
-    letterSpacing: 0.5,
-    textAlign: 'center',
+    fontSize: 11,
+    letterSpacing: 1,
+    fontWeight: '600',
     marginBottom: 6,
   },
   planName: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#ffffff',
-    textAlign: 'center',
-    lineHeight: 31,
-    marginBottom: 22,
+    lineHeight: 28,
   },
-  statCard: {
+  subtitle: {
+    fontSize: 12,
+    color: '#71717a',
+    marginTop: 6,
+  },
+  statStrip: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 18,
     backgroundColor: 'rgba(39, 39, 42, 0.4)',
-    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(113, 113, 122, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    width: '100%',
-    marginBottom: 22,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  statDivider: { height: 1, backgroundColor: 'rgba(113, 113, 122, 0.15)' },
-  statLabel: { fontSize: 14, color: '#a1a1aa' },
-  statValue: { fontSize: 14, fontWeight: '600' },
-  actions: { width: '100%' },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
     borderRadius: 14,
-    paddingVertical: 16,
+    overflow: 'hidden',
   },
-  primaryButtonTextLg: {
-    fontSize: 16,
+  stat: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(113, 113, 122, 0.2)',
+  },
+  statValue: {
+    fontSize: 19,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 10.5,
+    color: '#a1a1aa',
+    marginTop: 2,
+  },
+  insideBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  insideLabel: {
+    fontSize: 11,
+    color: '#52525b',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chip: {
+    backgroundColor: '#18181b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    maxWidth: '100%',
+  },
+  chipText: {
+    fontSize: 11.5,
+    color: '#d4d4d8',
+  },
+  actionSection: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+  cta: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  ctaText: {
+    fontSize: 15,
     fontWeight: '700',
     color: '#0a0a0b',
-    letterSpacing: 0.3,
+  },
+  dismissText: {
+    fontSize: 12,
+    color: '#52525b',
+    textAlign: 'center',
+    marginTop: 12,
   },
 });

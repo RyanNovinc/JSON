@@ -50,13 +50,6 @@ type NavProp = StackNavigationProp<any>;
 // Label maps — convert stored values to display strings.
 // ---------------------------------------------------------------------------
 
-const GOAL_LABELS: Record<string, string> = {
-  build_muscle: 'Build muscle',
-  burn_fat: 'Burn fat',
-  gain_strength: 'Gain strength',
-  body_recomposition: 'Body recomposition',
-  general_fitness: 'General fitness',
-};
 
 const DURATION_LABELS: Record<string, string> = {
   '4_weeks': '4 weeks',
@@ -113,12 +106,6 @@ interface RowConfig {
 }
 
 const ROWS: RowConfig[] = [
-  {
-    label: 'Goal',
-    route: 'Q1PrimaryGoal',
-    format: (a) =>
-      a.primaryGoal ? GOAL_LABELS[a.primaryGoal] ?? a.primaryGoal : '—',
-  },
   {
     label: 'Days per week',
     route: 'Q3DaysPerWeek',

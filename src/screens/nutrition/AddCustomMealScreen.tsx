@@ -1,12 +1,24 @@
 // src/screens/nutrition/AddCustomMealScreen.tsx
 //
-// "Add your meal" — create or edit a user-created custom meal.
+// "Your meal" — create or edit a user-created custom meal.
 //
 // Presented as a modal inside NutritionThemeProvider (green themeColor),
 // registered as route 'AddCustomMeal' with optional { editSlug } param for
 // edit mode.
 //
-// DESIGN NOTES (locked with the mockup, 3 Aug):
+// DESIGN NOTES (locked with the mockups, 6 Aug):
+//   - SUMMARY SCREEN + EDITOR SHEETS. The screen itself is a one-viewport
+//     summary of the meal. Every block below the header is a row showing its
+//     current value; tapping opens a focused bottom sheet that owns the full
+//     width and the keyboard. This replaced the single flat scroll, which gave
+//     required and optional fields identical visual weight.
+//   - CALORIES ARE DERIVED, never typed. kcal = round(P*4 + C*4 + F*9). The
+//     plan engine and the AI prompt both treat custom macros as authoritative,
+//     so a hand-typed kcal that disagreed with the macros produced day totals
+//     nothing downstream could detect as wrong. Fibre is stored but contributes
+//     zero kcal, matching AU labelling where carbohydrate already excludes it.
+//     Edit mode never loads the stored kcal — it recomputes from stored macros,
+//     so meals saved before this change self-correct on next save.
 //   - Everything the user enters is PER SERVING (macros, ingredient amounts).
 //     "Makes N servings" only informs batch scheduling — it never divides
 //     the macros.
@@ -14,24 +26,40 @@
 //     1:1; Main → 'australian' so it lands on the Mains shelf). Picking a
 //     category preselects sensible "Eaten at" slots ONLY when none are
 //     selected yet.
+//   - Required to save: name, at least one macro above zero, category, main
+//     protein, one slot. Everything else is optional. Save states what is
+//     missing rather than throwing an Alert per problem.
 //   - The photo stays a cache URI while editing the form; it is copied into
 //     permanent storage (importCustomMealImage) only on Save, so abandoning
 //     the form never orphans a file. Replaced/removed photos are cleaned up
 //     by upsertCustomMeal.
 //   - No cook mode for custom meals — steps are plain summaries
 //     (RecipeStep.substeps always []).
+//   - SHEET MOTION: the Modal runs with animationType="none" and the backdrop
+//     and panel are animated separately — backdrop fades, panel slides. Modal's
+//     own "slide" moved both together, which read as the whole screen sliding.
+//   - KEYBOARD: KeyboardAvoidingView is not used. It is a no-op on Android with
+//     behavior undefined, and it cannot shrink the sheet's inner ScrollView. A
+//     Keyboard listener supplies the real height; the sheet pads its bottom by
+//     that amount and the scroll area caps its maxHeight against it, so a field
+//     at the bottom of a sheet is always above the keyboard and reachable.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
+  Animated,
+  Easing,
+  Keyboard,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -107,6 +135,11 @@ const SLOT_OPTIONS: { slot: MealSlot; label: string }[] = [
   { slot: 'post_workout', label: 'Post-workout' },
 ];
 
+const SLOT_LABEL: Record<string, string> = SLOT_OPTIONS.reduce(
+  (acc, o) => ({ ...acc, [o.slot]: o.label }),
+  {} as Record<string, string>
+);
+
 const PROTEIN_OPTIONS: { value: PrimaryProtein; label: string }[] = [
   { value: 'chicken', label: 'Chicken' },
   { value: 'beef', label: 'Beef' },
@@ -119,6 +152,11 @@ const PROTEIN_OPTIONS: { value: PrimaryProtein; label: string }[] = [
   { value: 'dairy', label: 'Dairy' },
   { value: 'plant', label: 'Plant' },
 ];
+
+const PROTEIN_LABEL: Record<string, string> = PROTEIN_OPTIONS.reduce(
+  (acc, o) => ({ ...acc, [o.value]: o.label }),
+  {} as Record<string, string>
+);
 
 const ALLERGEN_OPTIONS: AllergenType[] = [
   'Nuts',
@@ -140,6 +178,22 @@ const parseNum = (s: string): number | null => {
   return isFinite(n) && n >= 0 ? n : null;
 };
 
+// Empty reads as zero for the derived calorie sum; only a malformed string
+// (letters, negatives) returns null and blocks Save.
+const numOrZero = (s: string): number => parseNum(s) ?? 0;
+
+// Atwater factors. Fibre is deliberately excluded: AU labels report available
+// carbohydrate with fibre broken out separately, so counting it here would
+// double up against what the user reads off the packet.
+const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 };
+
+const deriveKcal = (p: string, c: string, f: string): number =>
+  Math.round(
+    numOrZero(p) * KCAL_PER_G.protein +
+      numOrZero(c) * KCAL_PER_G.carbs +
+      numOrZero(f) * KCAL_PER_G.fat
+  );
+
 interface IngredientRow {
   id: string;
   name: string;
@@ -154,6 +208,27 @@ interface StepRow {
 
 let rowSeq = 0;
 const nextRowId = (prefix: string) => `${prefix}_${Date.now()}_${rowSeq++}`;
+
+type SheetKey = 'nutrition' | 'ingredients' | 'steps' | 'classify' | 'extras';
+
+// Real keyboard height. iOS gets the "will" events so the sheet moves with the
+// keyboard rather than after it; Android only fires the "did" events.
+function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e: any) =>
+      setHeight(e?.endCoordinates?.height ?? 0)
+    );
+    const hideSub = Keyboard.addListener(hideEvent, () => setHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+  return height;
+}
 
 // ---- route params ----------------------------------------------------------
 
@@ -177,13 +252,13 @@ export default function AddCustomMealScreen() {
   // ---- form state ----
   const [loadingEdit, setLoadingEdit] = useState(isEditing);
   const [saving, setSaving] = useState(false);
+  const [sheet, setSheet] = useState<SheetKey | null>(null);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<CategoryKey | null>(null);
   const [protein, setProtein] = useState<PrimaryProtein | null>(null);
   const [slots, setSlots] = useState<Set<MealSlot>>(new Set());
-  const [kcal, setKcal] = useState('');
   const [proteinG, setProteinG] = useState('');
   const [carbsG, setCarbsG] = useState('');
   const [fatG, setFatG] = useState('');
@@ -223,7 +298,8 @@ export default function AddCustomMealScreen() {
       setCategory(cuisineToCategory(meal.cuisine));
       setProtein(meal.primary_protein);
       setSlots(new Set(meal.eligible_slots));
-      setKcal(String(meal.macros.kcal));
+      // macros.kcal is deliberately NOT loaded — it is recomputed from the
+      // macros below, which repairs any meal saved with a mismatched kcal.
       setProteinG(String(meal.macros.protein_g));
       setCarbsG(String(meal.macros.carbs_g));
       setFatG(String(meal.macros.fat_g));
@@ -338,29 +414,76 @@ export default function AddCustomMealScreen() {
 
   const setStepText = (id: string, text: string) =>
     setSteps((prev) => prev.map((r) => (r.id === id ? { ...r, text } : r)));
-  const addStepRow = () =>
-    setSteps((prev) => [...prev, { id: nextRowId('st'), text: '' }]);
+  const addStepRow = () => setSteps((prev) => [...prev, { id: nextRowId('st'), text: '' }]);
   const removeStepRow = (id: string) =>
     setSteps((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
 
-  // ---- validation + save ----
-  const validationError = useMemo((): string | null => {
-    if (!name.trim()) return 'Give your meal a name.';
-    if (!category) return 'Pick a category.';
-    if (!protein) return 'Pick the main protein.';
-    if (slots.size === 0) return 'Pick at least one "Eaten at" slot.';
-    const k = parseNum(kcal);
-    if (k == null || k <= 0) return 'Enter calories per serving.';
-    if (parseNum(proteinG) == null) return 'Enter protein per serving (0 is fine).';
-    if (parseNum(carbsG) == null) return 'Enter carbs per serving (0 is fine).';
-    if (parseNum(fatG) == null) return 'Enter fat per serving (0 is fine).';
-    return null;
-  }, [name, category, protein, slots, kcal, proteinG, carbsG, fatG]);
+  // ---- derived values ----
+  const derivedKcal = useMemo(
+    () => deriveKcal(proteinG, carbsG, fatG),
+    [proteinG, carbsG, fatG]
+  );
+
+  const hasNutrition = derivedKcal > 0;
+
+  const filledIngredients = useMemo(
+    () => ingredients.filter((r) => r.name.trim().length > 0),
+    [ingredients]
+  );
+  const filledSteps = useMemo(
+    () => steps.filter((r) => r.text.trim().length > 0),
+    [steps]
+  );
+
+  const slotSummary = useMemo(
+    () =>
+      SLOT_OPTIONS.filter((o) => slots.has(o.slot))
+        .map((o) => o.label)
+        .join(', '),
+    [slots]
+  );
+
+  const classifySummary = useMemo(() => {
+    if (!category) return 'Pick a category';
+    const base = slotSummary || 'No slots picked';
+    return protein ? `${base}, ${PROTEIN_LABEL[protein]}` : `${base}, protein needed`;
+  }, [category, slotSummary, protein]);
+
+  const extrasSummary = useMemo(() => {
+    const n = Math.max(1, Math.round(parseNum(servings) ?? 1));
+    const parts = [`Makes ${n}`];
+    if (!requiresCooking) parts.push('no cook');
+    if (allergens.size > 0) parts.push(`${allergens.size} allergen${allergens.size > 1 ? 's' : ''}`);
+    return parts.join(', ');
+  }, [servings, requiresCooking, allergens]);
+
+  // ---- validation ----
+  const missing = useMemo((): string[] => {
+    const out: string[] = [];
+    if (!name.trim()) out.push('a name');
+    if (parseNum(proteinG) == null && proteinG.trim()) out.push('valid protein');
+    if (parseNum(carbsG) == null && carbsG.trim()) out.push('valid carbs');
+    if (parseNum(fatG) == null && fatG.trim()) out.push('valid fat');
+    if (!hasNutrition) out.push('nutrition');
+    if (!category) out.push('a category');
+    if (!protein) out.push('a main protein');
+    if (slots.size === 0) out.push('at least one slot');
+    return out;
+  }, [name, proteinG, carbsG, fatG, hasNutrition, category, protein, slots]);
+
+  const canSave = missing.length === 0;
+
+  const missingHint = useMemo(() => {
+    if (canSave) return '';
+    if (missing.length === 1) return `Add ${missing[0]} to save`;
+    const head = missing.slice(0, -1).join(', ');
+    return `Add ${head} and ${missing[missing.length - 1]} to save`;
+  }, [missing, canSave]);
 
   const onSave = async () => {
-    if (saving) return;
-    if (validationError) {
-      Alert.alert('Almost there', validationError);
+    if (saving || loadingEdit) return;
+    if (!canSave) {
+      Alert.alert('Almost there', `${missingHint.replace(/ to save$/, '')}.`);
       return;
     }
     setSaving(true);
@@ -372,23 +495,21 @@ export default function AddCustomMealScreen() {
         imageUri = (await importCustomMealImage(pickedUri, slug)) ?? undefined;
       }
 
-      const cleanIngredients: CustomIngredient[] = ingredients
-        .filter((r) => r.name.trim().length > 0)
-        .map((r) => {
-          const amount = parseNum(r.amount);
-          const unit = r.unit.trim();
-          return {
-            id: r.id,
-            name: r.name.trim(),
-            ...(amount != null ? { amount } : {}),
-            ...(unit ? { unit } : {}),
-          };
-        });
+      const cleanIngredients: CustomIngredient[] = filledIngredients.map((r) => {
+        const amount = parseNum(r.amount);
+        const unit = r.unit.trim();
+        return {
+          id: r.id,
+          name: r.name.trim(),
+          ...(amount != null ? { amount } : {}),
+          ...(unit ? { unit } : {}),
+        };
+      });
 
-      const cleanSteps = steps
-        .map((r) => r.text.trim())
-        .filter((t) => t.length > 0)
-        .map((summary) => ({ summary, substeps: [] as string[] }));
+      const cleanSteps = filledSteps.map((r) => ({
+        summary: r.text.trim(),
+        substeps: [] as string[],
+      }));
 
       const now = new Date().toISOString();
       const meal: CustomMeal = {
@@ -401,11 +522,11 @@ export default function AddCustomMealScreen() {
         produces_servings: Math.max(1, Math.round(parseNum(servings) ?? 1)),
         contains_allergens: Array.from(allergens),
         macros: {
-          kcal: parseNum(kcal)!,
-          protein_g: parseNum(proteinG)!,
-          carbs_g: parseNum(carbsG)!,
-          fat_g: parseNum(fatG)!,
-          fiber_g: parseNum(fiberG) ?? 0,
+          kcal: derivedKcal,
+          protein_g: numOrZero(proteinG),
+          carbs_g: numOrZero(carbsG),
+          fat_g: numOrZero(fatG),
+          fiber_g: numOrZero(fiberG),
         },
         ingredients: cleanIngredients,
         steps: cleanSteps,
@@ -429,8 +550,6 @@ export default function AddCustomMealScreen() {
   };
 
   // ---- render ----
-  const saveDisabled = saving || loadingEdit;
-
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 14) }]}>
       <View style={styles.header}>
@@ -441,333 +560,704 @@ export default function AddCustomMealScreen() {
         >
           <Ionicons name="close" size={22} color="#a1a1aa" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEditing ? 'Edit your meal' : 'Add your meal'}
-        </Text>
-        <View style={styles.headerBtn} />
+        <Text style={styles.headerTitle}>Your meal</Text>
+        <TouchableOpacity
+          onPress={onSave}
+          disabled={saving || loadingEdit}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={[styles.headerBtn, styles.headerBtnRight]}
+        >
+          <Text
+            style={[
+              styles.headerSave,
+              { color: canSave ? themeColor : '#3f3f46' },
+              (saving || loadingEdit) && { opacity: 0.6 },
+            ]}
+          >
+            {saving ? 'Saving' : 'Save'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Photo */}
-          {previewUri ? (
-            <View style={styles.photoWrap}>
-              <Image
-                source={{ uri: previewUri }}
-                style={styles.photo}
-                contentFit="cover"
-                transition={120}
-              />
-              <View style={styles.photoActions}>
-                <TouchableOpacity style={styles.photoActionBtn} onPress={pickPhoto}>
-                  <Ionicons name="camera-outline" size={14} color="#fafafa" />
-                  <Text style={styles.photoActionText}>Change</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.photoActionBtn} onPress={removePhoto}>
-                  <Ionicons name="trash-outline" size={14} color="#f87171" />
-                </TouchableOpacity>
-              </View>
+        {/* Photo */}
+        {previewUri ? (
+          <View style={styles.photoWrap}>
+            <Image
+              source={{ uri: previewUri }}
+              style={styles.photo}
+              contentFit="cover"
+              transition={120}
+            />
+            <View style={styles.photoActions}>
+              <TouchableOpacity style={styles.photoActionBtn} onPress={pickPhoto}>
+                <Ionicons name="camera-outline" size={13} color="#fafafa" />
+                <Text style={styles.photoActionText}>Change photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.photoActionBtn} onPress={removePhoto}>
+                <Ionicons name="trash-outline" size={13} color="#f87171" />
+              </TouchableOpacity>
             </View>
-          ) : (
-            <TouchableOpacity style={styles.photoEmpty} onPress={pickPhoto}>
-              <View
-                style={[styles.photoIconCircle, { backgroundColor: `${themeColor}26` }]}
-              >
-                <Ionicons name="camera-outline" size={20} color={themeColor} />
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.photoEmpty} onPress={pickPhoto}>
+            <Ionicons name="camera-outline" size={16} color="#52525b" />
+            <Text style={styles.photoEmptyText}>Add a photo</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Name + description */}
+        <View style={styles.titleBlock}>
+          <TextInput
+            style={styles.nameInput}
+            value={name}
+            onChangeText={setName}
+            placeholder="Name your meal"
+            placeholderTextColor="#52525b"
+            maxLength={60}
+          />
+          <TextInput
+            style={styles.descInput}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Short description, optional"
+            placeholderTextColor="#3f3f46"
+            maxLength={140}
+          />
+        </View>
+
+        {/* Nutrition */}
+        {hasNutrition ? (
+          <TouchableOpacity
+            style={styles.macroCard}
+            activeOpacity={0.75}
+            onPress={() => setSheet('nutrition')}
+          >
+            <View style={styles.macroGrid}>
+              {[
+                { v: String(derivedKcal), l: 'kcal' },
+                { v: String(numOrZero(proteinG)), l: 'prot' },
+                { v: String(numOrZero(carbsG)), l: 'carb' },
+                { v: String(numOrZero(fatG)), l: 'fat' },
+              ].map((cell) => (
+                <View key={cell.l} style={styles.macroCell}>
+                  <Text style={styles.macroValue}>{cell.v}</Text>
+                  <Text style={styles.macroLabel}>{cell.l}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.macroFooter}>
+              <View style={styles.macroFooterLeft}>
+                <Ionicons name="calculator-outline" size={12} color={themeColor} />
+                <Text style={[styles.macroFooterText, { color: themeColor }]}>
+                  Calories calculated, per serving
+                </Text>
               </View>
-              <Text style={styles.photoEmptyText}>Add a photo</Text>
+              <Ionicons name="chevron-forward" size={14} color="#52525b" />
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.nutritionEmpty}
+            activeOpacity={0.75}
+            onPress={() => setSheet('nutrition')}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nutritionEmptyTitle}>Add nutrition</Text>
+              <Text style={styles.nutritionEmptySub}>
+                Protein, carbs and fat per serving
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#52525b" />
+          </TouchableOpacity>
+        )}
+
+        {/* Summary rows */}
+        <View style={styles.rowList}>
+          <SummaryRow
+            label="Ingredients"
+            value={
+              filledIngredients.length > 0
+                ? `${filledIngredients.length} item${filledIngredients.length > 1 ? 's' : ''}`
+                : 'Add'
+            }
+            muted={filledIngredients.length === 0}
+            onPress={() => setSheet('ingredients')}
+            first
+          />
+          <SummaryRow
+            label="Steps"
+            value={
+              filledSteps.length > 0
+                ? `${filledSteps.length} step${filledSteps.length > 1 ? 's' : ''}`
+                : 'Add'
+            }
+            muted={filledSteps.length === 0}
+            onPress={() => setSheet('steps')}
+          />
+          <SummaryRow
+            label="When you eat it"
+            value={classifySummary}
+            muted={!category || !protein}
+            onPress={() => setSheet('classify')}
+          />
+          <SummaryRow
+            label="Cooking, batch, allergens"
+            value={extrasSummary}
+            onPress={() => setSheet('extras')}
+            last
+          />
+        </View>
+
+        {!canSave && <Text style={styles.missingHint}>{missingHint}</Text>}
+      </ScrollView>
+
+      {/* ---------------- Nutrition sheet ---------------- */}
+      <NutritionSheet
+        visible={sheet === 'nutrition'}
+        onClose={() => setSheet(null)}
+        themeColor={themeColor}
+        insets={insets}
+        proteinG={proteinG}
+        carbsG={carbsG}
+        fatG={fatG}
+        fiberG={fiberG}
+        setProteinG={setProteinG}
+        setCarbsG={setCarbsG}
+        setFatG={setFatG}
+        setFiberG={setFiberG}
+        derivedKcal={derivedKcal}
+      />
+
+      {/* ---------------- Ingredients sheet ---------------- */}
+      <Sheet
+        visible={sheet === 'ingredients'}
+        onClose={() => setSheet(null)}
+        title="Ingredients"
+        subtitle="Amounts are for one serving. Free text is fine, the AI localises these for your grocery list."
+        themeColor={themeColor}
+        insets={insets}
+      >
+        {ingredients.map((row) => (
+          <View key={row.id} style={styles.ingRow}>
+            <TextInput
+              style={[styles.ingInput, { flex: 1.7 }]}
+              value={row.name}
+              onChangeText={(v) => setIngredientField(row.id, 'name', v)}
+              placeholder="Ingredient"
+              placeholderTextColor="#52525b"
+            />
+            <TextInput
+              style={[styles.ingInput, { flex: 0.6 }]}
+              value={row.amount}
+              onChangeText={(v) => setIngredientField(row.id, 'amount', v)}
+              keyboardType="decimal-pad"
+              placeholder="Amt"
+              placeholderTextColor="#52525b"
+              maxLength={7}
+            />
+            <TextInput
+              style={[styles.ingInput, { flex: 0.6 }]}
+              value={row.unit}
+              onChangeText={(v) => setIngredientField(row.id, 'unit', v)}
+              placeholder="Unit"
+              placeholderTextColor="#52525b"
+              maxLength={12}
+            />
+            <TouchableOpacity
+              onPress={() => removeIngredientRow(row.id)}
+              style={styles.rowRemove}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={17} color="#3f3f46" />
             </TouchableOpacity>
-          )}
+          </View>
+        ))}
+        <TouchableOpacity onPress={addIngredientRow} style={styles.addRowBtn}>
+          <Ionicons name="add" size={15} color={themeColor} />
+          <Text style={[styles.addRowText, { color: themeColor }]}>Add ingredient</Text>
+        </TouchableOpacity>
+      </Sheet>
 
-          {/* Name / description */}
-          <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>Name</Text>
+      {/* ---------------- Steps sheet ---------------- */}
+      <Sheet
+        visible={sheet === 'steps'}
+        onClose={() => setSheet(null)}
+        title="Steps"
+        subtitle="Plain summaries. Custom meals skip cook mode."
+        themeColor={themeColor}
+        insets={insets}
+      >
+        {steps.map((row, i) => (
+          <View key={row.id} style={styles.stepRow}>
+            <View style={[styles.stepNum, { backgroundColor: themeColor }]}>
+              <Text style={styles.stepNumText}>{i + 1}</Text>
+            </View>
             <TextInput
-              style={styles.fieldInput}
-              value={name}
-              onChangeText={setName}
-              placeholder="e.g. Mum's lasagne"
+              style={[styles.ingInput, { flex: 1 }]}
+              value={row.text}
+              onChangeText={(v) => setStepText(row.id, v)}
+              placeholder={`Step ${i + 1}`}
               placeholderTextColor="#52525b"
-              maxLength={60}
+              multiline
             />
+            <TouchableOpacity
+              onPress={() => removeStepRow(row.id)}
+              style={styles.rowRemove}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={17} color="#3f3f46" />
+            </TouchableOpacity>
           </View>
-          <View style={styles.fieldCard}>
-            <Text style={styles.fieldLabel}>Description (optional)</Text>
-            <TextInput
-              style={styles.fieldInput}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="e.g. Beef, rich tomato sauce, bechamel"
-              placeholderTextColor="#52525b"
-              maxLength={140}
-            />
-          </View>
+        ))}
+        <TouchableOpacity onPress={addStepRow} style={styles.addRowBtn}>
+          <Ionicons name="add" size={15} color={themeColor} />
+          <Text style={[styles.addRowText, { color: themeColor }]}>Add step</Text>
+        </TouchableOpacity>
+      </Sheet>
 
-          {/* Category */}
-          <Text style={styles.sectionLabel}>Category</Text>
-          <View style={styles.chipRow}>
-            {CATEGORIES.map(({ key, label }) => {
-              const on = category === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[
-                    styles.chip,
-                    on && { backgroundColor: themeColor, borderColor: themeColor },
-                  ]}
-                  onPress={() => pickCategory(key)}
-                >
-                  <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+      {/* ---------------- Classification sheet ---------------- */}
+      <Sheet
+        visible={sheet === 'classify'}
+        onClose={() => setSheet(null)}
+        title="When you eat it"
+        subtitle="Controls where this meal can appear in your plan and which picker tabs show it."
+        themeColor={themeColor}
+        insets={insets}
+      >
+        <Text style={styles.sheetLabel}>Category</Text>
+        <View style={styles.chipRow}>
+          {CATEGORIES.map(({ key, label }) => {
+            const on = category === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.chip,
+                  on && { backgroundColor: themeColor, borderColor: themeColor },
+                ]}
+                onPress={() => pickCategory(key)}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-          {/* Protein */}
-          <Text style={styles.sectionLabel}>Main protein</Text>
-          <View style={styles.chipRow}>
-            {PROTEIN_OPTIONS.map(({ value, label }) => {
-              const on = protein === value;
-              return (
-                <TouchableOpacity
-                  key={value}
-                  style={[
-                    styles.chip,
-                    on && { backgroundColor: themeColor, borderColor: themeColor },
-                  ]}
-                  onPress={() => setProtein(value)}
-                >
-                  <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        <Text style={styles.sheetLabel}>Eaten at</Text>
+        <View style={styles.chipRow}>
+          {SLOT_OPTIONS.map(({ slot, label }) => {
+            const on = slots.has(slot);
+            return (
+              <TouchableOpacity
+                key={slot}
+                style={[
+                  styles.chip,
+                  on && { backgroundColor: themeColor, borderColor: themeColor },
+                ]}
+                onPress={() => toggleSlot(slot)}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-          {/* Eaten at */}
-          <Text style={styles.sectionLabel}>Eaten at</Text>
-          <View style={styles.chipRow}>
-            {SLOT_OPTIONS.map(({ slot, label }) => {
-              const on = slots.has(slot);
-              return (
-                <TouchableOpacity
-                  key={slot}
-                  style={[
-                    styles.chip,
-                    on && { backgroundColor: themeColor, borderColor: themeColor },
-                  ]}
-                  onPress={() => toggleSlot(slot)}
-                >
-                  <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+        <Text style={styles.sheetLabel}>Main protein</Text>
+        <View style={styles.chipRow}>
+          {PROTEIN_OPTIONS.map(({ value, label }) => {
+            const on = protein === value;
+            return (
+              <TouchableOpacity
+                key={value}
+                style={[
+                  styles.chip,
+                  on && { backgroundColor: themeColor, borderColor: themeColor },
+                ]}
+                onPress={() => setProtein(value)}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Sheet>
+
+      {/* ---------------- Extras sheet ---------------- */}
+      <Sheet
+        visible={sheet === 'extras'}
+        onClose={() => setSheet(null)}
+        title="Cooking, batch, allergens"
+        subtitle="Batch size informs meal prep scheduling. It never divides your macros."
+        themeColor={themeColor}
+        insets={insets}
+      >
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Needs cooking</Text>
+          <Switch
+            value={requiresCooking}
+            onValueChange={setRequiresCooking}
+            trackColor={{ false: '#3f3f46', true: themeColor }}
+            thumbColor="#fafafa"
+          />
+        </View>
+
+        <View style={styles.sheetFieldRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sheetFieldLabel}>Hands-on time</Text>
+            <Text style={styles.sheetFieldSub}>minutes, optional</Text>
           </View>
-          <Text style={styles.hint}>
-            Controls where this meal can appear in your plan and which picker
-            tabs show it.
+          <TextInput
+            style={styles.sheetNumInput}
+            value={activeMinutes}
+            onChangeText={setActiveMinutes}
+            keyboardType="number-pad"
+            placeholder="25"
+            placeholderTextColor="#52525b"
+            maxLength={4}
+          />
+        </View>
+
+        <View style={styles.sheetFieldRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sheetFieldLabel}>Makes</Text>
+            <Text style={styles.sheetFieldSub}>servings per batch</Text>
+          </View>
+          <TextInput
+            style={styles.sheetNumInput}
+            value={servings}
+            onChangeText={setServings}
+            keyboardType="number-pad"
+            placeholder="1"
+            placeholderTextColor="#52525b"
+            maxLength={3}
+          />
+        </View>
+
+        <Text style={styles.sheetLabel}>Contains allergens</Text>
+        <View style={styles.chipRow}>
+          {ALLERGEN_OPTIONS.map((a) => {
+            const on = allergens.has(a);
+            return (
+              <TouchableOpacity
+                key={a}
+                style={[
+                  styles.chip,
+                  on && { backgroundColor: themeColor, borderColor: themeColor },
+                ]}
+                onPress={() => toggleAllergen(a)}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{a}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Sheet>
+    </View>
+  );
+}
+
+// =============================================================================
+// Summary row
+// =============================================================================
+
+function SummaryRow({
+  label,
+  value,
+  onPress,
+  muted,
+  first,
+  last,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+  muted?: boolean;
+  first?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.summaryRow,
+        first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#1f1f24' },
+        last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1f1f24' },
+      ]}
+      activeOpacity={0.7}
+      onPress={onPress}
+    >
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <View style={styles.summaryValueWrap}>
+        <Text
+          style={[styles.summaryValue, muted && { color: '#52525b' }]}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+        <Ionicons name="chevron-forward" size={15} color="#52525b" />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// =============================================================================
+// Generic bottom sheet
+// =============================================================================
+
+function Sheet({
+  visible,
+  onClose,
+  title,
+  subtitle,
+  themeColor,
+  insets,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  themeColor: string;
+  insets: { bottom: number };
+  children: React.ReactNode;
+}) {
+  // Kept mounted through the exit animation so the panel can slide back down
+  // and the backdrop can fade out before the Modal unmounts.
+  const [mounted, setMounted] = useState(visible);
+  const [panelHeight, setPanelHeight] = useState(520);
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(1)).current;
+
+  const keyboardHeight = useKeyboardHeight();
+  const { height: windowHeight } = useWindowDimensions();
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(fade, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slide, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(fade, {
+        toValue: 0,
+        duration: 170,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slide, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+  }, [visible, fade, slide]);
+
+  const translateY = slide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, panelHeight || 520],
+  });
+
+  const backdropOpacity = fade.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.55],
+  });
+
+  // Chrome above the scroll area: grabber, title row, subtitle, safe area and
+  // whatever the keyboard is currently covering.
+  const chrome = 130 + keyboardHeight + (keyboardHeight > 0 ? 0 : insets.bottom);
+  const scrollMaxHeight = Math.max(180, windowHeight * 0.82 - chrome);
+
+  const handleClose = () => {
+    Keyboard.dismiss();
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={mounted}
+      transparent
+      animationType="none"
+      onRequestClose={handleClose}
+      statusBarTranslucent
+    >
+      <View style={styles.sheetRoot}>
+        <Animated.View
+          style={[styles.sheetBackdrop, { opacity: backdropOpacity }]}
+          pointerEvents="none"
+        />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <Animated.View
+          onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
+          style={[
+            styles.sheet,
+            {
+              transform: [{ translateY }],
+              paddingBottom:
+                keyboardHeight > 0 ? keyboardHeight + 12 : Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
+          <View style={styles.grabber} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <TouchableOpacity
+              onPress={handleClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={[styles.sheetDone, { color: themeColor }]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          {!!subtitle && <Text style={styles.sheetSub}>{subtitle}</Text>}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+            style={{ maxHeight: scrollMaxHeight }}
+            contentContainerStyle={{ paddingTop: 4, paddingBottom: 12 }}
+          >
+            {children}
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// =============================================================================
+// Nutrition sheet — calories are derived, never typed
+// =============================================================================
+
+function NutritionSheet({
+  visible,
+  onClose,
+  themeColor,
+  insets,
+  proteinG,
+  carbsG,
+  fatG,
+  fiberG,
+  setProteinG,
+  setCarbsG,
+  setFatG,
+  setFiberG,
+  derivedKcal,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  themeColor: string;
+  insets: { bottom: number };
+  proteinG: string;
+  carbsG: string;
+  fatG: string;
+  fiberG: string;
+  setProteinG: (v: string) => void;
+  setCarbsG: (v: string) => void;
+  setFatG: (v: string) => void;
+  setFiberG: (v: string) => void;
+  derivedKcal: number;
+}) {
+  // The arithmetic line only appears while a macro field has focus, so the
+  // sheet stays quiet when it is simply reopened to check a number.
+  const [focused, setFocused] = useState(false);
+
+  const workingLine = `${numOrZero(proteinG)} x 4 + ${numOrZero(carbsG)} x 4 + ${numOrZero(
+    fatG
+  )} x 9`;
+
+  const macroFields: {
+    label: string;
+    sub: string;
+    value: string;
+    set: (v: string) => void;
+  }[] = [
+    { label: 'Protein', sub: '4 kcal per gram', value: proteinG, set: setProteinG },
+    { label: 'Carbs', sub: '4 kcal per gram', value: carbsG, set: setCarbsG },
+    { label: 'Fat', sub: '9 kcal per gram', value: fatG, set: setFatG },
+  ];
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Nutrition"
+      subtitle="For one serving. Batch size never divides these."
+      themeColor={themeColor}
+      insets={insets}
+    >
+      <View style={styles.kcalCard}>
+        <Text style={styles.kcalValue}>{derivedKcal}</Text>
+        <Text style={styles.kcalLabel}>kcal per serving</Text>
+        <View style={[styles.kcalPill, { backgroundColor: `${themeColor}1f` }]}>
+          <Ionicons name="calculator-outline" size={12} color={themeColor} />
+          <Text style={[styles.kcalPillText, { color: themeColor }]}>
+            Calculated from your macros
           </Text>
+        </View>
+      </View>
+      {focused && <Text style={styles.kcalWorking}>{workingLine}</Text>}
 
-          {/* Macros */}
-          <Text style={styles.sectionLabel}>Macros per serving</Text>
-          <View style={styles.macroRow}>
-            {[
-              { label: 'kcal', value: kcal, set: setKcal },
-              { label: 'Protein g', value: proteinG, set: setProteinG },
-              { label: 'Carbs g', value: carbsG, set: setCarbsG },
-              { label: 'Fat g', value: fatG, set: setFatG },
-            ].map(({ label, value, set }) => (
-              <View key={label} style={styles.macroCell}>
-                <TextInput
-                  style={styles.macroInput}
-                  value={value}
-                  onChangeText={set}
-                  keyboardType="decimal-pad"
-                  placeholder="0"
-                  placeholderTextColor="#52525b"
-                  maxLength={6}
-                />
-                <Text style={styles.macroLabel}>{label}</Text>
-              </View>
-            ))}
+      {macroFields.map((f) => (
+        <View key={f.label} style={styles.sheetFieldRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sheetFieldLabel}>{f.label}</Text>
+            <Text style={styles.sheetFieldSub}>{f.sub}</Text>
           </View>
-          <View style={[styles.fieldCard, { marginTop: 8 }]}>
-            <Text style={styles.fieldLabel}>Fibre g (optional)</Text>
+          <View style={styles.macroInputWrap}>
             <TextInput
-              style={styles.fieldInput}
-              value={fiberG}
-              onChangeText={setFiberG}
+              style={styles.macroInput}
+              value={f.value}
+              onChangeText={f.set}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               keyboardType="decimal-pad"
               placeholder="0"
               placeholderTextColor="#52525b"
               maxLength={6}
             />
+            <Text style={styles.macroUnit}>g</Text>
           </View>
+        </View>
+      ))}
 
-          {/* Ingredients */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionLabelInline}>Ingredients · per serving</Text>
-            <TouchableOpacity onPress={addIngredientRow} style={styles.addRowBtn}>
-              <Ionicons name="add" size={14} color={themeColor} />
-              <Text style={[styles.addRowText, { color: themeColor }]}>Add row</Text>
-            </TouchableOpacity>
-          </View>
-          {ingredients.map((row) => (
-            <View key={row.id} style={styles.ingRow}>
-              <TextInput
-                style={[styles.ingInput, { flex: 1.6 }]}
-                value={row.name}
-                onChangeText={(v) => setIngredientField(row.id, 'name', v)}
-                placeholder="Ingredient"
-                placeholderTextColor="#52525b"
-              />
-              <TextInput
-                style={[styles.ingInput, { flex: 0.7 }]}
-                value={row.amount}
-                onChangeText={(v) => setIngredientField(row.id, 'amount', v)}
-                keyboardType="decimal-pad"
-                placeholder="Amt"
-                placeholderTextColor="#52525b"
-                maxLength={7}
-              />
-              <TextInput
-                style={[styles.ingInput, { flex: 0.7 }]}
-                value={row.unit}
-                onChangeText={(v) => setIngredientField(row.id, 'unit', v)}
-                placeholder="Unit"
-                placeholderTextColor="#52525b"
-                maxLength={12}
-              />
-              <TouchableOpacity
-                onPress={() => removeIngredientRow(row.id)}
-                style={styles.rowRemove}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="close-circle" size={17} color="#3f3f46" />
-              </TouchableOpacity>
-            </View>
-          ))}
-          <Text style={styles.hint}>
-            Free text is fine — the AI localises these for your grocery list.
-          </Text>
-
-          {/* Steps */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionLabelInline}>Steps</Text>
-            <TouchableOpacity onPress={addStepRow} style={styles.addRowBtn}>
-              <Ionicons name="add" size={14} color={themeColor} />
-              <Text style={[styles.addRowText, { color: themeColor }]}>Add step</Text>
-            </TouchableOpacity>
-          </View>
-          {steps.map((row, i) => (
-            <View key={row.id} style={styles.stepRow}>
-              <View style={[styles.stepNum, { backgroundColor: themeColor }]}>
-                <Text style={styles.stepNumText}>{i + 1}</Text>
-              </View>
-              <TextInput
-                style={[styles.ingInput, { flex: 1 }]}
-                value={row.text}
-                onChangeText={(v) => setStepText(row.id, v)}
-                placeholder={`Step ${i + 1}`}
-                placeholderTextColor="#52525b"
-                multiline
-              />
-              <TouchableOpacity
-                onPress={() => removeStepRow(row.id)}
-                style={styles.rowRemove}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="close-circle" size={17} color="#3f3f46" />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          {/* Cooking / time / servings */}
-          <View style={[styles.fieldCard, styles.switchCard, { marginTop: 14 }]}>
-            <Text style={styles.switchLabel}>Needs cooking</Text>
-            <Switch
-              value={requiresCooking}
-              onValueChange={setRequiresCooking}
-              trackColor={{ false: '#3f3f46', true: themeColor }}
-              thumbColor="#fafafa"
-            />
-          </View>
-          <View style={styles.twinRow}>
-            <View style={[styles.fieldCard, styles.twinCell]}>
-              <Text style={styles.fieldLabel}>Hands-on time (min)</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={activeMinutes}
-                onChangeText={setActiveMinutes}
-                keyboardType="number-pad"
-                placeholder="e.g. 25"
-                placeholderTextColor="#52525b"
-                maxLength={4}
-              />
-            </View>
-            <View style={[styles.fieldCard, styles.twinCell]}>
-              <Text style={styles.fieldLabel}>Makes (servings)</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={servings}
-                onChangeText={setServings}
-                keyboardType="number-pad"
-                placeholder="1"
-                placeholderTextColor="#52525b"
-                maxLength={3}
-              />
-            </View>
-          </View>
-
-          {/* Allergens */}
-          <Text style={styles.sectionLabel}>Contains allergens (optional)</Text>
-          <View style={styles.chipRow}>
-            {ALLERGEN_OPTIONS.map((a) => {
-              const on = allergens.has(a);
-              return (
-                <TouchableOpacity
-                  key={a}
-                  style={[
-                    styles.chip,
-                    on && { backgroundColor: themeColor, borderColor: themeColor },
-                  ]}
-                  onPress={() => toggleAllergen(a)}
-                >
-                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{a}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Save */}
-          <TouchableOpacity
-            style={[
-              styles.saveBtn,
-              { backgroundColor: themeColor },
-              saveDisabled && { opacity: 0.6 },
-            ]}
-            onPress={onSave}
-            disabled={saveDisabled}
-          >
-            <Text style={styles.saveBtnText}>
-              {saving ? 'Saving…' : isEditing ? 'Save changes' : 'Save meal'}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+      <View style={styles.sheetFieldRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.sheetFieldLabel, { color: '#a1a1aa' }]}>Fibre</Text>
+          <Text style={styles.sheetFieldSub}>optional, not counted in calories</Text>
+        </View>
+        <View style={styles.macroInputWrap}>
+          <TextInput
+            style={styles.macroInput}
+            value={fiberG}
+            onChangeText={setFiberG}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            placeholderTextColor="#52525b"
+            maxLength={6}
+          />
+          <Text style={styles.macroUnit}>g</Text>
+        </View>
+      </View>
+    </Sheet>
   );
 }
 
@@ -783,14 +1273,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 10,
   },
-  headerBtn: { width: 32, alignItems: 'flex-start' },
+  headerBtn: { width: 52, alignItems: 'flex-start' },
+  headerBtnRight: { alignItems: 'flex-end' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
     color: '#fafafa',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
+  headerSave: { fontSize: 14, fontWeight: '600' },
 
   photoWrap: {
     marginHorizontal: 14,
@@ -799,11 +1291,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#16161a',
   },
-  photo: { width: '100%', height: 170 },
+  photo: { width: '100%', height: 150 },
   photoActions: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    bottom: 8,
+    left: 8,
     flexDirection: 'row',
     gap: 6,
   },
@@ -816,67 +1308,204 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
   },
-  photoActionText: { color: '#fafafa', fontSize: 12 },
+  photoActionText: { color: '#fafafa', fontSize: 11 },
   photoEmpty: {
     marginHorizontal: 14,
     marginBottom: 12,
-    height: 110,
+    height: 96,
     borderRadius: 14,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#3f3f46',
+    borderColor: '#26262b',
     backgroundColor: '#16161a',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 7,
   },
-  photoIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoEmptyText: { color: '#a1a1aa', fontSize: 12 },
+  photoEmptyText: { color: '#52525b', fontSize: 12 },
 
-  fieldCard: {
+  titleBlock: { marginHorizontal: 14, marginBottom: 14 },
+  nameInput: {
+    color: '#fafafa',
+    fontSize: 19,
+    fontWeight: '600',
+    padding: 0,
+    marginBottom: 3,
+  },
+  descInput: { color: '#a1a1aa', fontSize: 12, padding: 0 },
+
+  macroCard: {
     marginHorizontal: 14,
-    marginBottom: 8,
-    backgroundColor: '#16161a',
+    marginBottom: 16,
+    backgroundColor: '#141417',
     borderWidth: 1,
-    borderColor: '#27272a',
+    borderColor: '#26262b',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 10,
+    paddingTop: 11,
+    paddingBottom: 9,
   },
-  fieldLabel: { color: '#71717a', fontSize: 11, marginBottom: 2 },
-  fieldInput: { color: '#fafafa', fontSize: 14, padding: 0 },
-
-  sectionLabel: {
-    color: '#a1a1aa',
-    fontSize: 12,
-    marginHorizontal: 14,
-    marginTop: 12,
-    marginBottom: 7,
-  },
-  sectionHeaderRow: {
+  macroGrid: { flexDirection: 'row' },
+  macroCell: { flex: 1, alignItems: 'center' },
+  macroValue: { color: '#fafafa', fontSize: 16, fontWeight: '600' },
+  macroLabel: { color: '#71717a', fontSize: 10, marginTop: 2 },
+  macroFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: 14,
-    marginTop: 14,
-    marginBottom: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#26262b',
+    marginTop: 9,
+    paddingTop: 8,
   },
-  sectionLabelInline: { color: '#a1a1aa', fontSize: 12 },
-  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  addRowText: { fontSize: 12, fontWeight: '600' },
+  macroFooterLeft: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  macroFooterText: { fontSize: 10.5 },
 
-  chipRow: {
+  nutritionEmpty: {
+    marginHorizontal: 14,
+    marginBottom: 16,
+    backgroundColor: '#141417',
+    borderWidth: 1,
+    borderColor: '#2f2f36',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 13,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    alignItems: 'center',
+  },
+  nutritionEmptyTitle: { color: '#fafafa', fontSize: 13 },
+  nutritionEmptySub: { color: '#71717a', fontSize: 11, marginTop: 3 },
+
+  rowList: { marginHorizontal: 14 },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#1f1f24',
+  },
+  summaryLabel: { color: '#a1a1aa', fontSize: 13, flexShrink: 0, marginRight: 12 },
+  summaryValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+  },
+  summaryValue: { color: '#fafafa', fontSize: 13, flexShrink: 1 },
+
+  missingHint: {
+    color: '#52525b',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 16,
     marginHorizontal: 14,
   },
+
+  // ---- sheets ----
+  sheetRoot: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+  },
+  sheet: {
+    backgroundColor: '#0f0f11',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: '#2a2a30',
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  grabber: {
+    width: 34,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3f3f46',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sheetTitle: { color: '#fafafa', fontSize: 15, fontWeight: '600' },
+  sheetDone: { fontSize: 13, fontWeight: '600' },
+  sheetSub: { color: '#71717a', fontSize: 11, lineHeight: 16, marginTop: 4, marginBottom: 12 },
+  sheetLabel: { color: '#71717a', fontSize: 11, marginTop: 16, marginBottom: 8 },
+
+  sheetFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1f1f24',
+  },
+  sheetFieldLabel: { color: '#fafafa', fontSize: 13 },
+  sheetFieldSub: { color: '#52525b', fontSize: 10, marginTop: 2 },
+  sheetNumInput: {
+    backgroundColor: '#141417',
+    borderWidth: 1,
+    borderColor: '#26262b',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#fafafa',
+    fontSize: 14,
+    minWidth: 68,
+    textAlign: 'right',
+  },
+
+  kcalCard: {
+    backgroundColor: '#141417',
+    borderWidth: 1,
+    borderColor: '#26262b',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  kcalValue: { color: '#fafafa', fontSize: 30, fontWeight: '600' },
+  kcalLabel: { color: '#71717a', fontSize: 11, marginTop: 3 },
+  kcalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginTop: 9,
+  },
+  kcalPillText: { fontSize: 10 },
+  kcalWorking: {
+    color: '#52525b',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  macroInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#141417',
+    borderWidth: 1,
+    borderColor: '#26262b',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 74,
+    justifyContent: 'flex-end',
+    gap: 4,
+  },
+  macroInput: {
+    color: '#fafafa',
+    fontSize: 14,
+    padding: 0,
+    minWidth: 34,
+    textAlign: 'right',
+  },
+  macroUnit: { color: '#71717a', fontSize: 11 },
+
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     paddingHorizontal: 11,
     paddingVertical: 6,
@@ -887,48 +1516,17 @@ const styles = StyleSheet.create({
   },
   chipText: { color: '#a1a1aa', fontSize: 12 },
   chipTextOn: { color: '#0a0a0b', fontWeight: '600' },
-  hint: {
-    color: '#52525b',
-    fontSize: 11,
-    marginHorizontal: 14,
-    marginTop: 7,
-  },
-
-  macroRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginHorizontal: 14,
-  },
-  macroCell: {
-    flex: 1,
-    backgroundColor: '#16161a',
-    borderWidth: 1,
-    borderColor: '#27272a',
-    borderRadius: 12,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  macroInput: {
-    color: '#fafafa',
-    fontSize: 15,
-    fontWeight: '600',
-    padding: 0,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  macroLabel: { color: '#71717a', fontSize: 11, marginTop: 2 },
 
   ingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginHorizontal: 14,
     marginBottom: 6,
   },
   ingInput: {
-    backgroundColor: '#16161a',
+    backgroundColor: '#141417',
     borderWidth: 1,
-    borderColor: '#27272a',
+    borderColor: '#26262b',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -936,12 +1534,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   rowRemove: { paddingLeft: 2 },
+  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 },
+  addRowText: { fontSize: 12, fontWeight: '600' },
 
   stepRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 14,
     marginBottom: 6,
   },
   stepNum: {
@@ -953,26 +1552,11 @@ const styles = StyleSheet.create({
   },
   stepNumText: { color: '#0a0a0b', fontSize: 11, fontWeight: '700' },
 
-  switchCard: {
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 7,
+    paddingVertical: 9,
   },
   switchLabel: { color: '#fafafa', fontSize: 13 },
-  twinRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginHorizontal: 14,
-  },
-  twinCell: { flex: 1, marginHorizontal: 0 },
-
-  saveBtn: {
-    marginHorizontal: 14,
-    marginTop: 18,
-    borderRadius: 13,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  saveBtnText: { color: '#0a0a0b', fontSize: 14, fontWeight: '700' },
 });

@@ -1,13 +1,24 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
   Animated,
+  Easing,
   StyleSheet,
   ScrollView,
+  LayoutChangeEvent,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
+// GestureHandlerRootView is NOT optional here, and its absence is silent on iOS.
+// RNGH gestures do not work inside a React Native <Modal> on Android by default, because
+// the modal's views are mounted outside the React Native root view in the native hierarchy,
+// so the root view never sees the touches. Wrapping the modal's own content gives the
+// gestures a root of their own. Without it the swipe works on iOS and does nothing on
+// Android, which is exactly the kind of bug that ships.
+import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useTimer } from '../contexts/TimerContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -63,6 +74,35 @@ const PACE_TITLES: Record<RestPace, string> = {
  *  does not change height between a timer being live and not. */
 const DURATION_PLACEHOLDER = '\u00A0';
 
+/**
+ * Swipe-to-dismiss tuning.
+ *
+ * DISMISS_DISTANCE_RATIO is a fraction of the sheet's own height rather than a fixed pixel
+ * count, so the sheet asks for the same proportional commitment on a small phone as on a
+ * large one. A quarter of the way down is the iOS sheet convention.
+ *
+ * DISMISS_VELOCITY exists so a fast flick from near the top still closes it. It is paired
+ * with FLICK_MIN_DISTANCE so that a jab which travels almost nowhere is not read as intent.
+ *
+ * UPWARD_RESISTANCE is the rubber-band above the resting position. Zero would feel like the
+ * sheet had come loose; 1 would imply there is somewhere above to drag it to, and there
+ * isn't — the sheet has one detent.
+ */
+const DISMISS_DISTANCE_RATIO = 0.25;
+const DISMISS_VELOCITY = 800;
+const FLICK_MIN_DISTANCE = 24;
+const UPWARD_RESISTANCE = 0.25;
+
+/** Only used for the first frame, before onLayout has measured the real sheet. */
+const ASSUMED_SHEET_HEIGHT = 420;
+
+/** How dark the backdrop is allowed to get as the sheet is dragged clear of it. */
+const BACKDROP_MIN_OPACITY = 0.35;
+
+/** Below this the drag is treated as the ScrollView's, not the sheet's. Not exactly zero:
+ *  iOS reports small negative and sub-pixel offsets at rest. */
+const SCROLL_TOP_EPSILON = 0.5;
+
 /** Matches the main display's m:ss above a minute, and stays compact below it. */
 const formatPaceSeconds = (seconds: number): string => {
   if (seconds < 60) return `${seconds}s`;
@@ -79,9 +119,162 @@ export const TimerModal: React.FC = () => {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
+  // ── Swipe to dismiss ───────────────────────────────────────────────
+  // dragY is the finger's contribution, kept SEPARATE from slideAnim rather than folded
+  // into it. slideAnim is owned by the open/close effect and is a spring; a drag has to be
+  // able to move the sheet while that spring is still settling without the two fighting
+  // over one value. They are summed at the transform instead.
+  const dragY = useRef(new Animated.Value(0)).current;
+
+  // The gesture callbacks are built ONCE (see the useMemo below) so a drag cannot be
+  // interrupted by the once-a-second re-render the running timer causes. Everything they
+  // read at gesture time therefore has to be a ref, not a captured value.
+  const sheetHeightRef = useRef(ASSUMED_SHEET_HEIGHT);
+  const scrollOffsetRef = useRef(0);
+  const dragBaseRef = useRef(0);
+  const dismissingRef = useRef(false);
+  const hideModalRef = useRef(hideModal);
+
+  // sheetHeight is ALSO state, because the backdrop interpolation needs a real number at
+  // render time. The ref is what the gesture reads; this is what the style reads.
+  const [sheetHeight, setSheetHeight] = useState(ASSUMED_SHEET_HEIGHT);
+
+  // Drives the grabber's colour only. Two setStates per drag, at activation and release —
+  // not per frame.
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    hideModalRef.current = hideModal;
+  }, [hideModal]);
+
+  const handleSheetLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    if (height <= 0) return;
+    if (Math.abs(height - sheetHeightRef.current) < 1) return;
+    sheetHeightRef.current = height;
+    setSheetHeight(height);
+  }, []);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+  }, []);
+
+  /**
+   * Ride the sheet the rest of the way out, then tell the context.
+   *
+   * The order matters. hideModal() flips `visible` on the Modal, which on RN removes the
+   * whole thing on the spot — so calling it first would make the sheet vanish rather than
+   * leave, and the drag would feel like it had crashed the screen. The backdrop is faded
+   * slightly faster than the sheet travels so the room behind is already back by the time
+   * the sheet clears the edge.
+   *
+   * dismissingRef guards the case where the animation is cut short: hideModal is called
+   * either way, exactly once.
+   */
+  const dismiss = useCallback(() => {
+    if (dismissingRef.current) return;
+    dismissingRef.current = true;
+    Animated.parallel([
+      Animated.timing(dragY, {
+        toValue: sheetHeightRef.current,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 170,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      hideModalRef.current();
+    });
+  }, [dragY, overlayOpacity]);
+
+  const settleBack = useCallback(() => {
+    Animated.spring(dragY, {
+      toValue: 0,
+      tension: 140,
+      friction: 14,
+      useNativeDriver: true,
+    }).start();
+  }, [dragY]);
+
+  /**
+   * One pan, attached twice: once to the pinned header and once to the scrolling body.
+   * They share dragY and every ref, so which one the finger landed on makes no difference
+   * to the result — it only changes who else is competing for the touch.
+   *
+   * activeOffsetY(12) means the gesture only ever claims a clearly DOWNWARD drag. An upward
+   * drag never activates it at all, so it goes to the ScrollView untouched and the settings
+   * below the fold stay reachable. failOffsetX stops a horizontal smudge from nudging the
+   * sheet.
+   */
+  const buildDragGesture = useCallback(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY(12)
+        .failOffsetX([-24, 24])
+        .onStart(() => {
+          // Take over from a spring that is still settling from a previous flick, rather
+          // than snapping back to where that spring started.
+          dragY.stopAnimation();
+          dragBaseRef.current = 0;
+          setIsDragging(true);
+        })
+        .onUpdate((event) => {
+          // The body is scrolled: this drag belongs to the ScrollView. Keep re-basing the
+          // origin so that the moment it does reach the top, the sheet picks the drag up
+          // from where the finger is NOW instead of jumping by however far it has already
+          // travelled.
+          if (scrollOffsetRef.current > SCROLL_TOP_EPSILON) {
+            dragBaseRef.current = event.translationY;
+            dragY.setValue(0);
+            return;
+          }
+          const delta = event.translationY - dragBaseRef.current;
+          dragY.setValue(delta >= 0 ? delta : delta * UPWARD_RESISTANCE);
+        })
+        .onEnd((event) => {
+          const delta = event.translationY - dragBaseRef.current;
+          const travelledFarEnough = delta > sheetHeightRef.current * DISMISS_DISTANCE_RATIO;
+          const flickedAway = event.velocityY > DISMISS_VELOCITY && delta > FLICK_MIN_DISTANCE;
+          if (travelledFarEnough || flickedAway) {
+            dismiss();
+          } else {
+            settleBack();
+          }
+        })
+        // onFinalize, not onEnd: a gesture cancelled by the system never reaches onEnd, and
+        // a grabber left lit after the finger is gone looks like a stuck screen.
+        .onFinalize(() => {
+          setIsDragging(false);
+        }),
+    [dragY, dismiss, settleBack]
+  );
+
+  // Two detectors, because a Gesture object belongs to exactly one GestureDetector.
+  //
+  // The body one is composed with Gesture.Native(), which is what represents the
+  // ScrollView's own scrolling to gesture-handler. Simultaneous means both are allowed to
+  // recognise at once: the ScrollView keeps scrolling normally and the pan runs alongside
+  // it, contributing nothing until the scroll offset says the body is at the top. A bare
+  // pan here would win the touch outright and the settings section would stop scrolling.
+  const headerDragGesture = useMemo(() => buildDragGesture(), [buildDragGesture]);
+  const bodyDragGesture = useMemo(
+    () => Gesture.Simultaneous(buildDragGesture(), Gesture.Native()),
+    [buildDragGesture]
+  );
+
   // Animate in/out when modal visibility changes
   useEffect(() => {
     if (!isMinimized) {
+      // Reset the drag before the entrance runs. The sheet is normally left sitting a full
+      // height below the screen by a dismissal, and this is the one place guaranteed to run
+      // before it is next visible.
+      dragY.setValue(0);
+      dismissingRef.current = false;
       // Show modal with smooth, spring-like animation
       Animated.parallel([
         Animated.timing(overlayOpacity, {
@@ -112,7 +305,7 @@ export const TimerModal: React.FC = () => {
         }),
       ]).start();
     }
-  }, [isMinimized, overlayOpacity, slideAnim]);
+  }, [isMinimized, overlayOpacity, slideAnim, dragY]);
 
   const displayTime = useMemo(() => {
     if (!timer) return '0:00';
@@ -172,6 +365,22 @@ export const TimerModal: React.FC = () => {
     outputRange: [300, 0], // Slide up from 300px below
   });
 
+  // Entrance position plus finger. Both operands are native-driver values and Animated.add
+  // is native-driver safe, so the drag never crosses the bridge per frame.
+  const sheetTranslateY = Animated.add(modalTranslateY, dragY);
+
+  // The backdrop lifts as the sheet is dragged clear of it, which is what makes the drag
+  // read as reversible rather than as a dismissal already in progress. Multiplied by the
+  // entrance opacity rather than replacing it, so an interrupted entrance still behaves.
+  const backdropOpacity = Animated.multiply(
+    overlayOpacity,
+    dragY.interpolate({
+      inputRange: [0, Math.max(1, sheetHeight)],
+      outputRange: [1, BACKDROP_MIN_OPACITY],
+      extrapolate: 'clamp',
+    })
+  );
+
   return (
     <Modal
       visible={!isMinimized}
@@ -179,7 +388,8 @@ export const TimerModal: React.FC = () => {
       animationType="none"
       onRequestClose={hideModal}
     >
-      <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+      <GestureHandlerRootView style={styles.gestureRoot}>
+      <Animated.View style={[styles.modalOverlay, { opacity: backdropOpacity }]}>
         {/* Backdrop tap to close */}
         <TouchableOpacity 
           style={styles.backdrop} 
@@ -188,10 +398,11 @@ export const TimerModal: React.FC = () => {
         />
         
         <Animated.View 
+          onLayout={handleSheetLayout}
           style={[
             styles.timerModal, 
             { 
-              transform: [{ translateY: modalTranslateY }],
+              transform: [{ translateY: sheetTranslateY }],
               borderTopColor: `${themeColor}40`,
               shadowColor: themeColor,
               shadowOffset: { width: 0, height: -8 },
@@ -201,39 +412,65 @@ export const TimerModal: React.FC = () => {
             }
           ]}
         >
-          {/* The sheet is capped at 70% of the window and its content is now taller than
-              that on a small phone, so it has to scroll or the bottom of the settings is
-              simply invisible — which is exactly how the alert toggles went missing.
-              bounces={false} keeps it feeling like a fixed sheet when everything does fit. */}
+          {/* The header sits OUTSIDE the ScrollView, which is both a fix and a
+              prerequisite. The fix: on a small phone the title used to scroll away, so the
+              sheet lost its own label exactly when there was most to read. The
+              prerequisite: this is the one region of the sheet where a downward drag has no
+              competition at all, so the swipe is guaranteed to work here even if the body
+              is mid-scroll. */}
+          <GestureDetector gesture={headerDragGesture}>
+            <View style={styles.headerBlock}>
+              {/* The affordance. Without it there is nothing on screen saying the sheet can
+                  be moved, and a gesture nobody discovers is a gesture that does not exist.
+                  It brightens on activation so the sheet acknowledges the finger even in
+                  the first few pixels, before it has travelled far enough to be obvious. */}
+              <View
+                style={[styles.grabber, isDragging && styles.grabberActive]}
+                accessible={false}
+                importantForAccessibility="no"
+              />
+
+              <View style={styles.header}>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={hideModal}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="chevron-down" size={24} color="#a1a1aa" />
+                </TouchableOpacity>
+
+                <View style={styles.titleContainer}>
+                  <Text style={styles.title}>
+                    {!timerSettings.countUp
+                      ? PACE_TITLES[timerSettings.pace]
+                      : 'Count Up'
+                    }
+                  </Text>
+                  <Text style={styles.subtitle}>
+                    {timerSettings.countUp ? 'Elapsed Time' : 'Rest Timer'}
+                  </Text>
+                </View>
+
+                <View style={{ width: 24 }} />
+              </View>
+            </View>
+          </GestureDetector>
+
+          {/* The sheet is capped at 85% of the window and its content is taller than that
+              on a small phone, so it has to scroll or the bottom of the settings is simply
+              invisible — which is exactly how the alert toggles went missing.
+              bounces={false} keeps it feeling like a fixed sheet when everything does fit,
+              and it also means a downward drag at the top produces no scroll of its own for
+              the pan to have to out-argue. */}
+          <GestureDetector gesture={bodyDragGesture}>
           <ScrollView
             bounces={false}
+            overScrollMode="never"
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={hideModal}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="chevron-down" size={24} color="#a1a1aa" />
-            </TouchableOpacity>
-            
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>
-                {!timerSettings.countUp
-                  ? PACE_TITLES[timerSettings.pace]
-                  : 'Count Up'
-                }
-              </Text>
-              <Text style={styles.subtitle}>
-                {timerSettings.countUp ? 'Elapsed Time' : 'Rest Timer'}
-              </Text>
-            </View>
-            
-            <View style={{ width: 24 }} />
-          </View>
-
           {/* Main Timer Display */}
           <View style={styles.timerSection}>
             <Text style={styles.timeDisplay}>{displayTime}</Text>
@@ -403,13 +640,18 @@ export const TimerModal: React.FC = () => {
             </View>
           </View>
           </ScrollView>
+          </GestureDetector>
         </Animated.View>
       </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
@@ -423,12 +665,31 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 34,
-    paddingTop: 24,
+    // Was 24. The grabber and its margin now supply that top breathing room, so the sheet
+    // keeps roughly the height it had rather than gaining a strip of empty black.
+    paddingTop: 10,
     maxHeight: '85%',
     borderTopWidth: 2,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  // The whole block is the drag target, not just the pill. A 5px-tall pill is a fine thing
+  // to look at and a poor thing to aim for, and everything in this header is either inert
+  // or has its own hit area, so handing the rest of it to the gesture costs nothing.
+  headerBlock: {
+    paddingTop: 4,
+  },
+  grabber: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#3a3a42',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  grabberActive: {
+    backgroundColor: '#5a5a66',
   },
   header: {
     alignItems: 'center',

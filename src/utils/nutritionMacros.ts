@@ -262,7 +262,23 @@ export function computeMacrosPhaseAware(
   answers: NutritionAnswers,
   profile: GoalsProfile
 ): MacroResults | null {
-  const { gender, age, height, activityLevel } = answers;
+  // Sex, age and height moved onto GoalsProfile when they became part of the
+  // shared intake — both plans need them, not just this one. The profile wins
+  // where it has a value; the questionnaire answers remain the fallback so
+  // every profile written before those fields existed keeps working, and so
+  // this change is inert until the intake has actually collected them.
+  //
+  // Weight was already profile-only. This brings its three siblings into line,
+  // which closes the "different source for fields answered on the same screen"
+  // split that made a stale draft able to disagree with the profile.
+  const gender = profile.sex ?? answers.gender;
+  const age = profile.ageYears ?? answers.age;
+  const height = profile.heightCm ?? answers.height;
+  // Activity level joins the others on the profile: it is a fact about the
+  // person, it does not change between plans, and the workout side wants it
+  // for recovery capacity. Answers stay as the fallback so profiles written
+  // before this field existed keep computing exactly the same macros.
+  const activityLevel = profile.activityLevel ?? answers.activityLevel;
   const weight = profile.currentWeightKg;
   if (!gender || !age || !height || !activityLevel || !weight) return null;
 

@@ -153,6 +153,36 @@ function getPlateFromMeal(meal: CuratedMeal, plateId: string): Plate | null {
   return meal.plates.find(p => p.id === plateId) || meal.plates[0] || null;
 }
 
+/**
+ * Today as a plan date key, in LOCAL time. `new Date().toISOString()` would give
+ * the UTC day, which is tomorrow in Australia for most of the evening.
+ */
+function todayKey(): string {
+  const d = new Date();
+  const month = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * The plan days a prep session should actually act on: today and later.
+ *
+ * A plan spans a week but you prep partway through it, so days that have already
+ * passed are meals that have already happened (or been missed). Cooking a
+ * container for them inflates every count on the screen — the queue, the "meals
+ * banked" score, and the number of containers you're told to fill.
+ *
+ * Fallback: if EVERY day is in the past, the user is looking at a finished plan.
+ * Filtering would empty the screen, so the whole plan is used as before and the
+ * caller keeps the plan's own first day as the cook day.
+ */
+function activePlanDays(dateKeys: string[], today: string): { days: string[]; historical: boolean } {
+  const upcoming = dateKeys.filter((k) => k >= today);
+  return upcoming.length > 0
+    ? { days: upcoming, historical: false }
+    : { days: dateKeys, historical: true };
+}
+
 /** Helper to calculate days between two dates */
 function daysBetween(startDate: string, endDate: string): number {
   const start = new Date(startDate);
@@ -249,6 +279,7 @@ function toPrepGroup(key: string, acc: Acc): PrepGroup {
 export function buildPrepSessionWithFreshness(
   plan: SimplifiedMealPlan,
   curated: Record<string, CuratedMeal> = CURATED_MEALS,
+  today: string = todayKey(),
 ): PrepSessionWithFreshness | null {
   const dailyMeals = plan?.dailyMeals;
   if (!dailyMeals || typeof dailyMeals !== 'object') return null;
@@ -256,36 +287,52 @@ export function buildPrepSessionWithFreshness(
   const dateKeys = Object.keys(dailyMeals).sort();
   if (dateKeys.length === 0) return null;
 
-  // Find earliest date with actual meals for session date
-  let sessionDate = dateKeys[0];
-  for (const dateKey of dateKeys) {
-    const dayData = dailyMeals[dateKey];
-    if (dayData?.meals && Array.isArray(dayData.meals) && dayData.meals.length > 0) {
-      // Check if any meals have curated_meal_slug (are eligible for prep)
-      const hasCuratedMeals = dayData.meals.some(meal => meal.curated_meal_slug);
-      if (hasCuratedMeals) {
-        sessionDate = dateKey;
-        break;
+  const { days: activeDays, historical } = activePlanDays(dateKeys, today);
+
+  // The cook day. Shelf life starts when the food is cooked, and the cook is
+  // happening NOW — so the fridge/freezer split is measured from today, not
+  // from the plan's first day. Measuring from the plan's start meant that the
+  // later in the week you prepped, the more of the plan got pushed into the
+  // freezer, including meals you were about to eat that evening.
+  let sessionDate = today;
+  if (historical) {
+    // Finished plan: fall back to the plan's own first day with curated meals.
+    sessionDate = dateKeys[0];
+    for (const dateKey of dateKeys) {
+      const dayData = dailyMeals[dateKey];
+      if (dayData?.meals && Array.isArray(dayData.meals) && dayData.meals.length > 0) {
+        if (dayData.meals.some(meal => meal.curated_meal_slug)) {
+          sessionDate = dateKey;
+          break;
+        }
       }
     }
   }
 
-  // Group servings by curated_meal_slug + plate_id
+  // Group servings by curated meal + RESOLVED plate. Keying on the raw
+  // `plate_id || 'standard'` split one dish into two groups when some plan
+  // entries carried a plate_id and others didn't, and produced a plate_id that
+  // buildPrepSession's own resolver would never emit — so the prep screens
+  // looked up freshness by a plate id that didn't exist and silently got none.
   const mealGroups: { [key: string]: { dates: string[]; meal: any; servings: number } } = {};
 
-  for (const dateKey of dateKeys) {
+  for (const dateKey of activeDays) {
     const dayData = dailyMeals[dateKey];
     if (!dayData?.meals || !Array.isArray(dayData.meals)) continue;
 
     for (const serving of dayData.meals) {
-      if (serving.curated_meal_slug) {
-        const groupKey = `${serving.curated_meal_slug}_${serving.plate_id || 'standard'}`;
-        if (!mealGroups[groupKey]) {
-          mealGroups[groupKey] = { dates: [], meal: serving, servings: 0 };
-        }
-        mealGroups[groupKey].dates.push(dateKey);
-        mealGroups[groupKey].servings += 1; // Count number of meal instances
+      if (!serving.curated_meal_slug) continue;
+      const curatedMeal = getCuratedMealBySlug(serving.curated_meal_slug, curated);
+      if (!curatedMeal) continue;
+      const resolvedPlate = getPlateFromMeal(curatedMeal, serving.plate_id || '');
+      if (!resolvedPlate) continue;
+
+      const groupKey = `${serving.curated_meal_slug}::${resolvedPlate.id}`;
+      if (!mealGroups[groupKey]) {
+        mealGroups[groupKey] = { dates: [], meal: serving, servings: 0 };
       }
+      mealGroups[groupKey].dates.push(dateKey);
+      mealGroups[groupKey].servings += 1; // Count number of meal instances
     }
   }
 
@@ -296,9 +343,9 @@ export function buildPrepSessionWithFreshness(
     const curatedMeal = getCuratedMealBySlug(meal.curated_meal_slug, curated);
     if (!curatedMeal) continue;
 
-    const plateId = meal.plate_id || 'standard';
-    const plate = getPlateFromMeal(curatedMeal, plateId);
+    const plate = getPlateFromMeal(curatedMeal, meal.plate_id || '');
     if (!plate) continue;
+    const plateId = plate.id;
 
     // Resolve storage config: plate-level overrides meal-level
     const storage = plate.meal_prep?.storage ?? curatedMeal.meal_prep?.storage;
@@ -308,8 +355,12 @@ export function buildPrepSessionWithFreshness(
     // Skip 'none' strategy meals
     if (strategy === 'none') continue;
 
-    // Compute freshness for 'full' and 'partial' strategies
-    const fridgeDays = storage?.fridge_days ?? 4;
+    // Compute freshness for 'full' and 'partial' strategies.
+    // A meal with a freezer life and no fridge life is freezer-by-design (the
+    // breakfast burritos, the protein ice creams, the date bark). Defaulting
+    // those to 4 fridge days told you to eat ice cream by Tuesday.
+    const fridgeDays =
+      storage?.fridge_days ?? (storage?.freeze_months ? 0 : 4);
     const fridgeDates: string[] = [];
     const freezeDates: string[] = [];
 
@@ -366,6 +417,7 @@ export function buildPrepSessionWithFreshness(
 export function buildPrepSession(
   plan: SimplifiedMealPlan,
   curated: Record<string, CuratedMeal> = CURATED_MEALS,
+  today: string = todayKey(),
 ): PrepSession {
   const empty: PrepSession = {
     cookAhead: [],
@@ -384,7 +436,10 @@ export function buildPrepSession(
   const dailyMeals = plan?.dailyMeals;
   if (!dailyMeals || typeof dailyMeals !== 'object') return empty;
 
-  const dayKeys = Object.keys(dailyMeals);
+  // Same rule as the freshness builder, and it has to be the same rule: if the
+  // queue counted a day the store screen ignored, the two would disagree about
+  // how many containers a batch produces.
+  const { days: dayKeys } = activePlanDays(Object.keys(dailyMeals).sort(), today);
   const dayCount = dayKeys.length;
 
   const groups = new Map<string, Acc>();

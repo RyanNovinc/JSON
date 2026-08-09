@@ -199,61 +199,180 @@ export const styles = StyleSheet.create({
   sectionLabelAccent: {
     color: '#22d3ee',
   },
-
-  // ── NEXT UP hero card ────────────────────────────────────────────
-  nextUpCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 18,
-  },
-  nextUpContent: {
+  // Section header with a trailing count. The label inside keeps `sectionLabel`
+  // but drops its own marginBottom, which the row now owns.
+  sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    marginBottom: 8,
+    paddingHorizontal: 2,
   },
-  nextUpTextBlock: {
-    flex: 1,
+  sectionHeaderLabel: {
+    marginBottom: 0,
+  },
+  sectionHeaderCount: {
+    fontSize: 10,
+    color: '#3a3a44',
+    letterSpacing: 0.8,
+    fontFamily: 'DMMono-Regular',
+  },
+  sectionSpacer: {
+    height: 22,
+  },
+
+  // ── NEXT UP hero card ────────────────────────────────────────────
+  // The hero is a vertical card, not a row. It is deliberately the only element
+  // on this screen with a 2px border and a full-width filled button — that pair
+  // is what separates "the day to do" from "the days in the week". Tombstone:
+  // nextUpContent / nextUpTextBlock / nextUpMetaDot belonged to the old
+  // horizontal row hero and are gone.
+  nextUpCard: {
+    borderRadius: 16,
+    borderWidth: 2,
+    padding: 16,
+    marginBottom: 22,
+  },
+  nextUpEyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  nextUpEyebrow: {
+    fontSize: 10,
+    letterSpacing: 1.6,
+    fontFamily: 'DMMono-Medium',
+    fontWeight: '600',
+  },
+  nextUpDayBadge: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  nextUpDayBadgeText: {
+    fontSize: 9,
+    letterSpacing: 1.1,
+    color: '#71717a',
+    fontFamily: 'DMMono-Medium',
   },
   nextUpDayName: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#f0f0f2',
-    letterSpacing: -0.3,
-    fontFamily: 'Outfit-SemiBold',
-    marginBottom: 4,
+    letterSpacing: -0.5,
+    fontFamily: 'Outfit-Bold',
+    lineHeight: 28,
   },
+  nextUpMuscles: {
+    fontSize: 12,
+    color: '#9898a4',
+    fontFamily: 'Outfit-Regular',
+    marginTop: 5,
+  },
+
+  // Thumbnail strip. Rendered ONLY for exercises that actually resolve to an
+  // image pair — a placeholder tile reads as broken, an absent tile reads as
+  // sparse. When nothing in the day resolves, the whole strip is omitted and
+  // the hero collapses to title + meta + button.
+  // height is set at runtime from the computed tile size (see heroStripMetrics in
+  // DayRow). It stays FIXED rather than implied by the tiles, because the row is
+  // rendered empty for the one microtask before the first resolve lands, and an
+  // empty row that then grows is exactly the jump this whole pass exists to remove.
+  nextUpThumbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+  },
+  // Reserved so the line's presence or absence can never change the card height.
+  nextUpMusclesReserve: {
+    minHeight: 17,
+  },
+  // width/height are supplied at runtime — a COMPUTED FIXED size, not flex: 1, so
+  // a strip with two tiles renders them at the same size a full row would.
+  nextUpThumb: {
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+  },
+  nextUpThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  nextUpThumbMore: {
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nextUpThumbMoreText: {
+    fontSize: 12,
+    color: '#71717a',
+    fontFamily: 'DMMono-Medium',
+  },
+
   nextUpMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 14,
+    marginTop: 14,
+  },
+  nextUpMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   nextUpMetaText: {
     fontSize: 11,
     color: '#9898a4',
     fontFamily: 'Outfit-Regular',
   },
-  nextUpMetaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#3a3a44',
-  },
   nextUpStartButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 9,
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 14,
+    borderRadius: 11,
+    marginTop: 16,
   },
   nextUpStartButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#000',
     fontFamily: 'Outfit-SemiBold',
     letterSpacing: -0.1,
+  },
+
+  // ── Done rows (quiet strip at the bottom) ────────────────────────
+  // Completed days keep their stats and stay tappable for review, but drop the
+  // card treatment so they cannot compete with what is still ahead.
+  doneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  doneName: {
+    flex: 1,
+    fontSize: 13,
+    color: '#71717a',
+    fontFamily: 'Outfit-Medium',
+  },
+  doneMeta: {
+    fontSize: 10,
+    color: '#55555f',
+    fontFamily: 'DMMono-Regular',
+    letterSpacing: 0.3,
   },
 
   // ── Day rows (compact) ───────────────────────────────────────────
@@ -329,6 +448,34 @@ export const styles = StyleSheet.create({
     color: '#55555f',
     fontFamily: 'DMMono-Regular',
     letterSpacing: 0.3,
+  },
+
+  // ── Delete a user-added day (exercise modal) ─────────────────────
+  // Muted red rather than a filled destructive button: this sits inside a modal
+  // whose primary action is Save Changes, and two loud buttons would compete.
+  deleteDaySection: {
+    marginTop: 20,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  deleteDayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  deleteDayText: {
+    fontSize: 13,
+    color: '#b04a4a',
+    fontFamily: 'Outfit-Medium',
+  },
+  deleteDayHint: {
+    fontSize: 11,
+    color: '#55555f',
+    marginTop: 5,
+    marginLeft: 23,
+    fontFamily: 'Outfit-Regular',
   },
 
   // ── List ─────────────────────────────────────────────────────────

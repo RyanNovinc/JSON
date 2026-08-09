@@ -21,7 +21,12 @@ import { updateQuestionnaireField } from '../../utils/questionnaireStorage';
 
 /**
  * Q3 — Days per week
- * Step 3 of 7.
+ * The FIRST workout question since Q1 left the flow on 9 Aug 2026.
+ *
+ * It keeps its Q3 name and route so nothing else has to be renamed, but its
+ * step literals moved: currentStep is now stepOffset + 1 (not + 2) and the
+ * flow is 5 screens, not 6. It also hands off at stepOffset - 1, which lets
+ * Q4-Q7 keep their own hardcoded literals untouched.
  *
  * Captures `totalTrainingDays` (number).
  *
@@ -86,13 +91,12 @@ export default function Q3DaysPerWeekScreen() {
       navigation.goBack();
       return;
     }
-    navigation.navigate(
-      'Q4ProgramDuration',
-      {
-        answersSoFar: { ...answersSoFar, totalTrainingDays: selected },
-        flowStepOffset: stepOffset,
-      },
-    );
+    // Offset drops by one: Q1 is gone, so Q4-Q7's hardcoded literals (which
+    // still assume Q1 occupied step 1) land correctly without editing them.
+    navigation.navigate('Q4ProgramDuration', {
+      answersSoFar: { ...answersSoFar, totalTrainingDays: selected },
+      flowStepOffset: stepOffset - 1,
+    });
   };
 
   const handleBack = () => navigation.goBack();
@@ -103,8 +107,8 @@ export default function Q3DaysPerWeekScreen() {
   return (
     <View style={styles.container}>
       <QuestionnaireHeader
-        currentStep={stepOffset + 2}
-        totalSteps={stepOffset + 6}
+        currentStep={stepOffset + 1}
+        totalSteps={stepOffset + 5}
         onBack={handleBack}
         onClose={handleClose}
       />

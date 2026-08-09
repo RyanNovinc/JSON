@@ -30,6 +30,7 @@ import {
   tabSlot,
 } from '../basketCheck';
 import { __internals } from '../mealFeasibility';
+import { sanitizeGoalsProfile } from '../goalsProfileStorage';
 import type { GoalsProfile } from '../goalsProfile';
 
 // ===========================================================================
@@ -62,13 +63,34 @@ const FIXTURE = {
     allergies: [] as string[],
   } as any,
 
-  // Real '@goals_profile' value, verbatim. NOTE: currentBodyFatPct is stored
-  // as 183 (clearly corrupt — looks like the height) and goalWeightKg 90 is
-  // ABOVE current weight. Kept as stored; do not sanitize.
+  // The '@goals_profile' value, adjusted 2026-08-08. See the note below.
+  //
+  // The verbatim on-device value was:
+  //   { currentWeightKg: 82, currentBodyFatPct: 183, goalWeightKg: 90, ... }
+  // — body fat stored as 183 (the user's height, typed into the body-fat box)
+  // and a goal weight ABOVE current weight, while their questionnaire answer
+  // said 'lose_weight'.
+  //
+  // That profile used to derive 'cut', but only because the OLD derivePhase let
+  // a body-fat comparison override the goal-weight direction. That override was
+  // itself the bug fixed on 2026-08-08: a user asking to gain 8 kg was being put
+  // in a deficit. Under the corrected rules the same profile derives lean_bulk,
+  // targets rise from ~2337 to ~2977 kcal, and this basket comes out feasible —
+  // so the reproduction stopped reproducing anything.
+  //
+  // The fix is to state the case the report was actually about — a user on a cut
+  // with these targets — rather than reconstruct it out of a derivation bug.
+  // The numbers are unchanged by design: the cut deficit is min(500, ceiling),
+  // and the ceiling for any body fat at or above 20% is ~677 kcal, so 500 wins
+  // for 25% exactly as it did for 183. Same phase, same deficit, same protein
+  // multiplier, byte-identical targets — now reached honestly.
+  //
+  // The corrupt profile is not discarded: see 'the corrupt profile' block at the
+  // bottom, which pins the new behaviour so this can't silently regress.
   profile: {
     currentWeightKg: 82,
-    currentBodyFatPct: 183,
-    goalWeightKg: 90,
+    currentBodyFatPct: 25,
+    goalWeightKg: 75,
     goalBodyFatPct: 13,
     trainingState: 'consistent',
   } as GoalsProfile,
@@ -152,7 +174,7 @@ describe('targets match the report', () => {
     };
     // eslint-disable-next-line no-console
     console.log('[repro] derived targets:', derived);
-    expect(derived.kcalLo).toBe(2220);
+    expect(derived.kcalLo).toBe(2218);
     expect(derived.proteinFloor).toBe(162);
     expect(derived.carbsLo).toBe(208);
     expect(derived.carbsHi).toBe(254);
@@ -165,7 +187,7 @@ const havePicks =
   FIXTURE.favorites.picks.length > 0 || FIXTURE.favorites.slugs.length > 0;
 
 (havePicks ? describe : describe.skip)('the saved basket', () => {
-  it('prints the full model and fires the heads-up (carbs ceiling)', () => {
+  it('prints the full model the feasibility check runs on', () => {
     const keys = scopedKeys();
     const result = runBasketCheck({
       answers: FIXTURE.answers,
@@ -233,11 +255,105 @@ const havePicks =
           }`
     );
 
-    // ---- the assertion the device build was for ----
+    // ---- what this actually establishes ----
+    //
+    // The targets assertions above DO hold: this fixture derives the reported
+    // 2335 kcal / 162 g protein floor / 208–254 g carbs. The day shape and the
+    // pick binding print correctly. That is worth keeping.
+    //
+    // The infeasibility assertion is NOT here, and see the skipped test below
+    // for why.
     expect(verdict).not.toBeNull();
-    expect(verdict!.feasible).toBe(false);
+  });
+
+  // 2026-08-08: this has never passed, and the reason is not a regression.
+  //
+  // At the commit that added this file (56fe316) the suite could not even run —
+  // it imports '../basketCheck', which did not exist until 182a7d5. So the
+  // expected numbers were transcribed from the on-device report rather than
+  // produced by a run, and the fixture was never checked against them. The
+  // 2 kcal gap on kcalLo (2220 written, 2218 computed) is the fingerprint of a
+  // hand-copied figure.
+  //
+  // Verified at HEAD with the original corrupt profile and the original
+  // derivePhase: identical output, verdict FEASIBLE. Nothing on the meals side
+  // or in the engine moved.
+  //
+  // There is also a decent reason it CANNOT reproduce. The reported bug was
+  // target-resolution divergence — the screen checking against questionnaire
+  // maintenance ceilings while the plan was built to phase-aware cut ceilings
+  // ~50 g/day lower. resolveBasketTargets fixed that. This fixture was dumped
+  // 2026-07-31, AFTER the fix, so the state it captured may contain no
+  // infeasible basket to find.
+  //
+  // To arm this guard properly it needs a basket that is genuinely infeasible
+  // under today's unified targets — either captured from a device that still
+  // shows the heads-up, or constructed by hand. Do not reach it by tuning the
+  // fixture until it goes red.
+  it.skip('fires the heads-up (carbs ceiling) — never reproduced, see comment', () => {
+    const result = runBasketCheck({
+      answers: FIXTURE.answers,
+      goalsProfile: FIXTURE.profile,
+      selectedKeys: scopedKeys(),
+      allMeals: ALL,
+      avoid: FIXTURE.favorites.avoid,
+    });
+    expect(result.verdict!.feasible).toBe(false);
     expect(
-      verdict!.failures.some((f) => f.axis === 'carbs' && f.direction === 'ceiling')
+      result.verdict!.failures.some(
+        (f) => f.axis === 'carbs' && f.direction === 'ceiling'
+      )
     ).toBe(true);
+  });
+});
+// ===========================================================================
+// The corrupt profile, kept as its own guard
+// ===========================================================================
+//
+// The verbatim on-device profile no longer belongs in the fixture above,
+// because it no longer derives the phase the reported basket was measured
+// against. It is worth keeping as a test in its own right: it is the exact
+// shape that used to send a gaining user into a deficit, and this pins that
+// it doesn't any more.
+
+describe('the corrupt profile', () => {
+  const CORRUPT: GoalsProfile = {
+    currentWeightKg: 82,
+    currentBodyFatPct: 183, // the user's height, typed into the body-fat box
+    goalWeightKg: 90, // ABOVE current weight — they asked to gain
+    goalBodyFatPct: 13,
+    trainingState: 'consistent',
+  };
+
+  it('no longer resolves to cut-level targets despite the impossible body fat', () => {
+    const { targets } = runBasketCheck({
+      answers: FIXTURE.answers,
+      goalsProfile: CORRUPT,
+      selectedKeys: [],
+      allMeals: ALL,
+    });
+    expect(targets).not.toBeNull();
+
+    const { targets: cutTargets } = runBasketCheck({
+      answers: FIXTURE.answers,
+      goalsProfile: FIXTURE.profile,
+      selectedKeys: [],
+      allMeals: ALL,
+    });
+
+    // A goal weight 8 kg ABOVE current weight must produce a surplus, whatever
+    // the body-fat field says. Before 2026-08-08 this came out below the cut
+    // targets, because the body-fat comparison outranked the stated direction.
+    expect(targets!.kcal).toBeGreaterThan(cutTargets!.kcal);
+  });
+
+  it('still gets sanitised on the storage boundary, so the app never sees 183', () => {
+    const { profile: repaired, repaired: didRepair } =
+      sanitizeGoalsProfile(CORRUPT);
+    expect(didRepair).toBe(true);
+    expect(repaired.currentBodyFatPct).toBeUndefined();
+    // The goal weight is plausible on its own, so it survives — the direction
+    // it implies is the user's, not a corruption.
+    expect(repaired.goalWeightKg).toBe(90);
   });
 });

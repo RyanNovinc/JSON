@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoalsProfile, TrainingState } from './goalsProfile';
+import { GoalsProfile, TrainingState, Sex, PeakLeanness, RoutePreference, BodyFatSource, ActivityLevel } from './goalsProfile';
 
 const KEY = '@goals_profile';
 
@@ -24,7 +24,22 @@ export const BODY_FAT_MAX = 60;
 export const WEIGHT_KG_MIN = 30;
 export const WEIGHT_KG_MAX = 300;
 
+// Same principle for the shared intake fields. These are plausibility guards,
+// not eligibility rules — the floor on age exists so that a mistyped "1" or a
+// height entered into the age box gets rejected, not to decide who may use the
+// app. Whether the app should PLAN a calorie deficit for a young teenager is a
+// separate product decision and does not belong in a sanitiser.
+export const HEIGHT_CM_MIN = 120;
+export const HEIGHT_CM_MAX = 250;
+export const AGE_MIN = 13;
+export const AGE_MAX = 100;
+
 const TRAINING_STATES: TrainingState[] = ['new', 'returning', 'consistent', 'advanced'];
+const SEXES: Sex[] = ['male', 'female', 'prefer_not_to_say'];
+const PEAK_LEANNESS: PeakLeanness[] = ['lean', 'average', 'soft'];
+const ROUTE_PREFERENCES: RoutePreference[] = ['lean', 'balanced', 'roomy'];
+const BODY_FAT_SOURCES: BodyFatSource[] = ['reported', 'visual', 'tape'];
+const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'heavy', 'extreme'];
 
 const inRange = (v: unknown, lo: number, hi: number): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
@@ -74,6 +89,69 @@ export function sanitizeGoalsProfile(
   if (!clean.trainingState || !TRAINING_STATES.includes(clean.trainingState)) {
     clean.trainingState = 'new';
     if (raw.trainingState !== 'new') repaired = true;
+  }
+
+  // ── Shared intake fields ───────────────────────────────────────────────────
+  // All optional, so the rule is the same as currentBodyFatPct: an implausible
+  // value is DROPPED, never clamped or defaulted. A dropped height means no
+  // FFMI plausibility check, which is a state every consumer already has to
+  // handle for profiles written before these fields existed. A clamped one
+  // would invent a measurement the user never gave and quietly plan around it.
+
+  if (clean.sex != null && !SEXES.includes(clean.sex)) {
+    delete clean.sex;
+    repaired = true;
+  }
+
+  if (clean.ageYears != null && !inRange(clean.ageYears, AGE_MIN, AGE_MAX)) {
+    delete clean.ageYears;
+    repaired = true;
+  }
+
+  if (clean.heightCm != null && !inRange(clean.heightCm, HEIGHT_CM_MIN, HEIGHT_CM_MAX)) {
+    delete clean.heightCm;
+    repaired = true;
+  }
+
+  if (clean.peakWeightKg != null && !inRange(clean.peakWeightKg, WEIGHT_KG_MIN, WEIGHT_KG_MAX)) {
+    delete clean.peakWeightKg;
+    repaired = true;
+  }
+
+  if (clean.peakLeanness != null && !PEAK_LEANNESS.includes(clean.peakLeanness)) {
+    delete clean.peakLeanness;
+    repaired = true;
+  }
+
+  // peakLeanness on its own describes nothing — it only means something
+  // alongside the weight it applied to. Drop the orphan rather than leave a
+  // half-answer that reads as data.
+  if (clean.peakLeanness != null && clean.peakWeightKg == null) {
+    delete clean.peakLeanness;
+    repaired = true;
+  }
+
+  if (clean.routePreference != null && !ROUTE_PREFERENCES.includes(clean.routePreference)) {
+    delete clean.routePreference;
+    repaired = true;
+  }
+
+  if (clean.bodyFatSource != null && !BODY_FAT_SOURCES.includes(clean.bodyFatSource)) {
+    delete clean.bodyFatSource;
+    repaired = true;
+  }
+
+  if (clean.activityLevel != null && !ACTIVITY_LEVELS.includes(clean.activityLevel)) {
+    delete clean.activityLevel;
+    repaired = true;
+  }
+
+  // Provenance without a reading describes nothing. Same orphan rule as
+  // peakLeanness — and note the reverse is fine: a body fat from before this
+  // field existed simply has no source, which readers must handle anyway.
+  if (clean.bodyFatSource != null && clean.currentBodyFatPct == null) {
+    delete clean.bodyFatSource;
+    repaired = true;
   }
 
   return { profile: clean, repaired };

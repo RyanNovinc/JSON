@@ -1,7 +1,7 @@
 {
   "routine_name": "Beginner Full Body 3-Day Hypertrophy",
   "description": "4-week beginner hypertrophy block. Full Body A/B/C, 3 sessions/week, conservative volume, moderate rest. Basic compounds and machine alternatives. No deload — short beginner block.",
-  "days_per_week": 7,
+  "days_per_week": 3,
   "blocks": [
     {
       "block_name": "Block 1 — Foundation",
@@ -440,11 +440,6 @@
               ]
             }
           ]
-        },
-        {
-          "day_name": "REST DAY",
-          "estimated_duration": 0,
-          "exercises": []
         },
         {
           "day_name": "REST DAY",

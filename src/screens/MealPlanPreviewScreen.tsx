@@ -17,6 +17,7 @@ import { MealPlan } from '../utils/storage';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { getMealImage } from '../assets/mealImages';
+import { startNutritionFlow } from '../utils/questionnaireRouting';
 
 /**
  * MealPlanPreviewScreen — opens when a user taps a saved meal plan in SavedNutrition.
@@ -385,10 +386,24 @@ export default function MealPlanPreviewScreen() {
   };
 
   // Example mode: send them into the meal questionnaire to build a calibrated
-  // plan rather than adopting this fixed sample. (Swap 'N1Goal' for the
-  // onboarding contract screen once that's built.) No save happens here.
-  const handleBuildOwn = () => {
-    navigation.navigate('N1Goal', { fromOnboarding: true });
+  // plan rather than adopting this fixed sample. No save happens here.
+  //
+  // This MUST go through startNutritionFlow, never straight to N1Goal. This
+  // screen is reachable before a GoalsProfile exists (OnboardingContractScreen
+  // "See example" and ExamplePlanCard "Peek at a finished plan" both land here
+  // on a first run), so a direct navigate dropped the user mid-questionnaire
+  // having never seen GoalsIntake. Every other entry point into the nutrition
+  // flow goes through this helper — including ExamplePlanCard's own "Build your
+  // own" link, which is why the two visually similar CTAs used to behave
+  // differently. startNutritionFlow routes to GoalsIntake when no profile
+  // exists and to ConfirmStats when one does.
+  //
+  // Note: extraParams are only forwarded on the ConfirmStats path, so
+  // fromOnboarding does not survive a true first run. Nothing in this file
+  // reads it; if a downstream screen does, it needs threading through
+  // GoalsIntakeScreen's forward navigation instead.
+  const handleBuildOwn = async () => {
+    await startNutritionFlow(navigation, { fromOnboarding: true });
   };
 
   // Example mode, secondary path: adopt the sample as a real, active plan.

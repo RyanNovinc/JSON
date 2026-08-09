@@ -226,7 +226,13 @@ interface HeroStripMeal {
 const getHeroToday = (
   original: SimplifiedMealPlan | undefined,
   curatedBySlug: Map<string, CuratedMeal>
-): { dayIndex: number; totalDays: number; stripLabel: string; meals: HeroStripMeal[] } | null => {
+): {
+  dayIndex: number;
+  totalDays: number;
+  stripLabel: string;
+  dayLabel: string;
+  meals: HeroStripMeal[];
+} | null => {
   if (!original?.dailyMeals) return null;
   const keys = Object.keys(original.dailyMeals).sort();
   if (keys.length === 0) return null;
@@ -264,7 +270,11 @@ const getHeroToday = (
       ? (day?.dayName || todayName).toUpperCase()
       : `DAY 1${day?.dayName ? ` · ${String(day.dayName).toUpperCase()}` : ''}`;
 
-  return { dayIndex, totalDays: keys.length, stripLabel, meals };
+  // dayLabel is the headline form: the day itself, title-cased, with no
+  // "TODAY ·" prefix. stripLabel keeps its uppercase eyebrow form.
+  const dayLabel = String(day?.dayName || todayName || 'Today');
+
+  return { dayIndex, totalDays: keys.length, stripLabel, dayLabel, meals };
 };
 
 // Display string like "30P/45C/25F" for a plan. Tries plan-level macro_targets
@@ -621,6 +631,10 @@ export default function NutritionHomeScreen({ route }: any) {
     isGenerating: false,
   });
   const [successModal, setSuccessModal] = useState(false);
+  // Closing keeps the subject in state and only flips `visible`. Clearing it
+  // on close made the sheet re-render mid dismiss-animation with no subject,
+  // so the "Current plan" state row visibly flipped back to the "Make this my
+  // current plan" button on the way out. The next open overwrites it anyway.
   const [deleteModal, setDeleteModal] = useState<{ visible: boolean; plan: MealPlan | null }>({
     visible: false,
     plan: null,
@@ -711,8 +725,30 @@ export default function NutritionHomeScreen({ route }: any) {
   // Opens share modal from inside the action sheet — same wiring pattern
   // as HomeScreen.tsx: dismiss the sheet, wait 200ms for animation, then
   // call handleExport which generates the QR + universal link.
+  /**
+   * Make a meal plan the current plan.
+   *
+   * Unlike workouts, the nutrition context already has setCurrentPlan and a
+   * real currentPlan value driving the hero card. It simply was never exposed
+   * in the UI. The sheet holds a legacy-converted plan, so map back to the
+   * SimplifiedMealPlan by id before handing it over.
+   */
+  const handleMakeCurrentPlan = async (plan: MealPlan) => {
+    try {
+      setDeleteModal((prev) => ({ ...prev, visible: false }));
+      // setCurrentPlan takes an ID, not the plan object (see
+      // handleMealPlanSwitch below, which is the existing caller).
+      const target = mealPlans.find((p) => p.id === plan.id);
+      if (!target) return;
+      await setCurrentPlan(target.id);
+    } catch (error) {
+      console.error('Failed to set current plan:', error);
+      Alert.alert('Error', 'Could not set that as your current plan. Please try again.');
+    }
+  };
+
   const handleShareFromActionSheet = (plan: MealPlan) => {
-    setDeleteModal({ visible: false, plan: null });
+    setDeleteModal((prev) => ({ ...prev, visible: false }));
     setTimeout(() => {
       handleExport(plan);
     }, 200);
@@ -726,14 +762,14 @@ export default function NutritionHomeScreen({ route }: any) {
       if (originalPlan) {
         await deleteMealPlan(originalPlan.id);
       }
-      setDeleteModal({ visible: false, plan: null });
+      setDeleteModal((prev) => ({ ...prev, visible: false }));
     } catch (error) {
       console.error('Failed to delete meal plan:', error);
     }
   };
 
   const handleRenameRequest = (plan: MealPlan) => {
-    setDeleteModal({ visible: false, plan: null });
+    setDeleteModal((prev) => ({ ...prev, visible: false }));
     setRenameModal({ visible: true, plan, newName: plan.name });
   };
 
@@ -1341,11 +1377,13 @@ export default function NutritionHomeScreen({ route }: any) {
                 apply (dismiss/subscribe hides it everywhere permanently). */}
             <CookbookCaptureCard />
 
-            {/* Your meals — user-created customs + add entry point */}
-            {renderYourMealsSection()}
-
             {/* Category sections, even without a plan */}
             {renderAllSections()}
+
+            {/* Your meals runs after the curated shelves, then the permanent
+                create entry point closes the feed. */}
+            {renderYourMealsSection()}
+            {renderAddYourOwnRow()}
           </ScrollView>
         ) : (
           // ============================================================
@@ -1397,26 +1435,35 @@ export default function NutritionHomeScreen({ route }: any) {
                   delayLongPress={600}
                 >
                   <View style={styles.heroEyebrowRow}>
-                    <Text style={[styles.heroEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
-                    {heroToday && (
-                      <View style={styles.heroDayBadge}>
-                        <Text style={styles.heroDayBadgeText}>
+                    {heroToday ? (
+                      <View style={[styles.heroDayBadge, { borderColor: themeColor + '4D', backgroundColor: themeColor + '14' }]}>
+                        <Text style={[styles.heroDayBadgeText, { color: themeColor }]}>
                           DAY {heroToday.dayIndex + 1} OF {heroToday.totalDays}
                         </Text>
                       </View>
+                    ) : (
+                      <Text style={[styles.heroEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
                     )}
                   </View>
-                  <Text style={styles.heroTitleText} numberOfLines={2}>
+
+                  {/* Plan name demoted to a caption: today is the headline. */}
+                  <Text style={styles.heroCaption} numberOfLines={1}>
                     {currentPlanLegacy.name}
+                  </Text>
+
+                  <Text style={styles.heroTitleText} numberOfLines={1}>
+                    {heroToday?.dayLabel || currentPlanLegacy.name}
                   </Text>
                   {heroAverages ? (
                     <Text style={styles.heroSubtitle}>
+                      {heroToday?.meals?.length
+                        ? `${heroToday.meals.length} ${heroToday.meals.length === 1 ? 'meal' : 'meals'} · `
+                        : ''}
                       <Text style={styles.heroSubtitleStrong}>
                         {heroAverages.kcal.toLocaleString()} kcal
                       </Text>
                       {' · '}
                       <Text style={styles.heroSubtitleStrong}>{heroAverages.protein}g protein</Text>
-                      {' per day'}
                     </Text>
                   ) : (
                     <Text style={styles.heroSubtitle}>
@@ -1432,7 +1479,6 @@ export default function NutritionHomeScreen({ route }: any) {
                       the day list on MealPlanDays is where names live. */}
                   {heroToday && heroToday.meals.length > 0 && (
                     <>
-                      <Text style={styles.heroStripLabel}>{heroToday.stripLabel}</Text>
                       <View style={styles.heroStrip}>
                         {heroToday.meals.slice(0, 4).map((m) => (
                           <View key={m.key} style={styles.heroThumb}>
@@ -1504,27 +1550,18 @@ export default function NutritionHomeScreen({ route }: any) {
               const macroSplit = getMacroSplitDisplay(plan);
               const averages = getPlanDailyAverages(plan);
               return (
-                <View key={plan.id} style={styles.planRow}>
-                  <RNTouchable
-                    style={styles.planRowMenuBtn}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleActionRequest(plan);
-                    }}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="More options"
-                  >
-                    <Ionicons name="ellipsis-horizontal" size={15} color="#a1a1aa" />
-                  </RNTouchable>
+                <Pressable
+                  key={plan.id}
+                  style={styles.planRow}
+                  onPress={() => handleMealPlanNavigation(plan)}
+                  onLongPress={() => handleActionRequest(plan)}
+                  delayLongPress={600}
+                >
+                  <View style={styles.planRowTile}>
+                    <Ionicons name="restaurant" size={19} color="#2f4436" />
+                  </View>
 
-                  <Pressable
-                    style={styles.planRowInfo}
-                    onPress={() => handleMealPlanNavigation(plan)}
-                    onLongPress={() => handleActionRequest(plan)}
-                    delayLongPress={600}
-                  >
+                  <View style={styles.planRowInfo}>
                     <Text style={styles.planRowTitle} numberOfLines={1}>
                       {plan.name}
                     </Text>
@@ -1536,18 +1573,28 @@ export default function NutritionHomeScreen({ route }: any) {
                         ? ` · ${macroSplit}`
                         : ''}
                     </Text>
-                  </Pressable>
+                  </View>
 
-                  <TouchableOpacity
-                    style={styles.planRowGo}
-                    onPress={() => handleJumpToToday(plan)}
-                    activeOpacity={0.85}
+                  {/* The jump-to-today button is gone: it duplicated the row
+                      tap and collided with this menu in the same corner.
+                      Starting a day lives on the current-plan card and inside
+                      the plan, so a secondary row does one thing: open. */}
+                  <RNTouchable
+                    style={styles.planRowMenuBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleActionRequest(plan);
+                    }}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 12, right: 6, bottom: 12, left: 6 }}
                     accessibilityRole="button"
-                    accessibilityLabel="Start today's meals"
+                    accessibilityLabel="More options"
                   >
-                    <Ionicons name="restaurant" size={15} color="#d4d4d8" />
-                  </TouchableOpacity>
-                </View>
+                    <Ionicons name="ellipsis-vertical" size={16} color="#52525b" />
+                  </RNTouchable>
+
+                  <Ionicons name="chevron-forward" size={16} color="#3f3f46" />
+                </Pressable>
               );
             })}
 
@@ -1559,7 +1606,6 @@ export default function NutritionHomeScreen({ route }: any) {
             {/* the empty state keeps renderAllSections() unchanged.   */}
             {/* ====================================================== */}
             {/* Your meals — user-created customs + add entry point */}
-            {renderYourMealsSection()}
 
             {orderedSections.length > 0 &&
               renderCategorySection(
@@ -1570,6 +1616,11 @@ export default function NutritionHomeScreen({ route }: any) {
             {orderedSections
               .slice(1)
               .map((section) => renderCategorySection(section, false))}
+
+            {/* Your meals runs after the curated shelves, then the permanent
+                create entry point closes the feed. */}
+            {renderYourMealsSection()}
+            {renderAddYourOwnRow()}
 
           </ScrollView>
         )}
@@ -1584,13 +1635,13 @@ export default function NutritionHomeScreen({ route }: any) {
         visible={deleteModal.visible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setDeleteModal({ visible: false, plan: null })}
+        onRequestClose={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
       >
         <View style={styles.actionModalOverlay}>
           <RNTouchable
             style={styles.actionModalBackdrop}
             activeOpacity={1}
-            onPress={() => setDeleteModal({ visible: false, plan: null })}
+            onPress={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
           />
 
           <View style={[styles.actionSheet, { borderColor: themeColor, paddingBottom: insets.bottom + 20 }]}>
@@ -1618,7 +1669,7 @@ export default function NutritionHomeScreen({ route }: any) {
                     </View>
                     <RNTouchable
                       style={styles.actionCloseButton}
-                      onPress={() => setDeleteModal({ visible: false, plan: null })}
+                      onPress={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
                       activeOpacity={0.7}
                       hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                     >
@@ -1627,6 +1678,34 @@ export default function NutritionHomeScreen({ route }: any) {
                   </View>
 
                   {/* Primary CTA: Share */}
+                  {/* Current-plan control. Outranks Save and Rename because it
+                      changes what the whole home screen shows, so it sits above
+                      Share rather than becoming a fourth tile. On the plan that
+                      is already current it degrades to a flat state row, so the
+                      sheet never offers an action that would do nothing. */}
+                  {deleteModal.plan && currentPlanLegacy?.id === deleteModal.plan.id ? (
+                    <View style={styles.currentPlanState}>
+                      <Ionicons name="checkmark-circle" size={17} color="#2f4436" />
+                      <Text style={styles.currentPlanStateText}>Current plan</Text>
+                    </View>
+                  ) : (
+                    <RNTouchable
+                      style={[
+                        styles.makeCurrentBtn,
+                        { borderColor: themeColor, backgroundColor: themeColor + '14' },
+                      ]}
+                      onPress={() => deleteModal.plan && handleMakeCurrentPlan(deleteModal.plan)}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Make this my current plan"
+                    >
+                      <Ionicons name="restaurant" size={16} color={themeColor} />
+                      <Text style={[styles.makeCurrentText, { color: themeColor }]}>
+                        Make this my current plan
+                      </Text>
+                    </RNTouchable>
+                  )}
+
                   <RNTouchable
                     style={[styles.shareCtaButton, { backgroundColor: themeColor, shadowColor: themeColor }]}
                     onPress={() => deleteModal.plan && handleShareFromActionSheet(deleteModal.plan)}
@@ -1685,7 +1764,7 @@ export default function NutritionHomeScreen({ route }: any) {
                   {/* Cancel */}
                   <RNTouchable
                     style={styles.actionCancel}
-                    onPress={() => setDeleteModal({ visible: false, plan: null })}
+                    onPress={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
                     activeOpacity={0.6}
                   >
                     <Text style={styles.actionCancelText}>Cancel</Text>
@@ -1908,13 +1987,14 @@ export default function NutritionHomeScreen({ route }: any) {
    * cookbook capture card after the first shelf instead (see above).
    */
   /**
-   * "Your meals" shelf — user-created custom meals with the add card leading.
-   * Always rendered (even with zero custom meals) so the entry point is
-   * permanently discoverable; the add card alone is the empty state. Custom
-   * cards reuse renderFeedCard, which handles the image URI, CUSTOM badge
-   * and the edit-form tap route.
+   * "Your meals" shelf — user-created custom meals only. Returns null when the
+   * user has none: the entry point lives in renderAddYourOwnRow() at the foot
+   * of the feed instead, so an empty shelf never claims space. Custom cards
+   * reuse renderFeedCard, which handles the image URI, CUSTOM badge and the
+   * tap route.
    */
   function renderYourMealsSection() {
+    if (customViews.length === 0) return null;
     return (
       <View key="your-meals" style={styles.feedSection}>
         <View style={styles.feedSectionHeader}>
@@ -1925,26 +2005,33 @@ export default function NutritionHomeScreen({ route }: any) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.feedScrollContent}
         >
-          <TouchableOpacity
-            key="add-your-own"
-            style={[styles.feedCard, styles.addMealCard]}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('AddCustomMeal' as any)}
-            accessibilityRole="button"
-            accessibilityLabel="Add your own meal"
-            accessibilityHint="Opens a form to create a custom meal"
-          >
-            <View style={[styles.addMealCircle, { backgroundColor: `${themeColor}26` }]}>
-              <Ionicons name="add" size={22} color={themeColor} />
-            </View>
-            <Text style={styles.addMealText}>Add your own</Text>
-            <Text style={styles.addMealSub}>
-              Photo, macros and steps — pickable in your plans
-            </Text>
-          </TouchableOpacity>
           {customViews.map((meal) => renderFeedCard(meal))}
         </ScrollView>
       </View>
+    );
+  }
+
+  /**
+   * The permanent create-a-custom-meal entry point. A single row at the very
+   * bottom of the feed in BOTH states, so it never moves once the user crosses
+   * from zero custom meals to one — and so the discovery path doesn't depend on
+   * the picker inside the plan questionnaire, which isn't a browsing surface.
+   */
+  function renderAddYourOwnRow() {
+    return (
+      <TouchableOpacity
+        key="add-your-own-row"
+        style={styles.addMealRow}
+        activeOpacity={0.75}
+        onPress={() => navigation.navigate('AddCustomMeal' as any)}
+        accessibilityRole="button"
+        accessibilityLabel="Add your own meal"
+        accessibilityHint="Opens a form to create a custom meal"
+      >
+        <Ionicons name="add" size={19} color={themeColor} />
+        <Text style={styles.addMealRowText}>Add your own meal</Text>
+        <Ionicons name="chevron-forward" size={16} color="#4a4a52" />
+      </TouchableOpacity>
     );
   }
 
@@ -2163,40 +2250,38 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'relative',
   },
+  planRowTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   planRowInfo: {
     flex: 1,
     minWidth: 0,
-    paddingRight: 20,
   },
   planRowTitle: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 3,
   },
   planRowSub: {
     color: '#71717a',
     fontSize: 12,
   },
-  planRowGo: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#3f3f46',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // planRowGo is gone: it duplicated the row tap and fought this menu for the
+  // same corner. planRowMenuBtn is now an inline sibling, not absolute, which
+  // is what caused the overlap.
   planRowMenuBtn: {
-    position: 'absolute',
-    top: 6,
-    right: 8,
     width: 26,
     height: 26,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
   },
 
   // Section grouping (for "Other plans" — old style)
@@ -2250,6 +2335,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  heroCaption: {
+    color: '#71717a',
+    fontSize: 11,
     marginBottom: 6,
   },
   heroTitleText: {
@@ -2420,38 +2510,26 @@ const styles = StyleSheet.create({
     borderColor: '#27272a',
     marginRight: 12,
   },
-  // "Add your own" lead card on the Your meals shelf. Stretches to the row's
-  // height when custom cards sit beside it; minHeight keeps it a real card
-  // when it stands alone.
-  addMealCard: {
+  // Permanent "Add your own meal" row at the foot of the feed. Sits inside the
+  // scroll's own horizontal padding (unlike feedSection, which bleeds to the
+  // edges), so it lines up with the section headers above it.
+  addMealRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#3f3f46',
-    backgroundColor: '#101013',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-    gap: 8,
-    minHeight: 200,
+    borderColor: '#2e2e36',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginTop: 4,
+    marginBottom: 8,
   },
-  addMealCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addMealText: {
-    color: '#fafafa',
+  addMealRowText: {
+    flex: 1,
+    color: '#e8e8ea',
     fontSize: 15,
-    fontWeight: '600',
-  },
-  addMealSub: {
-    color: '#71717a',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 17,
+    fontWeight: '500',
   },
   feedCardImageWrap: {
     width: '100%',
@@ -2692,6 +2770,36 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   actionModalBackdrop: { flex: 1 },
+  makeCurrentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  makeCurrentText: {
+    fontSize: 14.5,
+    fontWeight: '600',
+  },
+  currentPlanState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#1c1c1f',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  currentPlanStateText: {
+    fontSize: 14.5,
+    fontWeight: '500',
+    color: '#52525b',
+  },
   actionSheet: {
     backgroundColor: '#18181b',
     borderTopLeftRadius: 28,

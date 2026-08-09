@@ -19,6 +19,35 @@
 // picker/feasibility never resolve a dangling slug. Saved plans that
 // reference a deleted custom slug keep working — plan entries carry their
 // own name/macros; only the image lookup falls back to the monogram tile.
+//
+// WRITE SAFETY (6 Aug):
+//   - ALL mutations run through a single promise chain (runExclusive). Both
+//     mutators do read-modify-write on one shared key, so two overlapping
+//     calls — a save landing while a delete is still in flight — would build
+//     the second write from a stale read and silently drop the first.
+//   - upsert/remove return a boolean. They used to return void while
+//     swallowing their own errors, so a failed write was indistinguishable
+//     from a successful one and the calling screen closed as if the meal
+//     had saved.
+//   - Every write is read back and compared before it reports success. Note
+//     what this does and does not prove: on iOS small values are held in a
+//     native in-memory dictionary, so a matching read-back confirms the
+//     round trip and catches a clobber, but it is NOT proof the bytes hit
+//     disk. Real write failures (Android's 6MB SQLite ceiling, which raises
+//     "database or disk is full") surface as a throw from setItem instead.
+//   - A write NEVER proceeds from an unreadable store. loadCustomMeals()
+//     returns [] on a parse failure, and building the next array from that
+//     read would turn one corrupt blob into a full wipe.
+//   - When a read drops records (corrupt JSON, or entries that fail
+//     isUsableRecord), the raw string is copied to a backup key before the
+//     store is overwritten. The backup is written ONCE and never replaced:
+//     the first quarantine is the copy taken closest to the good state.
+//   - The replaced image is deleted AFTER the record is written, not
+//     before. The old order could delete a live photo when the write then
+//     failed.
+//   - A schema version is stored under its own key so a future change to
+//     CustomMeal has a migration hook. It is stamped on write and read by
+//     inspectCustomMealStore; nothing branches on it yet.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -33,6 +62,26 @@ import {
 } from './curatedFavoritesStorage';
 
 const KEY = '@custom_meals';
+const BACKUP_KEY = '@custom_meals_backup';
+const SCHEMA_KEY = '@custom_meals_schema';
+const SCHEMA_VERSION = '1';
+
+/**
+ * Serialises every mutation onto one chain. Reads stay unqueued — they are
+ * snapshots and a stale one is harmless — but read-modify-write mutations
+ * must not interleave, or the later write silently discards the earlier.
+ * Failures do not poison the chain: the next operation runs regardless.
+ */
+let writeChain: Promise<unknown> = Promise.resolve();
+
+function runExclusive<T>(op: () => Promise<T>): Promise<T> {
+  const run = writeChain.then(op, op);
+  writeChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
 
 // expo-file-system moved its classic API behind /legacy in newer SDKs
 // (same guarded require as WeightTrackerScreen).
@@ -82,48 +131,151 @@ const isUsableRecord = (m: any): m is CustomMeal =>
   Array.isArray(m.eligible_slots) &&
   m.eligible_slots.length > 0;
 
-export async function loadCustomMeals(): Promise<CustomMeal[]> {
+interface StoreRead {
+  meals: CustomMeal[];
+  /** Raw stored string, kept so a lossy read can be quarantined before overwrite. */
+  raw: string | null;
+  /** False when the key could not be read at all — never write over this. */
+  readable: boolean;
+  /** True when the read discarded something that was actually stored. */
+  lossy: boolean;
+}
+
+async function readStore(): Promise<StoreRead> {
+  let raw: string | null = null;
   try {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isUsableRecord);
+    raw = await AsyncStorage.getItem(KEY);
   } catch (e) {
-    console.error('loadCustomMeals failed', e);
-    return [];
+    console.error('customMeals: store unreadable', e);
+    return { meals: [], raw: null, readable: false, lossy: false };
   }
+  if (raw == null) return { meals: [], raw: null, readable: true, lossy: false };
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return { meals: [], raw, readable: true, lossy: true };
+    }
+    const meals = parsed.filter(isUsableRecord);
+    return { meals, raw, readable: true, lossy: meals.length !== parsed.length };
+  } catch (e) {
+    console.error('customMeals: store did not parse', e);
+    return { meals: [], raw, readable: true, lossy: true };
+  }
+}
+
+/**
+ * Copy the current raw store aside before a lossy overwrite. Written once
+ * and never replaced — a later quarantine would be a copy of an already
+ * damaged store, and the first one is closest to the good state. Best
+ * effort: failing to back up is not a reason to block the user's save.
+ */
+async function quarantineStore(raw: string): Promise<void> {
+  try {
+    const existing = await AsyncStorage.getItem(BACKUP_KEY);
+    if (existing != null) return;
+    await AsyncStorage.setItem(BACKUP_KEY, raw);
+    console.warn('customMeals: lossy read, previous store copied to', BACKUP_KEY);
+  } catch (e) {
+    console.error('customMeals: quarantine failed', e);
+  }
+}
+
+/**
+ * Write the array, then read it back and compare. The comparison catches a
+ * concurrent clobber and a native no-op; it does not prove durability (see
+ * the WRITE SAFETY note at the top). A genuine out-of-space failure throws
+ * from setItem and is caught here.
+ */
+async function writeStoreVerified(meals: CustomMeal[]): Promise<boolean> {
+  const payload = JSON.stringify(meals);
+  try {
+    await AsyncStorage.setItem(KEY, payload);
+  } catch (e) {
+    console.error('customMeals: setItem failed', e);
+    return false;
+  }
+  try {
+    const back = await AsyncStorage.getItem(KEY);
+    if (back !== payload) {
+      console.error('customMeals: write did not verify');
+      return false;
+    }
+  } catch (e) {
+    console.error('customMeals: verification read failed', e);
+    return false;
+  }
+  try {
+    await AsyncStorage.setItem(SCHEMA_KEY, SCHEMA_VERSION);
+  } catch (e) {
+    // Non-fatal: the records are already written. Only the migration hook
+    // is missing, and a reader with no version can assume version 1.
+  }
+  return true;
+}
+
+export async function loadCustomMeals(): Promise<CustomMeal[]> {
+  const store = await readStore();
+  return store.meals;
 }
 
 /**
  * Create or update by slug. Preserves created_at on update, stamps
  * updated_at, and deletes the previous image file if the photo was
  * replaced or removed in an edit.
+ *
+ * Returns true only when the record is confirmed present in storage.
+ * Callers must not treat a save as done without checking this.
  */
-export async function upsertCustomMeal(meal: CustomMeal): Promise<void> {
+export async function upsertCustomMeal(meal: CustomMeal): Promise<boolean> {
+  return runExclusive(() => upsertCustomMealInner(meal));
+}
+
+async function upsertCustomMealInner(meal: CustomMeal): Promise<boolean> {
   try {
-    const meals = await loadCustomMeals();
+    const store = await readStore();
+    if (!store.readable) {
+      // Writing now would replace an unknown store with a single record.
+      return false;
+    }
+    if (store.lossy && store.raw) {
+      await quarantineStore(store.raw);
+    }
+
+    const meals = store.meals;
     const now = new Date().toISOString();
     const idx = meals.findIndex((m) => m.slug === meal.slug);
+
+    // Held until the write succeeds — deleting it first can strand a live
+    // record pointing at a file that no longer exists.
+    let replacedImage: string | undefined;
+
     if (idx === -1) {
       meals.push({ ...meal, created_at: meal.created_at || now, updated_at: now });
     } else {
       const prev = meals[idx];
       if (prev.image_uri && prev.image_uri !== meal.image_uri) {
-        await deleteCustomMealImage(prev.image_uri);
+        replacedImage = prev.image_uri;
       }
       meals[idx] = { ...meal, created_at: prev.created_at, updated_at: now };
     }
-    await AsyncStorage.setItem(KEY, JSON.stringify(meals));
+
+    const ok = await writeStoreVerified(meals);
+    if (!ok) return false;
+
+    if (replacedImage) {
+      await deleteCustomMealImage(replacedImage);
+    }
+    return true;
   } catch (e) {
     console.error('upsertCustomMeal failed', e);
+    return false;
   }
 }
 
 /**
  * Delete the meal, its image file, and any curated-favorites picks that
  * point at it (so the picker and feasibility engine never see a slug that
- * no longer resolves).
+ * no longer resolves). Returns true when the removal is confirmed.
  *
  * Note: saveCuratedFavoritesV2 rebuilds the legacy slug mirror from picks,
  * which drops mirror-only slugs that were never hydrated into picks. The
@@ -131,27 +283,82 @@ export async function upsertCustomMeal(meal: CustomMeal): Promise<void> {
  * custom meal has run the current picker, so this is consistent with app
  * behaviour.
  */
-export async function removeCustomMeal(slug: string): Promise<void> {
+export async function removeCustomMeal(slug: string): Promise<boolean> {
+  return runExclusive(() => removeCustomMealInner(slug));
+}
+
+async function removeCustomMealInner(slug: string): Promise<boolean> {
   try {
-    const meals = await loadCustomMeals();
-    const target = meals.find((m) => m.slug === slug);
-    const next = meals.filter((m) => m.slug !== slug);
-    await AsyncStorage.setItem(KEY, JSON.stringify(next));
+    const store = await readStore();
+    if (!store.readable) return false;
+    if (store.lossy && store.raw) {
+      await quarantineStore(store.raw);
+    }
+
+    const target = store.meals.find((m) => m.slug === slug);
+    const next = store.meals.filter((m) => m.slug !== slug);
+
+    const ok = await writeStoreVerified(next);
+    if (!ok) return false;
+
     if (target?.image_uri) {
       await deleteCustomMealImage(target.image_uri);
     }
-    const fav = await loadCuratedFavoritesV2();
-    if (fav.picks.some((p) => p.slug === slug) || fav.slugs.includes(slug)) {
-      await saveCuratedFavoritesV2({
-        picks: fav.picks.filter((p) => p.slug !== slug),
-        cuisines: fav.cuisines,
-        avoid: fav.avoid,
-        likedDishes: fav.likedDishes,
-      });
+
+    // Favorites pruning is deliberately after the meal is gone: if this
+    // fails the picker just holds a stale pick, which the merge already
+    // tolerates, whereas pruning first could orphan a pick for a meal that
+    // never got deleted.
+    try {
+      const fav = await loadCuratedFavoritesV2();
+      if (fav.picks.some((p) => p.slug === slug) || fav.slugs.includes(slug)) {
+        await saveCuratedFavoritesV2({
+          picks: fav.picks.filter((p) => p.slug !== slug),
+          cuisines: fav.cuisines,
+          avoid: fav.avoid,
+          likedDishes: fav.likedDishes,
+        });
+      }
+    } catch (e) {
+      console.error('removeCustomMeal: favorites prune failed', e);
     }
+
+    return true;
   } catch (e) {
     console.error('removeCustomMeal failed', e);
+    return false;
   }
+}
+
+/**
+ * Diagnostic for the store's health. Not used in normal flow — call it from
+ * a debug screen or a console when a save is in question.
+ */
+export async function inspectCustomMealStore(): Promise<{
+  readable: boolean;
+  lossy: boolean;
+  usableCount: number;
+  rawBytes: number;
+  hasBackup: boolean;
+  schemaVersion: string | null;
+}> {
+  const store = await readStore();
+  let hasBackup = false;
+  let schemaVersion: string | null = null;
+  try {
+    hasBackup = (await AsyncStorage.getItem(BACKUP_KEY)) != null;
+    schemaVersion = await AsyncStorage.getItem(SCHEMA_KEY);
+  } catch (e) {
+    hasBackup = false;
+  }
+  return {
+    readable: store.readable,
+    lossy: store.lossy,
+    usableCount: store.meals.length,
+    rawBytes: store.raw ? store.raw.length : 0,
+    hasBackup,
+    schemaVersion,
+  };
 }
 
 // ---------------------------------------------------------------------------

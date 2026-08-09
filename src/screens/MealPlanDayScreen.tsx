@@ -37,7 +37,7 @@ import { buildFreshnessIndex } from '../utils/buildPrepSession';
 import RecipeFavorites from '../utils/recipeFavorites';
 import { CURATED_MEALS } from '../data/curated_meals';
 import { getMealImage } from '../assets/mealImages';
-import { loadCustomMeals } from '../utils/customMealsStorage';
+import { loadCustomMeals, loadCustomMealViews } from '../utils/customMealsStorage';
 
 type MealPlanDayScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MealPlanDay'>;
 type MealPlanDayScreenRouteProp = RouteProp<RootStackParamList, 'MealPlanDay'>;
@@ -52,6 +52,9 @@ const FAINT = '#6a6a70';
 // Resolve a meal photo from whatever field the curated record uses.
 const getMealImageUri = (meal: any): string | null =>
   meal?.photo_url || meal?.image || meal?.imageUrl || meal?.image_url || meal?.photo || meal?.imageURL || meal?.img || meal?.thumbnail || null;
+
+// Parse a macro/calorie text field. Empty and garbage both read as zero.
+const numField = (s: string): number => parseInt(s, 10) || 0;
 
 interface MealCardProps {
   meal: SimplifiedMeal;
@@ -514,6 +517,13 @@ export default function MealPlanDayScreen() {
   const [newMealProtein, setNewMealProtein] = useState('');
   const [newMealCarbs, setNewMealCarbs] = useState('');
   const [newMealFat, setNewMealFat] = useState('');
+
+  // Calories is the primary field; macros are optional and collapsed by default.
+  // Macros always win: any edit to protein/carbs/fat recomputes the kcal field
+  // from 4P + 4C + 9F. `kcalEdited` only tracks whether the user has since typed
+  // over that figure by hand, which is the one case worth a reconcile line.
+  const [showMacros, setShowMacros] = useState(false);
+  const [kcalEdited, setKcalEdited] = useState(false);
   
   // Action sheet and delete modal states
   const [showActionSheet, setShowActionSheet] = useState(false);
@@ -523,9 +533,13 @@ export default function MealPlanDayScreen() {
   // Meal completion tracking
   const [completedMeals, setCompletedMeals] = useState<Record<string, boolean>>({});
 
-  // Favourited recipes (from the Library's recipe-favourites store), loaded
-  // when the quick-add sheet opens. Slugs are resolved to curated meals.
+  // Favourited recipes (from the Library's recipe-favourites store) and the
+  // user's own created meals, loaded when the quick-add sheet opens. Both are
+  // normalised to the same { meal, plate, slug, plateId, key } entry shape so a
+  // single card row can render either source.
   const [favRecipes, setFavRecipes] = useState<any[]>([]);
+  const [customEntries, setCustomEntries] = useState<any[]>([]);
+  const [pickSource, setPickSource] = useState<'favourites' | 'mine'>('favourites');
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null);
 
   useEffect(() => {
@@ -544,6 +558,29 @@ export default function MealPlanDayScreen() {
         setFavRecipes(entries as any[]);
       } catch {
         setFavRecipes([]);
+      }
+    })();
+  }, [showAddMealModal]);
+
+  // The user's own meals. toCustomMealView() already fabricates the curated
+  // shape (one 'standard' plate carrying the per-serving macros), so these drop
+  // straight into recipeFields() — only the photo differs, and that's a device
+  // file URI on image_uri rather than a bundled asset.
+  useEffect(() => {
+    if (!showAddMealModal) return;
+    (async () => {
+      try {
+        const views = await loadCustomMealViews();
+        const entries = (views || [])
+          .map((meal: any) => {
+            const plate = Array.isArray(meal?.plates) ? meal.plates[0] : null;
+            if (!plate) return null;
+            return { meal, plate, slug: meal.slug, plateId: plate?.id, key: `${meal.slug}::${plate?.id}` };
+          })
+          .filter(Boolean);
+        setCustomEntries(entries as any[]);
+      } catch {
+        setCustomEntries([]);
       }
     })();
   }, [showAddMealModal]);
@@ -1017,22 +1054,29 @@ export default function MealPlanDayScreen() {
     setNewMealProtein('');
     setNewMealCarbs('');
     setNewMealFat('');
+    setShowMacros(false);
+    setKcalEdited(false);
+    setPickSource('favourites');
   };
 
-  // A favourite entry is { meal, plate, slug, plateId, key }; we read macros /
-  // name / photo from the specific favourited plate. Falls back gracefully if
-  // handed a raw meal (defensive).
+  // A pick entry is { meal, plate, slug, plateId, key }; we read macros / name /
+  // photo from the specific plate. Custom meals arrive in the same shape via
+  // toCustomMealView(), and are told apart by their slug prefix — their photo is
+  // a device file URI, not a bundled asset, so localName stays null for them.
   const recipeFields = (r: any) => {
     const meal = r?.meal || r;
     const plate = r?.plate || meal?.plates?.[0];
     const m = plate?.plate_macros || {};
+    const slug = meal?.slug;
+    const custom = !!meal?.custom || (typeof slug === 'string' && slug.startsWith('custom_'));
     return {
-      slug: meal?.slug,
+      slug,
       plateId: plate?.id,
       key: r?.key || `${meal?.slug}::${plate?.id}`,
-      name: plate?.display_name || meal?.display_name || 'Recipe',
-      photo: meal?.photo_url || null,
-      localName: plate?.image_filename || meal?.image_filename || null,
+      name: plate?.display_name || meal?.display_name || meal?.name || 'Recipe',
+      custom,
+      photo: custom ? (meal?.image_uri || null) : (meal?.photo_url || null),
+      localName: custom ? null : (plate?.image_filename || meal?.image_filename || null),
       kcal: Math.round(m.kcal || 0),
       protein: Math.round(m.protein_g || 0),
       carbs: Math.round(m.carbs_g || 0),
@@ -1048,6 +1092,48 @@ export default function MealPlanDayScreen() {
     setNewMealProtein(f.protein ? String(f.protein) : '');
     setNewMealCarbs(f.carbs ? String(f.carbs) : '');
     setNewMealFat(f.fat ? String(f.fat) : '');
+    // The recipe's own kcal is authoritative and isn't a hand-typed override, so
+    // it gets no reconcile line even where the plate's figure and the arithmetic
+    // disagree. Show the macros it came with rather than hiding them.
+    setKcalEdited(false);
+    setShowMacros(true);
+  };
+
+  // Which list the card row is showing.
+  const pickList = pickSource === 'mine' ? customEntries : favRecipes;
+  const hasAnyPicks = favRecipes.length > 0 || customEntries.length > 0;
+
+  // 4 kcal per gram of protein and carbs, 9 per gram of fat. Fibre is left out
+  // deliberately (AU labels exclude it from carbs), matching AddCustomMealScreen.
+  const derivedKcal = Math.round(
+    numField(newMealProtein) * 4 + numField(newMealCarbs) * 4 + numField(newMealFat) * 9
+  );
+  const enteredKcal = numField(newMealCalories);
+  // Only reachable when the user types over a figure the macros just produced,
+  // and only once the gap is bigger than label rounding. Never blocks the log.
+  const showReconcile =
+    showMacros && kcalEdited && derivedKcal > 0 && enteredKcal > 0 && Math.abs(enteredKcal - derivedKcal) > 5;
+
+  const applyMacro = (field: 'protein' | 'carbs' | 'fat', val: string) => {
+    const next = { protein: newMealProtein, carbs: newMealCarbs, fat: newMealFat };
+    next[field] = val;
+    if (field === 'protein') setNewMealProtein(val);
+    else if (field === 'carbs') setNewMealCarbs(val);
+    else setNewMealFat(val);
+
+    // Macros are the source of truth from here on, whatever was in the kcal
+    // field before. Clearing every macro back to nothing is the one exception:
+    // that leaves the last figure alone rather than wiping a kcal-only entry.
+    const k = Math.round(numField(next.protein) * 4 + numField(next.carbs) * 4 + numField(next.fat) * 9);
+    if (k > 0) {
+      setNewMealCalories(String(k));
+      setKcalEdited(false);
+    }
+  };
+
+  const useDerivedKcal = () => {
+    setNewMealCalories(String(derivedKcal));
+    setKcalEdited(false);
   };
 
   const logQuickMeal = async () => {
@@ -1061,6 +1147,8 @@ export default function MealPlanDayScreen() {
 
     // Typed loosely: photo_url/slug aren't on SimplifiedMeal yet, but we attach
     // them so logged-from-recipe meals can show their photo on the day screen.
+    // For a custom meal rf.photo is already the device file URI, so the day card
+    // resolves it without needing the slug index.
     const meal: any = {
       name: newMealName.trim() || 'Logged meal',
       type: newMealType === 'custom' ? 'snack' : newMealType,
@@ -1464,65 +1552,150 @@ export default function MealPlanDayScreen() {
                 </View>
               ))}
 
-              <Text style={[styles.qaLabel, { marginTop: 18 }]}>Macros</Text>
-              <View style={styles.qaMacroRow}>
-                <View style={styles.qaMacroCol}>
-                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealCalories} onChangeText={setNewMealCalories} keyboardType="numeric" textAlign="center" />
-                  <Text style={styles.qaMacroLbl}>Kcal</Text>
-                </View>
-                <View style={styles.qaMacroCol}>
-                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealProtein} onChangeText={setNewMealProtein} keyboardType="numeric" textAlign="center" />
-                  <Text style={styles.qaMacroLbl}>Protein</Text>
-                </View>
-                <View style={styles.qaMacroCol}>
-                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealCarbs} onChangeText={setNewMealCarbs} keyboardType="numeric" textAlign="center" />
-                  <Text style={styles.qaMacroLbl}>Carbs</Text>
-                </View>
-                <View style={styles.qaMacroCol}>
-                  <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealFat} onChangeText={setNewMealFat} keyboardType="numeric" textAlign="center" />
-                  <Text style={styles.qaMacroLbl}>Fat</Text>
-                </View>
+              {/* Calories is the headline field. Everything below it is optional,
+                  so a kcal-only log is one number and done. */}
+              <Text style={[styles.qaLabel, { marginTop: 20 }]}>Calories</Text>
+              <View style={styles.qaCalField}>
+                <TextInput
+                  style={styles.qaCalInput}
+                  placeholder="0"
+                  placeholderTextColor="#3a3a40"
+                  value={newMealCalories}
+                  onChangeText={(t) => {
+                    setKcalEdited(true);
+                    setNewMealCalories(t);
+                  }}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.qaCalUnit}>KCAL</Text>
               </View>
 
-              {favRecipes.length > 0 && (
+              {!showMacros ? (
+                <TouchableOpacity
+                  style={styles.qaMacroToggle}
+                  activeOpacity={0.8}
+                  onPress={() => setShowMacros(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add macros, optional"
+                >
+                  <Text style={styles.qaMacroToggleText}>
+                    Add macros <Text style={styles.qaOptionalInline}>(optional)</Text>
+                  </Text>
+                  <Ionicons name="add" size={16} color={FAINT} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.qaMacroBox}>
+                  <View style={styles.qaMacroHead}>
+                    <Text style={styles.qaMacroHeadText}>Macros</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowMacros(false)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Hide macros"
+                    >
+                      <Ionicons name="remove" size={16} color={FAINT} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.qaMacroRow}>
+                    <View style={styles.qaMacroCol}>
+                      <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealProtein} onChangeText={(t) => applyMacro('protein', t)} keyboardType="numeric" textAlign="center" />
+                      <Text style={styles.qaMacroLbl}>Protein</Text>
+                    </View>
+                    <View style={styles.qaMacroCol}>
+                      <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealCarbs} onChangeText={(t) => applyMacro('carbs', t)} keyboardType="numeric" textAlign="center" />
+                      <Text style={styles.qaMacroLbl}>Carbs</Text>
+                    </View>
+                    <View style={styles.qaMacroCol}>
+                      <TextInput style={styles.qaMacroInput} placeholder="0" placeholderTextColor="#5a5a60" value={newMealFat} onChangeText={(t) => applyMacro('fat', t)} keyboardType="numeric" textAlign="center" />
+                      <Text style={styles.qaMacroLbl}>Fat</Text>
+                    </View>
+                  </View>
+
+                  {showReconcile && (
+                    <View style={styles.qaReconcile}>
+                      <Text style={styles.qaReconcileText}>Macros work out to {derivedKcal} kcal</Text>
+                      <TouchableOpacity onPress={useDerivedKcal} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+                        <Text style={[styles.qaReconcileAction, { color: themeColor }]}>Use {derivedKcal}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {hasAnyPicks && (
                 <>
                   <View style={styles.qaDivider}>
                     <View style={styles.qaDivLine} />
-                    <Text style={styles.qaDivText}>OR PICK A FAVOURITE</Text>
+                    <Text style={styles.qaDivText}>OR PICK A MEAL</Text>
                     <View style={styles.qaDivLine} />
                   </View>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.qaFavRow}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {favRecipes.map((r) => {
-                      const f = recipeFields(r);
-                      const selected = selectedRecipe?.key === f.key;
-                      const localSrc = f.localName ? getMealImage(f.localName) : null;
+
+                  <View style={styles.qaSource}>
+                    {(['favourites', 'mine'] as const).map((s) => {
+                      const active = pickSource === s;
                       return (
                         <TouchableOpacity
-                          key={f.key}
-                          style={[styles.qaFav, selected && { borderColor: themeColor }]}
+                          key={s}
+                          style={[styles.qaSourceItem, active && styles.qaSourceItemActive]}
                           activeOpacity={0.8}
-                          onPress={() => prefillFromRecipe(r)}
+                          onPress={() => setPickSource(s)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
                         >
-                          {localSrc ? (
-                            <Image source={localSrc} style={styles.qaFavPhoto} resizeMode="cover" />
-                          ) : f.photo ? (
-                            <Image source={{ uri: f.photo }} style={styles.qaFavPhoto} resizeMode="cover" />
-                          ) : (
-                            <View style={styles.qaFavPhotoFallback}>
-                              <Ionicons name="restaurant-outline" size={20} color="#52525b" />
-                            </View>
-                          )}
-                          <Text style={[styles.qaFavName, selected && { color: themeColor }]} numberOfLines={1}>{f.name}</Text>
-                          <Text style={styles.qaFavKcal}>{f.kcal} kcal · {f.protein}g P</Text>
+                          <Text style={[styles.qaSourceText, active && styles.qaSourceTextActive]}>
+                            {s === 'favourites' ? 'Favourites' : 'My meals'}
+                          </Text>
                         </TouchableOpacity>
                       );
                     })}
-                  </ScrollView>
+                  </View>
+
+                  {pickList.length === 0 ? (
+                    <Text style={styles.qaPickEmpty}>
+                      {pickSource === 'mine'
+                        ? "You haven't created any meals yet."
+                        : 'No favourited recipes yet.'}
+                    </Text>
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.qaFavRow}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {pickList.map((r) => {
+                        const f = recipeFields(r);
+                        const selected = selectedRecipe?.key === f.key;
+                        const localSrc = f.localName ? getMealImage(f.localName) : null;
+                        return (
+                          <TouchableOpacity
+                            key={f.key}
+                            style={[styles.qaFav, selected && { borderColor: themeColor }]}
+                            activeOpacity={0.8}
+                            onPress={() => prefillFromRecipe(r)}
+                          >
+                            {localSrc ? (
+                              <Image source={localSrc} style={styles.qaFavPhoto} resizeMode="cover" />
+                            ) : f.photo ? (
+                              <Image source={{ uri: f.photo }} style={styles.qaFavPhoto} resizeMode="cover" />
+                            ) : (
+                              <View style={styles.qaFavPhotoFallback}>
+                                <Ionicons name="restaurant-outline" size={20} color="#52525b" />
+                              </View>
+                            )}
+                            {f.custom && (
+                              <View style={styles.qaFavBadge}>
+                                <Text style={[styles.qaFavBadgeText, { color: themeColor }]}>CUSTOM</Text>
+                              </View>
+                            )}
+                            <Text style={[styles.qaFavName, selected && { color: themeColor }]} numberOfLines={1}>{f.name}</Text>
+                            <Text style={styles.qaFavKcal}>{f.kcal} kcal · {f.protein}g P</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
                 </>
               )}
             </ScrollView>
@@ -1535,9 +1708,6 @@ export default function MealPlanDayScreen() {
                 activeOpacity={0.85}
               >
                 <Text style={[styles.qaBtnText, !canLog && styles.qaBtnTextDisabled]}>Log it</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={closeAddMeal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.7}>
-                <Text style={styles.qaCancel}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -1896,16 +2066,65 @@ const styles = StyleSheet.create({
   qaContent: { padding: 20, paddingBottom: 40 },
   qaLabel: { fontSize: 10, letterSpacing: 2, color: FAINT, fontWeight: '600', textTransform: 'uppercase', marginBottom: 9 },
   qaOptional: { letterSpacing: 0, textTransform: 'none', color: '#4a4a50' },
+  qaOptionalInline: { color: '#5a5a60' },
   qaFavRow: { paddingRight: 8 },
   qaFav: { width: 140, borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 14, overflow: 'hidden', marginRight: 9 },
   qaFavPhoto: { width: '100%', height: 76 },
   qaFavPhotoFallback: { width: '100%', height: 76, backgroundColor: '#141416', alignItems: 'center', justifyContent: 'center' },
   qaFavName: { fontFamily: SERIF, fontSize: 14, color: '#e8e8ea', paddingHorizontal: 10, paddingTop: 8 },
   qaFavKcal: { fontSize: 11, color: MUTED, paddingHorizontal: 10, paddingBottom: 10, paddingTop: 3 },
+  // Same badge language as the CUSTOM pill on the picker and the Your meals shelf.
+  qaFavBadge: { position: 'absolute', top: 7, left: 7, backgroundColor: 'rgba(0,0,0,0.62)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  qaFavBadgeText: { fontSize: 8.5, letterSpacing: 0.8, fontWeight: '700' },
   qaDivider: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 18 },
   qaDivLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#222' },
   qaDivText: { fontSize: 10, letterSpacing: 1.5, color: '#5a5a60', fontWeight: '600' },
   qaField: { backgroundColor: '#0e0e12', borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#f4f4f6', minHeight: 48 },
+
+  // Calories: one wide primary field, serif figure, unit sitting to the right.
+  qaCalField: {
+    backgroundColor: '#0e0e12',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#26262c',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 64,
+  },
+  qaCalInput: { flex: 1, fontFamily: SERIF, fontSize: 30, color: '#f4f4f6', paddingVertical: Platform.OS === 'ios' ? 12 : 6 },
+  qaCalUnit: { fontSize: 11, letterSpacing: 1.4, color: FAINT, fontWeight: '600', marginLeft: 10 },
+
+  // Collapsed macro affordance. Dashed, matching the add-your-own cards.
+  qaMacroToggle: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#2e2e36',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  qaMacroToggleText: { fontSize: 13, color: '#9a9aa0' },
+
+  qaMacroBox: { marginTop: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 12, paddingHorizontal: 13, paddingTop: 12, paddingBottom: 14 },
+  qaMacroHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 },
+  qaMacroHeadText: { fontSize: 10, letterSpacing: 1.6, color: FAINT, fontWeight: '600', textTransform: 'uppercase' },
+  qaReconcile: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#1c1c20' },
+  qaReconcileText: { fontSize: 12, color: MUTED, flex: 1, marginRight: 10 },
+  qaReconcileAction: { fontSize: 12, fontWeight: '600' },
+
+  // Favourites / My meals source toggle above the card row.
+  qaSource: { flexDirection: 'row', backgroundColor: '#0e0e12', borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 13, padding: 3, marginBottom: 13 },
+  qaSourceItem: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  qaSourceItemActive: { backgroundColor: '#1c1c22' },
+  qaSourceText: { fontSize: 13, color: '#7a7a82' },
+  qaSourceTextActive: { color: '#f4f4f6', fontWeight: '500' },
+  qaPickEmpty: { fontSize: 13, color: '#5a5a60', paddingVertical: 14 },
+
   qaMacroRow: { flexDirection: 'row', gap: 9 },
   qaSegment: { flexDirection: 'row', backgroundColor: '#0e0e12', borderWidth: StyleSheet.hairlineWidth, borderColor: '#26262c', borderRadius: 13, padding: 3 },
   qaSegItem: { paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -1919,7 +2138,6 @@ const styles = StyleSheet.create({
   qaBtnDisabled: { backgroundColor: '#1a1a1e' },
   qaBtnText: { fontSize: 16, fontWeight: '700', color: '#ffffff' },
   qaBtnTextDisabled: { color: '#5a5a60' },
-  qaCancel: { fontSize: 14, color: MUTED, textAlign: 'center', marginTop: 14 },
 
   // ===== Existing modal / picker / sheet styles (unchanged) =====
   modalScreen: {

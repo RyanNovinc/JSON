@@ -151,20 +151,36 @@ const buyAmount = (need: number, unit: string, packSize?: number): number => {
 
 export function buildNativeGroceryList(
   plan: SimplifiedMealPlan | null | undefined,
-  choices: VariantChoices
+  choices: VariantChoices,
+  /**
+   * Slug → meal. Defaults to the curated catalogue so existing callers are
+   * unaffected; pass the merged lookup (see hooks/useMealLookup) to include the
+   * user's own meals. Without it a custom_ slug matches nothing here and the
+   * meal contributes NOTHING to the list — no items, no unpriced count, no
+   * error — so a user who flipped one MAKE IT toggle lost their own meal's
+   * ingredients off the shop with no way to notice.
+   */
+  mealsDb: Record<string, any> = MEALS
 ): NativeGroceryBuild {
   const meals = Object.values(plan?.dailyMeals ?? {}).flatMap((d: any) => d?.meals ?? []);
 
-  // ── Collect curated occurrences by slug ──
-  const bySlug: Record<string, { scales: number[]; plates: { plate_id: string; scale: number }[] }> = {};
+  // ── Collect occurrences by slug, splitting curated from user-created ──
+  // They can't share a loop below: a curated meal resolves library ingredient
+  // ids through resolveBaseIngredients, while a user's meal carries free text
+  // rows with no ids at all.
+  type Occurrences = { scales: number[]; plates: { plate_id: string; scale: number }[] };
+  const bySlug: Record<string, Occurrences> = {};
+  const byCustomSlug: Record<string, Occurrences> = {};
   const invented: any[] = [];
   for (const m of meals) {
     const slug = (m as any).curated_meal_slug;
-    if (slug && MEALS[slug]) {
+    const known = slug ? mealsDb[slug] : null;
+    if (known) {
       const scale = Number((m as any).scale_factor) > 0 ? Number((m as any).scale_factor) : 1;
-      bySlug[slug] = bySlug[slug] || { scales: [], plates: [] };
-      bySlug[slug].scales.push(scale);
-      bySlug[slug].plates.push({ plate_id: (m as any).plate_id, scale });
+      const bucket = known.custom ? byCustomSlug : bySlug;
+      bucket[slug] = bucket[slug] || { scales: [], plates: [] };
+      bucket[slug].scales.push(scale);
+      bucket[slug].plates.push({ plate_id: (m as any).plate_id, scale });
     } else if (Array.isArray((m as any).ingredients) && (m as any).ingredients.length) {
       invented.push(m);
     }
@@ -190,7 +206,7 @@ export function buildNativeGroceryList(
   const curatedMeals: CuratedPlanMeal[] = [];
 
   for (const slug of Object.keys(bySlug)) {
-    const meal = MEALS[slug];
+    const meal = mealsDb[slug];
     const occ = bySlug[slug];
     const variants = meal.sauce_variants ?? [];
     const defaultVariant = variants.find((v: any) => v.is_default) ?? variants[0] ?? null;
@@ -254,6 +270,40 @@ export function buildNativeGroceryList(
       altExtraTime: altVariant ? (extra ? fmtTime(extra) : '') : null,
       chosenVariantId: chosen,
     });
+  }
+
+  // ── User-created meals: free-text rows, amounts already PER SERVING ──
+  //
+  // Quantity follows the same rule as a curated meal: you buy for whole cooks,
+  // not for portions eaten. A meal that makes four and is eaten three times
+  // still needs a full batch's ingredients. Single-serving meals scale by the
+  // occurrences themselves.
+  //
+  // Keys are prefixed `cust_` rather than `ing_` so the price lookup below
+  // skips the id index and goes straight to the name index — which is right,
+  // because the prompt tells the AI these rows carry no id and so appear on its
+  // list with no bracket.
+  for (const slug of Object.keys(byCustomSlug)) {
+    const meal = mealsDb[slug];
+    const occ = byCustomSlug[slug];
+    const totalScale = occ.scales.reduce((s, x) => s + x, 0);
+    const serves = Number(meal.produces_servings) > 0 ? Number(meal.produces_servings) : 1;
+    const batches = serves > 1 ? Math.max(1, Math.ceil(totalScale / serves - 1e-9)) : 1;
+    const servingsToBuy = serves > 1 ? batches * serves : totalScale;
+
+    for (const row of (meal.custom_ingredients ?? []) as any[]) {
+      const name = String(row?.name ?? '').trim();
+      if (!name) continue;
+      const per = Number(row?.amount);
+      const amount = Number.isFinite(per) && per > 0 ? per * servingsToBuy : 0;
+      add(
+        `cust_${normaliseName(name)}`,
+        name,
+        amount,
+        String(row?.unit ?? '').trim(),
+        'other'
+      );
+    }
   }
 
   // ── Invented / manually-added meals: pass their inline ingredients through ──

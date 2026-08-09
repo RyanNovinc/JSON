@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WorkoutRoutine } from '../utils/storage';
+import RobustStorage from '../utils/robustStorage';
 
 // =============================================================================
 // WORKOUT ROUTINE CONTEXT - Based on SimplifiedMealPlanningContext Pattern
@@ -183,8 +184,103 @@ export const WorkoutRoutineProvider = ({ children }: WorkoutRoutineProviderProps
     await saveRoutine(routine); // Same operation
   };
 
+  // Some screens sanitize the block name before using it in a key
+  // (DaysScreen does `replace(/[^a-zA-Z0-9]/g, '_')`), so a sweep has to look for
+  // both spellings.
+  const sanitizeBlockName = (name: string): string => name.replace(/[^a-zA-Z0-9]/g, '_');
+
+  /**
+   * Removing a routine used to leave every per-block key behind: completed_*,
+   * completionStats_*, currentWeek_*, bookmark_*, manual_days_*,
+   * day_customization_*, workout_*_sets, workout_*_exercises, plus the
+   * RobustStorage shadows of each (_backup1, _backup2, _meta, _emergency_*).
+   * Re-adding the same program then inherited the old progress.
+   *
+   * The sweep is by BLOCK NAME because that is what every one of those keys is
+   * built from — none of them carry the routine id. Block names are NOT unique
+   * across routines (all three bundled sample plans use "Block 1 — Foundation"),
+   * so purging blindly would wipe a different program's history. Only names that
+   * no REMAINING routine still uses are purged; a shared name is left alone.
+   */
+  const purgeBlockStorage = async (
+    deleted: WorkoutRoutine | undefined,
+    remaining: WorkoutRoutine[],
+  ): Promise<void> => {
+    console.log('🧹 WorkoutContext: purgeBlockStorage v2 running', {
+      deleted: (deleted as any)?.name,
+      blocksOnDeleted: ((deleted as any)?.data?.blocks || []).length,
+      remainingRoutines: remaining.length,
+    });
+
+    if (!deleted) {
+      console.log('🧹 WorkoutContext: nothing to purge — no deleted routine captured');
+      return;
+    }
+
+    const namesOf = (routine: any): string[] =>
+      (routine?.data?.blocks || [])
+        .map((block: any) => block?.block_name)
+        .filter((name: any): name is string => typeof name === 'string' && name.length >= 3);
+
+    const stillUsed = new Set<string>();
+    remaining.forEach(routine => namesOf(routine).forEach(name => stillUsed.add(name)));
+
+    const purgeable = Array.from(new Set(namesOf(deleted))).filter(name => !stillUsed.has(name));
+
+    if (purgeable.length === 0) {
+      console.log('🧹 WorkoutContext: no block names to purge (shared with a remaining routine, or none found)');
+      return;
+    }
+
+    const needles: string[] = [];
+    purgeable.forEach(name => {
+      needles.push(name);
+      const sanitized = sanitizeBlockName(name);
+      if (sanitized !== name) needles.push(sanitized);
+    });
+
+    const allKeys = await AsyncStorage.getAllKeys();
+    const doomed = allKeys.filter(key => needles.some(needle => key.includes(needle)));
+
+    console.log(`🧹 WorkoutContext: ${doomed.length} keys match block(s): ${purgeable.join(', ')}`);
+
+    if (doomed.length === 0) {
+      console.log('🧹 WorkoutContext: no matching keys found — nothing removed');
+      return;
+    }
+
+    // Completion primaries go through RobustStorage so it lays its tombstone and
+    // clears its own cross-session copies; a raw removeItem here would let the
+    // recovery layer resurrect them on the next read.
+    const primaries = doomed.filter(key =>
+      (key.startsWith('completed_') || key.startsWith('workout_completion_')) &&
+      !/_backup1$|_backup2$|_meta$|_emergency_/.test(key)
+    );
+
+    for (const key of primaries) {
+      try {
+        await RobustStorage.removeItem(key, true, true);
+      } catch (error) {
+        console.warn(`🧹 WorkoutContext: RobustStorage could not remove "${key}"`, error);
+      }
+    }
+
+    const leftovers = (await AsyncStorage.getAllKeys()).filter(key =>
+      needles.some(needle => key.includes(needle))
+    );
+
+    if (leftovers.length > 0) {
+      await AsyncStorage.multiRemove(leftovers);
+    }
+
+    console.log(
+      `🧹 WorkoutContext: purged ${doomed.length} keys for block(s): ${purgeable.join(', ')}`
+    );
+  };
+
   const deleteRoutine = async (routineId: string): Promise<void> => {
     try {
+      const removed = state.routines.find(r => r.id === routineId);
       const updatedRoutines = state.routines.filter(r => r.id !== routineId);
       
       // Save updated routines
@@ -199,6 +295,15 @@ export const WorkoutRoutineProvider = ({ children }: WorkoutRoutineProviderProps
       }));
       
       console.log(`✅ WorkoutContext: Deleted routine "${routineId}"`);
+
+      // Deliberately AFTER the routine list is saved and state is updated: the
+      // routine is gone from the user's point of view either way, so a failure
+      // in the cleanup must never make the delete itself look broken.
+      try {
+        await purgeBlockStorage(removed, updatedRoutines);
+      } catch (purgeError) {
+        console.warn('🧹 WorkoutContext: block storage purge failed (routine still deleted):', purgeError);
+      }
     } catch (error) {
       console.error('❌ WorkoutContext: Failed to delete routine:', error);
     }

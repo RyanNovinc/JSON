@@ -1281,6 +1281,17 @@ export default function BlocksScreen() {
     .map((block, idx) => ({ block, idx }))
     .filter(({ idx }) => idx !== activeBlockIndex);
 
+  // "ALL BLOCKS" was never all of them — the active block is filtered out above —
+  // and it put a finished block next to one you have not started, separated by
+  // nothing but a small tick. Splitting on completion is what makes the labels
+  // honest: COMING UP is what is ahead, DONE is a receipt.
+  const upcomingBlocksWithIndex = otherBlocksWithIndex.filter(
+    ({ block }) => !completionStatus[block.block_name]
+  );
+  const completedBlocksWithIndex = otherBlocksWithIndex.filter(
+    ({ block }) => completionStatus[block.block_name]
+  );
+
   // For mesocycle mode, separate active from others
   const activeMesocycle = mesocycleCards.find(m => m.isActive);
   const otherMesocycles = mesocycleCards.filter(m => !m.isActive);
@@ -1307,7 +1318,9 @@ export default function BlocksScreen() {
         <FlatList
           data={otherMesocycles}
           keyExtractor={(item) => `mesocycle-${item.mesocycleNumber}-${item.customId || ''}`}
-          ListHeaderComponent={() => (
+          /* Element, not a function — see the block branch below. The ALL
+             MESOCYCLES section is deliberately left as it is. */
+          ListHeaderComponent={(
             <>
               {/* Title block */}
               <View style={styles.titleBlock}>
@@ -1360,7 +1373,7 @@ export default function BlocksScreen() {
               themeColor={themeColor}
             />
           )}
-          ListFooterComponent={() => (
+          ListFooterComponent={(
             <TouchableOpacity
               style={[styles.addButton, { borderColor: themeColor }]}
               onPress={() => handleAddMesocycle()}
@@ -1375,9 +1388,12 @@ export default function BlocksScreen() {
         />
       ) : (
         <FlatList
-          data={otherBlocksWithIndex}
+          data={upcomingBlocksWithIndex}
           keyExtractor={(item) => `${item.block.block_name}-${item.idx}`}
-          ListHeaderComponent={() => (
+          /* Passed as an ELEMENT, not a function. An inline arrow here is a new
+             component TYPE on every render, so React unmounts and remounts the
+             whole header subtree instead of updating it. Same for the footer. */
+          ListHeaderComponent={(
             <>
               {/* Title block */}
               <View style={styles.titleBlock}>
@@ -1415,10 +1431,18 @@ export default function BlocksScreen() {
                 </>
               )}
 
-              {otherBlocksWithIndex.length > 0 && (
-                <Text style={[styles.sectionLabel, styles.sectionLabelMuted]}>
-                  {activeBlock ? 'ALL BLOCKS' : 'BLOCKS'}
-                </Text>
+              {upcomingBlocksWithIndex.length > 0 && (
+                <View style={styles.sectionHeaderRow}>
+                  <Text
+                    style={[styles.sectionLabel, styles.sectionHeaderLabel, styles.sectionLabelMuted]}
+                  >
+                    {activeBlock ? 'COMING UP' : 'BLOCKS'}
+                  </Text>
+                  <Text style={styles.sectionHeaderCount}>
+                    {upcomingBlocksWithIndex.length}{' '}
+                    {upcomingBlocksWithIndex.length === 1 ? 'block' : 'blocks'}
+                  </Text>
+                </View>
               )}
             </>
           )}
@@ -1431,20 +1455,64 @@ export default function BlocksScreen() {
               themeColor={themeColor}
             />
           )}
-          ListFooterComponent={() => (
-            <TouchableOpacity
-              style={[styles.addButton, { borderColor: themeColor }]}
-              onPress={() => {
-                navigation.navigate('AddBlock', {
-                  targetWorkoutId: routine.id,
-                  routineName: routine.name,
-                });
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="add-circle-outline" size={18} color={themeColor} />
-              <Text style={[styles.addButtonText, { color: themeColor }]}>Add Block</Text>
-            </TouchableOpacity>
+          ListFooterComponent={(
+            <>
+              {completedBlocksWithIndex.length > 0 && (
+                <>
+                  <View style={styles.sectionSpacer} />
+                  <View style={styles.sectionHeaderRow}>
+                    <Text
+                      style={[styles.sectionLabel, styles.sectionHeaderLabel, styles.sectionHeaderCount]}
+                    >
+                      DONE
+                    </Text>
+                    <Text style={styles.sectionHeaderCount}>
+                      {completedBlocksWithIndex.length}
+                    </Text>
+                  </View>
+                  {completedBlocksWithIndex.map(({ block, idx }) => {
+                    const blockWeeks = getBlockWeekCount(block.weeks);
+                    return (
+                      <TouchableOpacity
+                        key={`done-${block.block_name}-${idx}`}
+                        style={styles.blockDoneRow}
+                        activeOpacity={0.7}
+                        onPress={() => handleBlockPress(block)}
+                        onLongPress={() => handleBlockLongPress(block, idx)}
+                        delayLongPress={500}
+                      >
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={16}
+                          color={hexA(themeColor, 0.55)}
+                        />
+                        <Text style={styles.blockDoneName} numberOfLines={1}>
+                          {block.block_name}
+                        </Text>
+                        <Text style={styles.blockDoneMeta}>
+                          {blockWeeks} {blockWeeks === 1 ? 'week' : 'weeks'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={13} color="#2a2a32" />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              )}
+
+              <TouchableOpacity
+                style={[styles.addButton, { borderColor: themeColor }]}
+                onPress={() => {
+                  navigation.navigate('AddBlock', {
+                    targetWorkoutId: routine.id,
+                    routineName: routine.name,
+                  });
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={themeColor} />
+                <Text style={[styles.addButtonText, { color: themeColor }]}>Add Block</Text>
+              </TouchableOpacity>
+            </>
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

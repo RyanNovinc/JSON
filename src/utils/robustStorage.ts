@@ -26,6 +26,73 @@ class RobustStorage {
     verificationDelay: 100
   };
 
+  // How many of each TIMESTAMPED copy family to keep. Three families gain a
+  // brand new key on every single save and nothing ever removed them:
+  //   <sanitizedKey>_emergency_<ts>
+  //   backup_critical_<sanitizedKey>_<ts>
+  //   cross_<key>_<ts>            (plus cross_<key>_session_<ts>_<rand> per launch)
+  // Measured on a real device: 122 emergency + 161 cross-session copies of ONE
+  // key holding a 35-character value, and 472 total keys for a single program.
+  // Every critical getItem does a getAllKeys scan and filter across the lot, so
+  // the read cost grows for as long as the user keeps training.
+  //
+  // Worse than the size: those copies are snapshots of whatever the value was at
+  // that save, and each carries its OWN checksum — so a stale one validates
+  // against itself and getItem will happily return it AND write it back over the
+  // primary. Capping the history is what makes that unlikely; sorting newest
+  // first in getItem is what makes it correct.
+  //
+  // The STABLE copies are untouched and still give seven redundant locations:
+  // primary, _backup1, _backup2, _meta, emergency_<sanitizedKey>_<hash>,
+  // cross_latest_<key>, and the current session's cross key. Only duplicates of
+  // a value that has just been overwritten anyway are removed.
+  private static readonly TIMESTAMPED_COPIES_KEPT = 2;
+
+  // Pull the save time out of a copy's key name. Every timestamped family ends
+  // in a Date.now() value, and the session ids embed one too. Returns 0 when
+  // there is nothing to read, which sorts that key oldest.
+  private static copyTimestamp(key: string): number {
+    const matches = key.match(/\d{10,}/g);
+    if (!matches || matches.length === 0) return 0;
+    return parseInt(matches[matches.length - 1], 10) || 0;
+  }
+
+  // Trim each timestamped family back to TIMESTAMPED_COPIES_KEPT, newest first.
+  // Runs after a save has already succeeded and verified, and swallows its own
+  // errors — housekeeping must never turn a successful write into a failed one.
+  private static async pruneTimestampedCopies(key: string): Promise<void> {
+    try {
+      const sanitizedKey = key.replace(/[^a-zA-Z0-9]/g, '_');
+      const allKeys = await AsyncStorage.getAllKeys();
+
+      const families: string[][] = [
+        allKeys.filter(k => k.startsWith(`${sanitizedKey}_emergency_`)),
+        allKeys.filter(k => k.startsWith(`backup_critical_${sanitizedKey}_`)),
+        // CrossSessionStorage keys off the RAW key. `cross_latest_<key>` starts
+        // with `cross_latest_`, not `cross_<key>_`, so it is excluded already.
+        allKeys.filter(k => k.startsWith(`cross_${key}_`)),
+      ];
+
+      const doomed: string[] = [];
+      for (const family of families) {
+        if (family.length <= this.TIMESTAMPED_COPIES_KEPT) continue;
+        const newestFirst = [...family].sort(
+          (a, b) => this.copyTimestamp(b) - this.copyTimestamp(a)
+        );
+        doomed.push(...newestFirst.slice(this.TIMESTAMPED_COPIES_KEPT));
+      }
+
+      if (doomed.length === 0) return;
+
+      await AsyncStorage.multiRemove(doomed);
+      console.log(
+        `🔐 [ROBUST-STORAGE] 🧽 Pruned ${doomed.length} stale timestamped copies for "${key}"`
+      );
+    } catch (error) {
+      console.warn(`🔐 [ROBUST-STORAGE] ⚠️ Prune failed (the save itself is fine):`, error);
+    }
+  }
+
   // Generate simple checksum for data verification
   private static generateChecksum(data: string): string {
     let hash = 0;
@@ -140,7 +207,15 @@ class RobustStorage {
             // CROSS-SESSION BACKUP: Save to cross-session storage
             const crossSessionSuccess = await CrossSessionStorage.setItem(key, value);
             console.log(`🔐 [ROBUST-STORAGE] Cross-session backup: ${crossSessionSuccess ? '✅ SUCCESS' : '❌ FAILED'}`)
-            
+
+            // Housekeeping, last: the data is saved and verified by this point.
+            // Three of the ten keys written above are brand new every save, so
+            // without this the key count only ever climbs. Deliberately NOT
+            // CrossSessionStorage.cleanup() — that derives its base key from the
+            // key name with a regex, which is fragile for keys containing spaces
+            // and underscores. Here the exact key is already known.
+            await this.pruneTimestampedCopies(key);
+
             return true;
           } else {
             console.error(`🔐 [ROBUST-STORAGE] ❌ Verification failed after ${verificationAttempts} attempts`);
@@ -233,11 +308,16 @@ class RobustStorage {
         const sanitizedKey = key.replace(/[^a-zA-Z0-9]/g, '_');
         const keyHash = this.generateChecksum(key);
         
+        // Sorted NEWEST FIRST, which is a correctness fix rather than a tidy-up.
+        // Each emergency copy carries its own checksum, so a stale one validates
+        // against itself, gets returned, and then gets restored over the primary.
+        // Arbitrary getAllKeys order made that a coin flip across every surviving
+        // copy; newest first means the freshest surviving value always wins.
         const emergencyKeys = allKeys.filter(k => 
           k.includes(`${sanitizedKey}_emergency_`) || 
           k.includes(`emergency_${sanitizedKey}_${keyHash}`) ||
           k.includes(`backup_critical_${sanitizedKey}_`)
-        );
+        ).sort((a, b) => this.copyTimestamp(b) - this.copyTimestamp(a));
         keysToTry.push(...emergencyKeys);
         console.log(`🔐 [ROBUST-STORAGE] 🔍 Found ${emergencyKeys.length} emergency backup keys to try`);
       } catch (error) {

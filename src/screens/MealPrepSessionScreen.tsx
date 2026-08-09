@@ -678,20 +678,22 @@ export default function MealPrepSessionScreen() {
       setCelebration(item);
       celebScale.setValue(0.3);
       celebFade.setValue(1);
+      // ~700ms end to end. The stamp reads at a glance, so the beat only has to
+      // register that it happened — anything longer is the user waiting.
       celebAnim.current = Animated.sequence([
-        // Stamp lands.
+        // Stamp snaps in. Stiff spring: lands rather than settles.
         Animated.spring(celebScale, {
           toValue: 1,
-          friction: 5,
-          tension: 150,
+          friction: 6,
+          tension: 260,
           useNativeDriver: true,
         }),
-        // Beat to read it.
-        Animated.delay(420),
+        // Just enough of a beat to see it land.
+        Animated.delay(170),
         // The finished dish gives way to the next one.
         Animated.timing(celebFade, {
           toValue: 0,
-          duration: 340,
+          duration: 230,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
@@ -1419,9 +1421,7 @@ export default function MealPrepSessionScreen() {
               }}
             >
               <Text style={styles.ctaBtnText} numberOfLines={1}>
-                {startedAlready
-                  ? `Continue — ${remaining[0].title} is next`
-                  : 'Start prepping'}
+                {startedAlready ? 'Continue' : 'Start prepping'}
               </Text>
               <Ionicons name="arrow-forward" size={16} color="#000" />
             </TouchableOpacity>
@@ -1926,7 +1926,7 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     paddingVertical: 15,
   },
-  ctaBtnText: { color: '#000', fontSize: 15, fontWeight: '600' },
+  ctaBtnText: { color: '#000', fontSize: 15, fontWeight: '600', flexShrink: 1 },
   undoBtn: {
     flex: 1,
     flexDirection: 'row',

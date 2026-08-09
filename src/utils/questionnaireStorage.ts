@@ -29,7 +29,9 @@ import { WorkoutStorage } from './storage';
 const DRAFT_KEY = '@workout_questionnaire_answers';
 
 export interface QuestionnaireAnswers {
-  // Required (set in Q1, Q3–Q7)
+  // Required (set in Q3–Q7)
+  // No longer collected — Q1 left the flow on 9 Aug 2026. Kept optional for
+  // profiles saved before that, which prompt assembly still reads.
   primaryGoal?: string;
   totalTrainingDays?: number;
   programDuration?: string;
@@ -73,17 +75,27 @@ export async function loadQuestionnaireAnswers(): Promise<QuestionnaireAnswers |
 }
 
 /**
- * True only if every required Q1, Q3–Q7 field is set. Refinements don't
- * count — they're optional. trainingExperience is intentionally excluded:
- * Q2 no longer appears in the flow, so it's never populated for a new
- * questionnaire (see GoalsProfile.trainingState / deriveExperienceTier).
+ * True only if every required Q3–Q7 field is set. Refinements don't count —
+ * they're optional.
+ *
+ * Two fields are deliberately NOT required:
+ *   - trainingExperience: Q2 left the flow when GoalsProfile.trainingState
+ *     became the source of truth (see deriveExperienceTier).
+ *   - primaryGoal: Q1 left the flow on 9 Aug 2026. The roadmap decides whether
+ *     the user is gaining or losing, and the phase context already varies
+ *     volume, RIR and cardio as they move through it — so a static,
+ *     program-wide emphasis answered once at step 1 was the wrong scope for a
+ *     plan that periodises. assemblePlanningPrompt defaults it to
+ *     'build_muscle', and every branch that reads it still works.
+ *
+ * Gating on either would make the questionnaire permanently incomplete for
+ * anyone who filled it in after the screen was removed.
  */
 export async function hasCompleteQuestionnaire(): Promise<boolean> {
   const a = await loadQuestionnaireAnswers();
   if (!a) return false;
   return Boolean(
-    a.primaryGoal &&
-      a.totalTrainingDays &&
+    a.totalTrainingDays &&
       a.programDuration &&
       a.selectedEquipment &&
       a.selectedEquipment.length > 0 &&

@@ -27,6 +27,10 @@ import * as Clipboard from 'expo-clipboard';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+// Aliased: this file already imports RN's Image. expo-image is used only for the
+// exercise strip, where its cross-fade matters.
+import { Image as ExpoImage } from 'expo-image';
+import { resolveExerciseImagePair } from '../utils/exerciseImages';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RobustStorage from '../utils/robustStorage';
 import QRCode from 'react-native-qrcode-svg';
@@ -134,6 +138,10 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   });
   const [calendarModal, setCalendarModal] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
+  // Closing keeps the subject in state and only flips `visible`. Clearing it
+  // on close made the sheet re-render mid dismiss-animation with no subject,
+  // so the "Current plan" state row visibly flipped back to the "Make this my
+  // current plan" button on the way out. The next open overwrites it anyway.
   const [deleteModal, setDeleteModal] = useState<{ visible: boolean; routine: WorkoutRoutine | null }>({
     visible: false,
     routine: null,
@@ -737,8 +745,30 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     setDeleteModal({ visible: true, routine });
   };
 
+  /**
+   * Make a routine the current plan.
+   *
+   * There is no "isActive" flag on a routine: the home screen treats
+   * routines[0] as current, so becoming current means moving to the front of
+   * the stored array. Written through WorkoutStorage and then reloaded via the
+   * context so both views of the list agree.
+   */
+  const handleMakeCurrentPlan = async (routine: WorkoutRoutine) => {
+    try {
+      setDeleteModal((prev) => ({ ...prev, visible: false }));
+      const all = await WorkoutStorage.loadRoutines();
+      const target = all.find((r) => r.id === routine.id);
+      if (!target) return;
+      await WorkoutStorage.saveRoutines([target, ...all.filter((r) => r.id !== routine.id)]);
+      await loadRoutines();
+    } catch (error) {
+      console.error('Failed to set current plan:', error);
+      Alert.alert('Error', 'Could not set that as your current plan. Please try again.');
+    }
+  };
+
   const handleShareFromActionSheet = (routine: WorkoutRoutine) => {
-    setDeleteModal({ visible: false, routine: null });
+    setDeleteModal((prev) => ({ ...prev, visible: false }));
     setTimeout(() => {
       handleExport(routine);
     }, 200);
@@ -785,7 +815,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
           onPress: async () => {
             try {
               await deleteRoutineFromContext(routine.id);
-              setDeleteModal({ visible: false, routine: null });
+              setDeleteModal((prev) => ({ ...prev, visible: false }));
             } catch (error) {
               console.error('Failed to delete routine:', error);
               Alert.alert('Error', 'Failed to remove workout plan. Please try again.');
@@ -797,7 +827,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
   };
 
   const handleRenameRequest = (routine: WorkoutRoutine) => {
-    setDeleteModal({ visible: false, routine: null });
+    setDeleteModal((prev) => ({ ...prev, visible: false }));
     setRenameModal({ visible: true, routine, newName: routine.name });
   };
 
@@ -828,6 +858,12 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     totalWeeks: number;
     programWeek: number;
     programTotalWeeks: number;
+    // The week-scan above already reads the completion list for currentWeek;
+    // it used to throw the per-day detail away. These carry it out so the hero
+    // card can name the NEXT session instead of always naming the first one.
+    nextDay: any | null;
+    weekDaysDone: number;
+    weekDaysTotal: number;
   } | null> => {
     if (!activeRoutine?.data?.blocks || activeRoutine.data.blocks.length === 0) return null;
 
@@ -914,6 +950,36 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       currentWeek = 1;
     }
 
+    // Which day is next in currentWeek. Reads the same key the week-scan used
+    // (RobustStorage first, AsyncStorage as the legacy fallback) and picks the
+    // first workout day with no completion entry. Rest days are skipped: they
+    // are never written to the completed list, so they would otherwise always
+    // look "next".
+    const workoutDays = (block.days || []).filter(
+      (day: any) => day?.day_name && !day.day_name.toLowerCase().includes('rest')
+    );
+
+    let weekCompleted: string[] = [];
+    try {
+      const key = `completed_${block.block_name}_week${currentWeek}`;
+      const raw =
+        (await RobustStorage.getItem(key, true)) || (await AsyncStorage.getItem(key));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        weekCompleted = Array.isArray(parsed) ? parsed : [];
+      }
+    } catch {
+      weekCompleted = [];
+    }
+
+    const isDone = (day: any) =>
+      weekCompleted.includes(`${day.day_name}_week${currentWeek}`);
+
+    // If every day is done the week is finished, so fall back to the first day
+    // rather than returning nothing: the card still needs something to show.
+    const nextDay = workoutDays.find((day: any) => !isDone(day)) || workoutDays[0] || null;
+    const weekDaysDone = workoutDays.filter(isDone).length;
+
     let priorWeeks = 0;
     for (let i = 0; i < blockIndex; i++) {
       priorWeeks += spanOf(activeRoutine.data.blocks[i]?.weeks);
@@ -930,6 +996,9 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       totalWeeks,
       programWeek: priorWeeks + currentWeek,
       programTotalWeeks,
+      nextDay,
+      weekDaysDone,
+      weekDaysTotal: workoutDays.length,
     };
   };
 
@@ -988,6 +1057,14 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     blockName: string;
     programWeek: number;
     programTotalWeeks: number;
+    // Preview of the session the CTA leads to. exerciseCount is the whole
+    // day; thumbs is at most three resolved start frames, since a strip of
+    // four near-identical dark tiles stops reading as distinct exercises.
+    sessionName: string;
+    exerciseCount: number;
+    thumbs: any[];
+    weekDaysDone: number;
+    weekDaysTotal: number;
   } | null>(null);
 
   useEffect(() => {
@@ -1000,16 +1077,45 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
     (async () => {
       try {
         const pos = await resolveBlockPosition(current);
+        if (!pos) {
+          if (!cancelled) setHeroPosition(null);
+          return;
+        }
+
+        // The NEXT unfinished session, resolved from the completion list, not
+        // just the first day in the block. Without this the card kept naming
+        // Push A after you had already done Push A, and the strip below it
+        // previewed exercises you had finished.
+        const session = pos.nextDay;
+        const exercises = Array.isArray(session?.exercises) ? session.exercises : [];
+
+        // Resolve start frames for the first few exercises. Misses are dropped,
+        // not padded: a placeholder tile is worse than a shorter strip.
+        const thumbs: any[] = [];
+        for (const ex of exercises) {
+          if (thumbs.length >= 3) break;
+          try {
+            const pair = await resolveExerciseImagePair(
+              { exercise: ex?.exercise || ex?.activity || ex?.circuit_name },
+              isPinkTheme ? 'pink' : 'blue'
+            );
+            if (pair?.start) thumbs.push(pair.start);
+          } catch {
+            // Ignore and continue; a hero thumbnail is never worth a failure.
+          }
+        }
+
         if (!cancelled) {
-          setHeroPosition(
-            pos
-              ? {
-                  blockName: pos.block?.block_name || '',
-                  programWeek: pos.programWeek,
-                  programTotalWeeks: pos.programTotalWeeks,
-                }
-              : null
-          );
+          setHeroPosition({
+            blockName: pos.block?.block_name || '',
+            programWeek: pos.programWeek,
+            programTotalWeeks: pos.programTotalWeeks,
+            sessionName: session?.day_name || pos.block?.block_name || '',
+            exerciseCount: exercises.length,
+            thumbs,
+            weekDaysDone: pos.weekDaysDone,
+            weekDaysTotal: pos.weekDaysTotal,
+          });
         }
       } catch {
         if (!cancelled) setHeroPosition(null);
@@ -1019,7 +1125,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
       cancelled = true;
     };
      
-  }, [routines]);
+  }, [routines, isPinkTheme]);
 
   // ==========================================================================
   // Render helpers
@@ -1263,7 +1369,30 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
               const isPrimary = idx === 0;
               if (!isPrimary) {
                 return (
-                  <View key={routine.id} style={styles.planRow}>
+                  <Pressable
+                    key={routine.id}
+                    style={styles.planRow}
+                    onPress={() => navigation.navigate('Blocks' as any, { routine })}
+                    onLongPress={() => handleActionRequest(routine)}
+                    delayLongPress={600}
+                  >
+                    <View style={styles.planRowTile}>
+                      <Ionicons name="barbell" size={19} color="#3f5257" />
+                    </View>
+
+                    <View style={styles.planRowInfo}>
+                      <Text style={styles.planRowTitle} numberOfLines={1}>
+                        {routine.name}
+                      </Text>
+                      <Text style={styles.planRowSub} numberOfLines={1}>
+                        {routine.days} days / week · {routine.blocks} {routine.blocks === 1 ? 'block' : 'blocks'}
+                      </Text>
+                    </View>
+
+                    {/* The play button is gone. It duplicated the row tap and
+                        collided with this menu in the same corner. Starting a
+                        session now lives on the current-plan card and inside
+                        the plan, so a secondary row does one thing: open. */}
                     <RNTouchable
                       style={styles.planRowMenuBtn}
                       onPress={(e) => {
@@ -1271,37 +1400,15 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                         handleActionRequest(routine);
                       }}
                       activeOpacity={0.7}
-                      hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                      hitSlop={{ top: 12, right: 6, bottom: 12, left: 6 }}
                       accessibilityRole="button"
                       accessibilityLabel="More options"
                     >
-                      <Ionicons name="ellipsis-horizontal" size={15} color="#a1a1aa" />
+                      <Ionicons name="ellipsis-vertical" size={16} color="#52525b" />
                     </RNTouchable>
 
-                    <Pressable
-                      style={styles.planRowInfo}
-                      onPress={() => navigation.navigate('Blocks' as any, { routine })}
-                      onLongPress={() => handleActionRequest(routine)}
-                      delayLongPress={600}
-                    >
-                      <Text style={styles.planRowTitle} numberOfLines={1}>
-                        {routine.name}
-                      </Text>
-                      <Text style={styles.planRowSub} numberOfLines={1}>
-                        {routine.days} days / week · {routine.blocks} {routine.blocks === 1 ? 'block' : 'blocks'}
-                      </Text>
-                    </Pressable>
-
-                    <TouchableOpacity
-                      style={styles.planRowGo}
-                      onPress={() => handleGoToTodayWorkoutForRoutine(routine)}
-                      activeOpacity={0.85}
-                      accessibilityRole="button"
-                      accessibilityLabel="Start today's workout"
-                    >
-                      <Ionicons name="play" size={15} color="#d4d4d8" />
-                    </TouchableOpacity>
-                  </View>
+                    <Ionicons name="chevron-forward" size={16} color="#3f3f46" />
+                  </Pressable>
                 );
               }
               return (
@@ -1334,38 +1441,88 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                     onLongPress={() => handleActionRequest(routine)}
                     delayLongPress={600}
                   >
+                    {/* Plan name demoted to a caption. It is not what you need
+                        to read daily, and a long one ate two lines here. */}
                     <View style={styles.planEyebrowRow}>
-                      <Text style={[styles.planEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
-                      {heroPosition && heroPosition.programTotalWeeks > 0 && (
-                        <View style={styles.planWeekBadge}>
-                          <Text style={styles.planWeekBadgeText}>
+                      {heroPosition && heroPosition.programTotalWeeks > 0 ? (
+                        <View style={[styles.planWeekBadge, { borderColor: themeColor + '4D', backgroundColor: themeColor + '14' }]}>
+                          <Text style={[styles.planWeekBadgeText, { color: themeColor }]}>
                             WEEK {heroPosition.programWeek} OF {heroPosition.programTotalWeeks}
                           </Text>
                         </View>
+                      ) : (
+                        <Text style={[styles.planEyebrow, { color: themeColor }]}>CURRENT PLAN</Text>
                       )}
                     </View>
-                    <Text style={styles.planTitlePrimary} numberOfLines={2}>
+
+                    <Text style={styles.planCaption} numberOfLines={1}>
                       {routine.name}
                     </Text>
-                    <Text style={styles.planSubtitlePrimary}>
-                      {heroPosition?.blockName ? `${heroPosition.blockName} · ` : ''}
-                      {routine.days} days / week
-                      {heroPosition?.blockName ? '' : ` · ${routine.blocks} ${routine.blocks === 1 ? 'block' : 'blocks'}`}
+
+                    <Text style={styles.planTitlePrimary} numberOfLines={1}>
+                      {heroPosition?.sessionName || heroPosition?.blockName || routine.name}
                     </Text>
+
+                    <Text style={styles.planSubtitlePrimary}>
+                      {heroPosition?.exerciseCount
+                        ? `${heroPosition.exerciseCount} ${heroPosition.exerciseCount === 1 ? 'exercise' : 'exercises'} · `
+                        : ''}
+                      {routine.days} days / week
+                    </Text>
+
+                    {/* Session preview strip, mirroring the nutrition card so
+                        both tabs speak the same visual language. Hidden rather
+                        than padded when nothing resolves. */}
+                    {!!heroPosition?.thumbs?.length && (
+                      <View style={styles.planStrip}>
+                        {heroPosition.thumbs.map((src, i) => (
+                          <View key={i} style={styles.planThumb}>
+                            <ExpoImage
+                              source={src}
+                              style={styles.planThumbImg}
+                              contentFit="contain"
+                              transition={120}
+                            />
+                          </View>
+                        ))}
+                        {heroPosition.exerciseCount > heroPosition.thumbs.length && (
+                          <View style={[styles.planThumb, styles.planThumbMore]}>
+                            <Text style={styles.planThumbMoreCount}>
+                              +{heroPosition.exerciseCount - heroPosition.thumbs.length}
+                            </Text>
+                            <Text style={styles.planThumbMoreLabel}>MORE</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </Pressable>
 
-                  {heroPosition && heroPosition.programTotalWeeks > 0 && (
-                    <View style={styles.planProgressTrack}>
-                      <View
-                        style={[
-                          styles.planProgressFill,
-                          {
-                            backgroundColor: themeColor,
-                            width: `${Math.min(100, Math.round((heroPosition.programWeek / heroPosition.programTotalWeeks) * 100))}%`,
-                          },
-                        ]}
-                      />
-                    </View>
+                  {/* Progress through THIS WEEK, not the whole program. At week
+                      7 of 54 the program bar sat at 13% and looked identical the
+                      following week; this one moves every session, and it is the
+                      thing the user can affect today. */}
+                  {heroPosition && heroPosition.weekDaysTotal > 0 && (
+                    <>
+                      <View style={styles.planProgressRow}>
+                        <Text style={styles.planProgressLabel}>
+                          Week {heroPosition.programWeek}
+                        </Text>
+                        <Text style={styles.planProgressLabel}>
+                          {heroPosition.weekDaysDone} of {heroPosition.weekDaysTotal} done
+                        </Text>
+                      </View>
+                      <View style={styles.planProgressTrack}>
+                        <View
+                          style={[
+                            styles.planProgressFill,
+                            {
+                              backgroundColor: themeColor,
+                              width: `${Math.min(100, Math.round((heroPosition.weekDaysDone / heroPosition.weekDaysTotal) * 100))}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                    </>
                   )}
 
                   <TouchableOpacity
@@ -1535,13 +1692,13 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
         visible={deleteModal.visible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setDeleteModal({ visible: false, routine: null })}
+        onRequestClose={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
       >
         <View style={styles.actionModalOverlay}>
           <TouchableOpacity
             style={styles.actionModalBackdrop}
             activeOpacity={1}
-            onPress={() => setDeleteModal({ visible: false, routine: null })}
+            onPress={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
           />
 
           <View style={[styles.actionSheet, { borderColor: themeColor, paddingBottom: insets.bottom + 20 }]}>
@@ -1568,13 +1725,41 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                     </View>
                     <RNTouchable
                       style={styles.actionCloseButton}
-                      onPress={() => setDeleteModal({ visible: false, routine: null })}
+                      onPress={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
                       activeOpacity={0.7}
                       hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
                     >
                       <Ionicons name="close" size={22} color="#71717a" />
                     </RNTouchable>
                   </View>
+
+                  {/* Current-plan control. Outranks Save and Rename because it
+                      changes what the whole home screen shows, so it sits above
+                      Share rather than becoming a fourth tile. On the plan that
+                      is already current it degrades to a flat state row, so the
+                      sheet never offers an action that would do nothing. */}
+                  {deleteModal.routine && routines[0]?.id === deleteModal.routine.id ? (
+                    <View style={styles.currentPlanState}>
+                      <Ionicons name="checkmark-circle" size={17} color="#3f5257" />
+                      <Text style={styles.currentPlanStateText}>Current plan</Text>
+                    </View>
+                  ) : (
+                    <RNTouchable
+                      style={[
+                        styles.makeCurrentBtn,
+                        { borderColor: themeColor, backgroundColor: themeColor + '14' },
+                      ]}
+                      onPress={() => deleteModal.routine && handleMakeCurrentPlan(deleteModal.routine)}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Make this my current plan"
+                    >
+                      <Ionicons name="play" size={16} color={themeColor} />
+                      <Text style={[styles.makeCurrentText, { color: themeColor }]}>
+                        Make this my current plan
+                      </Text>
+                    </RNTouchable>
+                  )}
 
                   {/* Primary CTA: Share */}
                   <RNTouchable
@@ -1640,7 +1825,7 @@ export default function HomeScreen({ route, transitionProgress, panGestureRef }:
                   {/* Cancel */}
                   <RNTouchable
                     style={styles.actionCancel}
-                    onPress={() => setDeleteModal({ visible: false, routine: null })}
+                    onPress={() => setDeleteModal((prev) => ({ ...prev, visible: false }))}
                     activeOpacity={0.6}
                   >
                     <Text style={styles.actionCancelText}>Cancel</Text>
@@ -1894,6 +2079,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: '#1f1f24',
     overflow: 'hidden',
+    // Top spacing now lives on planProgressRow above it.
     marginBottom: 15,
   },
   planProgressFill: {
@@ -1915,40 +2101,88 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'relative',
   },
+  planRowTile: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   planRowInfo: {
     flex: 1,
     minWidth: 0,
-    paddingRight: 20,
   },
   planRowTitle: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 3,
   },
   planRowSub: {
     color: '#71717a',
     fontSize: 12,
   },
-  planRowGo: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#3f3f46',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // planRowGo is gone: the play button duplicated the row tap and fought the
+  // menu for the same corner. planRowMenuBtn is now an inline sibling rather
+  // than absolutely positioned, which is what caused the overlap.
   planRowMenuBtn: {
-    position: 'absolute',
-    top: 6,
-    right: 8,
     width: 26,
     height: 26,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
+  },
+
+  planProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 7,
+  },
+  planProgressLabel: {
+    color: '#71717a',
+    fontSize: 11.5,
+  },
+  planCaption: {
+    color: '#71717a',
+    fontSize: 11,
+    marginBottom: 6,
+  },
+  planStrip: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 14,
+  },
+  planThumb: {
+    flex: 1,
+    height: 52,
+    borderRadius: 9,
+    // Pure black, matching the exercise frames' own background so the
+    // letterboxing from contentFit="contain" disappears into the art.
+    backgroundColor: '#000',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  planThumbMore: {
+    backgroundColor: '#111114',
+  },
+  planThumbMoreCount: {
+    color: '#d4d4d8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  planThumbMoreLabel: {
+    color: '#71717a',
+    fontSize: 9.5,
+    letterSpacing: 0.5,
   },
 
   planCardPrimary: {
@@ -1971,9 +2205,9 @@ const styles = StyleSheet.create({
   },
   planTitlePrimary: {
     color: '#ffffff',
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 19,
+    fontWeight: '600',
+    letterSpacing: -0.2,
     marginBottom: 4,
     paddingRight: 30,
   },
@@ -2340,6 +2574,36 @@ const styles = StyleSheet.create({
   // ==========================================================================
   actionModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'flex-end' },
   actionModalBackdrop: { flex: 1 },
+  makeCurrentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  makeCurrentText: {
+    fontSize: 14.5,
+    fontWeight: '600',
+  },
+  currentPlanState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#1c1c1f',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  currentPlanStateText: {
+    fontSize: 14.5,
+    fontWeight: '500',
+    color: '#52525b',
+  },
   actionSheet: {
     backgroundColor: '#18181b',
     borderTopLeftRadius: 28,

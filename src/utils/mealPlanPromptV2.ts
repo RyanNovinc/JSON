@@ -61,6 +61,8 @@ import { WorkoutStorage } from './storage';
 import { loadGoalsProfile } from './goalsProfileStorage';
 import { derivePhase } from './goalsProfile';
 import type { DerivedPhase } from './goalsProfile';
+import { deriveRoadmap } from './roadmap';
+import type { Roadmap } from './roadmap';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -243,6 +245,15 @@ export interface BuildOpts {
   acceptedShortfall?: string[];
   /** Derived phase from GoalsProfile — injected by assembleMealPlanPromptV2. */
   derivedPhase?: DerivedPhase;
+  /**
+   * The multi-phase roadmap derived FRESH from the current profile — injected
+   * by assembleMealPlanPromptV2 alongside derivedPhase (same derivePhase call
+   * underlies both, so the route section cannot contradict the phase line).
+   * Never sourced from roadmapStorage snapshots: those are a historical
+   * record for deviation measurement and can be stale on exactly the fields
+   * the phase depends on.
+   */
+  roadmap?: Roadmap | null;
   /** GoalsProfile weight (kg) — preferred over answers.weight for tolerances. */
   profileWeightKg?: number;
   /** True when GoalsProfile has goalWeightKg or goalBodyFatPct — triggers lean-mass-targets.md fetch. */
@@ -902,7 +913,7 @@ function adjusterSection(): string {
 // Phase context block (injected into the prompt when GoalsProfile is present)
 // ---------------------------------------------------------------------------
 
-function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number, hasLeanMassTargets?: boolean): string {
+function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number, hasLeanMassTargets?: boolean, roadmap?: Roadmap | null): string {
   const PHASE_LABELS: Record<DerivedPhase, string> = {
     cut:       'Cut (fat loss)',
     recomp:    'Recomp (simultaneous fat loss + muscle gain)',
@@ -953,6 +964,58 @@ function phaseContextBlock(phase: DerivedPhase, macros: any, planDays: number, h
     `**Phase:** ${PHASE_LABELS[phase]}`,
     rationale,
   ];
+
+  // ── Route section (9 Aug 2026) ────────────────────────────────────────────
+  // The multi-phase journey this plan serves, so the AI stops treating the
+  // current phase as forever. Skipped for 'maintain' (no journey to describe,
+  // and the roadmap's maintain→build opener mapping would contradict the
+  // phase label above) and when no roadmap could be derived (no goal body
+  // fat) — in both cases the block degrades to exactly its pre-route shape.
+  if (roadmap && phase !== 'maintain' && roadmap.phases.length > 0) {
+    const KIND_LABELS: Record<string, string> = {
+      recomp: 'Recomp',
+      build: 'Build',
+      trim: 'Trim',
+      reveal: 'Final cut (reveal)',
+    };
+    const current = roadmap.phases[0];
+    const last = roadmap.phases[roadmap.phases.length - 1];
+    const totalPhases = last.index;
+    const { floor, ceiling } = roadmap.band;
+    const goalBf = last.exitBodyFatPct;
+
+    lines.push('', '**Route (the multi-phase journey this plan serves):**');
+
+    if (totalPhases === 1) {
+      // HARD RULE 4 roadmap: the muscle is already built; one terminal cut.
+      lines.push(
+        `- This meal plan covers the CURRENT phase only: phase 1 of 1 — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches the ~${goalBf}% goal (estimated ${current.estMonths[0]}–${current.estMonths[1]} months).`,
+        '- The muscle is already built: current lean mass meets the target, so there are no build phases — this cut lands the goal.',
+        '- Phases end on a body-fat NUMBER, never a date. Body-fat readings carry several points of error, so thresholds apply to the trend.',
+      );
+    } else {
+      // A losing user opens on a trim, so their cycles run build-first;
+      // everyone else trims first. Order the sentence to match the sequence.
+      const cyclesClause =
+        roadmap.phases[1]?.kind === 'build'
+          ? `builds to ~${ceiling}% alternating with trims back to ~${floor}%`
+          : `trims to ~${floor}% alternating with builds back to ~${ceiling}%`;
+
+      lines.push(
+        `- This meal plan covers the CURRENT phase only: phase 1 of ${totalPhases} — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches ~${current.exitBodyFatPct}% (estimated ${current.estMonths[0]}–${current.estMonths[1]} months; individual variation is wide — treat every duration as a range and never promise a date).`,
+        `- Then: ${cyclesClause} (the ${floor}–${ceiling}% operating band), finishing with a final cut to the ~${goalBf}% goal. Whole journey: roughly ${roadmap.estYears[0]}–${roadmap.estYears[1]} years.`,
+      );
+      if (roadmap.gapKg != null && roadmap.gapKg > 0 && roadmap.leanNowKg != null) {
+        lines.push(
+          `- Lean-mass target: ~${roadmap.leanTargetKg} kg (currently ~${roadmap.leanNowKg} kg — still ~${roadmap.gapKg} kg to build).`,
+        );
+      }
+      lines.push(
+        '- Phases end on a body-fat NUMBER, never a date. Body-fat readings carry several points of error, so thresholds apply to the trend.',
+        '- The app recomputes calorie and protein targets at each phase change, and the user regenerates their plan then. Do NOT schedule the transition into this plan, do NOT re-derive or reorder the sequence, and NEVER present cutting first as a physiological requirement for building muscle.',
+      );
+    }
+  }
 
   if (phase === 'cut' && planDays > 56) {
     lines.push(
@@ -1089,7 +1152,7 @@ export function buildMealPlanPrompt(
   parts.push(`${varietySetting} ${varietyAlwaysApplies}`);
 
   if (opts?.derivedPhase) {
-    parts.push(phaseContextBlock(opts.derivedPhase, macros, duration, opts?.hasLeanMassTargets));
+    parts.push(phaseContextBlock(opts.derivedPhase, macros, duration, opts?.hasLeanMassTargets, opts?.roadmap));
   }
 
   const targetLines = [
@@ -1303,6 +1366,7 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
   let macros: any = null;
   let derivedPhase: DerivedPhase | undefined;
   let profileWeightKg: number | undefined;
+  let roadmap: Roadmap | null = null;
 
   // Phase-aware macros only apply when the profile can actually supply a
   // direction (a goal weight — see derivePhase). Without one, N1/N2 were
@@ -1317,6 +1381,11 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
     macros = computeMacrosPhaseAware(answers as NutritionAnswers, profile);
     if (macros) {
       derivedPhase = derivePhase(profile);
+      // Fresh, never from snapshots. Same derivePhase underlies the opener,
+      // so this cannot contradict the phase line above it. Null when the
+      // profile has no goal body fat — the block then degrades to its
+      // pre-route shape.
+      roadmap = deriveRoadmap(profile, profile.routePreference ?? 'balanced');
       profileWeightKg = profile.currentWeightKg;
       hasLeanMassTargets = profile.goalWeightKg != null || profile.goalBodyFatPct != null;
     }
@@ -1362,6 +1431,7 @@ export async function assembleMealPlanPromptV2(opts?: BuildOpts): Promise<string
     ...opts,
     customMeals,
     derivedPhase,
+    roadmap,
     profileWeightKg,
     hasLeanMassTargets,
   });

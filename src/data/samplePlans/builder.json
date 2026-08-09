@@ -833,6 +833,11 @@
           ]
         },
         {
+          "day_name": "REST DAY",
+          "estimated_duration": 0,
+          "exercises": []
+        },
+        {
           "day_name": "Upper B",
           "estimated_duration": 132,
           "exercises": [
@@ -1664,11 +1669,6 @@
               ]
             }
           ]
-        },
-        {
-          "day_name": "REST DAY",
-          "estimated_duration": 0,
-          "exercises": []
         },
         {
           "day_name": "REST DAY",

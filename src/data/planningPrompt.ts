@@ -4,6 +4,8 @@ import { ExperienceTier, VolumeTier, VOLUME_TIER_LABELS } from './volumeRanges';
 import { loadGoalsProfile } from '../utils/goalsProfileStorage';
 import { derivePhase, phaseToVolumeTier, deriveExperienceTier } from '../utils/goalsProfile';
 import type { GoalsProfile, DerivedPhase, VolumeTierInfo } from '../utils/goalsProfile';
+import { deriveRoadmap } from '../utils/roadmap';
+import type { Roadmap } from '../utils/roadmap';
 
 export interface ProgramContext {
   totalMesocycles: number;
@@ -910,10 +912,18 @@ const TIER_TO_PREF: Record<'low' | 'moderate' | 'high', VolumeTier> = {
 // Builds the ## Phase Context block injected into the training prompt.
 // volumeTierInfo: from phaseToVolumeTier(phase)
 // userVolumePref: data.volumePreference (may be undefined / 'not_sure')
+// roadmap: the multi-phase sequence derived FRESH from the current profile
+//   (9 Aug 2026) — never from roadmapStorage snapshots, which can be stale on
+//   exactly the fields the phase depends on. Optional so existing callers and
+//   tests keep working unchanged.
+// profile: supplies the athlete line (age / height / day-to-day activity) —
+//   fields the workout prompt previously never received.
 export function buildTrainingPhaseContext(
   phase: DerivedPhase,
   volumeTierInfo: VolumeTierInfo,
-  userVolumePref?: string
+  userVolumePref?: string,
+  roadmap?: Roadmap | null,
+  profile?: GoalsProfile
 ): string {
   const phasePref = TIER_TO_PREF[volumeTierInfo.tier];
   const prefLabel = VOLUME_TIER_LABELS[phasePref];
@@ -925,6 +935,19 @@ export function buildTrainingPhaseContext(
   lines.push('');
   lines.push(`**Derived training phase:** ${phase}`);
   lines.push(`**Phase rationale:** ${volumeTierInfo.rationale}`);
+
+  // Athlete context from the profile. Sex is NOT repeated here — it reaches
+  // the prompt through the existing **Gender:** line in the program specs,
+  // which assemblePlanningPromptWithProfile now sources from profile.sex.
+  if (profile) {
+    const athlete: string[] = [];
+    if (profile.ageYears != null) athlete.push(`${profile.ageYears}`);
+    if (profile.heightCm != null) athlete.push(`${profile.heightCm} cm`);
+    if (profile.activityLevel) athlete.push(`${profile.activityLevel} day-to-day activity outside training`);
+    if (athlete.length) {
+      lines.push(`**Athlete:** ${athlete.join(' · ')}.`);
+    }
+  }
   lines.push('');
 
   // Volume guidance per phase
@@ -970,6 +993,52 @@ export function buildTrainingPhaseContext(
     lines.push(`> **Note:** The user has explicitly selected the ${VOLUME_TIER_LABELS[userVolumePref as VolumeTier] ?? userVolumePref} volume tier, which differs from the phase recommendation (${prefLabel}). Honour the user's selection but apply the phase-specific RIR and goal guidance above.`);
   }
 
+  // ── Route section (9 Aug 2026) ────────────────────────────────────────────
+  // The multi-phase journey this program serves, so the AI stops treating the
+  // current phase as forever. Skipped for 'maintain' (no journey to describe,
+  // and the roadmap's maintain→build opener mapping would contradict the
+  // phase line above) and when no roadmap could be derived — in both cases
+  // the block is byte-identical to its pre-route shape.
+  if (roadmap && phase !== 'maintain' && roadmap.phases.length > 0) {
+    const KIND_LABELS: Record<string, string> = {
+      recomp: 'Recomp',
+      build: 'Build',
+      trim: 'Trim',
+      reveal: 'Final cut (reveal)',
+    };
+    // What the training emphasis becomes in the NEXT phase — the mechanical
+    // consequence the transition note tells the user about. Matches the
+    // per-phase guidance this block emits when that phase is current.
+    const NEXT_PHASE_SHIFT: Record<string, string> = {
+      trim: 'volume shifts toward the MEV end and RIR rises by +1 to protect muscle in the deficit',
+      reveal: 'volume shifts toward the MEV end and RIR rises by +1 to protect muscle in the deficit',
+      build: 'volume shifts toward the MAV-high end with standard RIR to capitalise on the surplus',
+      recomp: 'volume holds at mid-MAV with standard RIR',
+    };
+    const current = roadmap.phases[0];
+    const next = roadmap.phases[1];
+    const last = roadmap.phases[roadmap.phases.length - 1];
+    const totalPhases = last.index;
+
+    lines.push('');
+    lines.push('**Route (the multi-phase journey this program serves):**');
+
+    if (totalPhases === 1) {
+      lines.push(
+        `- This program serves the CURRENT phase only: phase 1 of 1 — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches the ~${current.exitBodyFatPct}% goal (estimated ${current.estMonths[0]}–${current.estMonths[1]} months).`,
+        '- The muscle is already built — this cut lands the goal; no later phases follow.',
+        '- Phases end on a body-fat NUMBER, never a date. Body-fat readings carry several points of error, so thresholds apply to the trend.',
+      );
+    } else {
+      lines.push(
+        `- This program serves the CURRENT phase only: phase 1 of ${totalPhases} — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches ~${current.exitBodyFatPct}% (estimated ${current.estMonths[0]}–${current.estMonths[1]} months; individual variation is wide — treat every duration as a range and never promise a date).`,
+        `- Next phase: ${KIND_LABELS[next.kind]} to ~${next.exitBodyFatPct}% — ${NEXT_PHASE_SHIFT[next.kind]}.`,
+        '- Phases end on a body-fat NUMBER, never a date. Body-fat readings carry several points of error, so thresholds apply to the trend.',
+        `- **Program length vs phase length:** the chosen program duration may outlast the current phase. Do NOT bake later phases into specific weeks and do NOT re-derive or reorder the sequence. Periodise normally for the CURRENT phase, and add one short "When the phase changes" note to the program overview: when the body-fat trend reaches ~${current.exitBodyFatPct}%, the training emphasis above no longer applies — regenerating the program then is recommended, and the app's targets will already reflect the new phase.`,
+      );
+    }
+  }
+
   return lines.join('\n');
 }
 
@@ -982,20 +1051,28 @@ export function assemblePlanningPromptWithProfile(
 ): string {
   const phase = derivePhase(profile);
   const volumeTierInfo = phaseToVolumeTier(phase);
+  // Fresh, never from snapshots. Same derivePhase underlies the roadmap's
+  // opener, so the route section cannot contradict the phase line.
+  const roadmap = deriveRoadmap(profile, profile.routePreference ?? 'balanced');
 
   // Only override volumePreference when the user hasn't made an explicit choice.
   // trainingExperience is always sourced from the profile — Q2 (training
   // experience) no longer exists in the visible flow, so trainingState is
   // the only place this can come from (see deriveExperienceTier).
+  // gender: the intake's `sex` wins over the Refinements answer whenever the
+  // profile has one, so the prompt's **Gender:** line and the athlete context
+  // share a single source of truth. The Refinements field remains the
+  // fallback for profiles written before the intake collected sex.
   const resolvedData = {
     ...data,
     ...(!data.volumePreference || data.volumePreference === 'not_sure'
       ? { volumePreference: TIER_TO_PREF[volumeTierInfo.tier] }
       : {}),
+    ...(profile.sex ? { gender: profile.sex } : {}),
     trainingExperience: deriveExperienceTier(profile.trainingState),
   };
 
-  const phaseCtx = buildTrainingPhaseContext(phase, volumeTierInfo, data.volumePreference);
+  const phaseCtx = buildTrainingPhaseContext(phase, volumeTierInfo, data.volumePreference, roadmap, profile);
   return assemblePlanningPrompt(resolvedData, mesocycleContext, phaseCtx);
 }
 

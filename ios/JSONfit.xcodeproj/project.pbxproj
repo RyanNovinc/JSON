@@ -574,7 +574,7 @@
 				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 130;
+				CURRENT_PROJECT_VERSION = 134;
 				DEVELOPMENT_TEAM = RJL5VQK2DK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
@@ -714,7 +714,7 @@
 				CODE_SIGN_ENTITLEMENTS = LiveActivity/LiveActivity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 130;
+				CURRENT_PROJECT_VERSION = 134;
 				DEVELOPMENT_TEAM = RJL5VQK2DK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LiveActivity/Info.plist;

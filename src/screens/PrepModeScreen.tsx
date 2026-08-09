@@ -302,9 +302,23 @@ export default function PrepModeScreen() {
     return item?.freshness ?? null;
   }, [freshnessSession, mealSlug, plateId]);
 
-  // How the batch divides. freeze_servings is one container per eat-date that
-  // falls outside the fridge window; everything else stays in the fridge.
-  const freezeCount = freshness?.freeze_servings ?? 0;
+  // How the batch divides.
+  //
+  // These two numbers must be in the SAME unit, and they weren't: `servings` is
+  // cookServings — round(Σ scale_factor), clamped to the cook flow's range —
+  // while freeze_servings counts eat-dates. Subtracting one from the other went
+  // wrong the moment a meal was scaled, or when the session screen merged two
+  // plates of one dish into a single batch. So take the freezer's SHARE of the
+  // eat dates and apply it to the containers actually being filled.
+  const eatDateCount =
+    (freshness?.fridge_dates?.length ?? 0) + (freshness?.freeze_dates?.length ?? 0);
+  const freezeCount =
+    freshness && eatDateCount > 0
+      ? Math.min(
+          servings,
+          Math.round((servings * freshness.freeze_dates.length) / eatDateCount)
+        )
+      : 0;
   const fridgeCount = Math.max(0, servings - freezeCount);
   const fridgeDays = freshness?.fridge_days ?? storage?.fridge_days ?? null;
 
@@ -662,11 +676,18 @@ export default function PrepModeScreen() {
           <View style={[styles.body, styles.finaleBody]}>
             <Text style={[styles.stepEyebrow, { color: themeColor }]}>STORE IT</Text>
             <Text style={styles.storeHeadline}>
-              {freezeCount > 0 ? (
+              {freezeCount > 0 && fridgeCount > 0 ? (
                 <>
                   Let it cool, then split it{'\n'}
                   <Text style={styles.storeHeadlineSub}>
                     {servings} containers, two places.
+                  </Text>
+                </>
+              ) : freezeCount > 0 ? (
+                <>
+                  Let it cool, then freeze it{'\n'}
+                  <Text style={styles.storeHeadlineSub}>
+                    All {servings} {servings === 1 ? 'container' : 'containers'}.
                   </Text>
                 </>
               ) : (

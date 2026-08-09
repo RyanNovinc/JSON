@@ -27,6 +27,7 @@ import { GroceryItem, FoodCategory } from '../types/nutrition';
 import { buildNativeGroceryList, NativeGroceryBuild, CuratedPlanMeal } from '../utils/groceryEngine';
 import { getVariantChoices, setVariantChoice, VariantChoices } from '../utils/variantChoices';
 import { useSimplifiedMealPlanning } from '../contexts/SimplifiedMealPlanningContext';
+import { useMealLookup } from '../hooks/useMealLookup';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'GroceryList'>;
 type GroceryListRouteProp = RouteProp<RootStackParamList, 'GroceryList'>;
@@ -351,6 +352,11 @@ export default function GroceryListScreen() {
   const nativeKey = nativePlan
     ? `grocery_native_purchased_${(nativePlan as any).fingerprint || (nativePlan as any).id}`
     : null;
+  // Curated meals plus the user's own. Without this the native engine can't see
+  // a custom_ slug at all, so flipping any MAKE IT toggle quietly dropped that
+  // meal's ingredients off the list. `meals` starts as the curated map and is
+  // replaced once storage resolves, which is why it's a dependency below.
+  const { meals: mealLookup } = useMealLookup();
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
@@ -359,7 +365,7 @@ export default function GroceryListScreen() {
         if (!active) return;
         setVariantChoicesState(choices);
         if (nativePlan) {
-          setNativeBuild(buildNativeGroceryList(nativePlan as any, choices));
+          setNativeBuild(buildNativeGroceryList(nativePlan as any, choices, mealLookup));
           if (nativeKey) {
             try {
               const stored = await AsyncStorage.getItem(nativeKey);
@@ -369,7 +375,7 @@ export default function GroceryListScreen() {
         }
       })();
       return () => { active = false; };
-    }, [nativePlan])
+    }, [nativePlan, mealLookup])
   );
   const curatedChoices: CuratedPlanMeal[] = (nativeBuild?.curatedMeals ?? []).filter(m => m.hasAlt);
   const useNative = !!nativeBuild && curatedChoices.some(m => m.chosenVariantId !== m.defaultId);
@@ -380,7 +386,7 @@ export default function GroceryListScreen() {
   const handleChooseVariant = async (cm: CuratedPlanMeal, variantId: string | null) => {
     const next = await setVariantChoice(cm.slug, variantId);
     setVariantChoicesState(next);
-    if (nativePlan) setNativeBuild(buildNativeGroceryList(nativePlan as any, next));
+    if (nativePlan) setNativeBuild(buildNativeGroceryList(nativePlan as any, next, mealLookup));
   };
   const toggleNativePurchased = async (item: GroceryItem) => {
     const next = { ...nativePurchased, [item.id]: !nativePurchased[item.id] };

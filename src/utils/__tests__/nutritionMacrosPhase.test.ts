@@ -226,11 +226,24 @@ describe('trainingState-scaled surplus', () => {
     dietType: 'balanced',
   };
 
-  // Both profiles have no BF data and gaining direction → 'bulk' phase.
-  const newProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'new' };
-  const advProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'advanced' };
-  const retProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'returning' };
-  const conProfile: GoalsProfile    = { currentWeightKg: 80, goalWeightKg: 87, trainingState: 'consistent' };
+  // Reaching the 'bulk' phase now takes TWO things: a gaining direction AND an
+  // explicit routePreference of 'roomy', with known body fat at or under that
+  // route's ceiling (roomy male: 18%). phase-selection.md gates the full
+  // surplus on the user accepting faster gain, so it is a preference outcome
+  // rather than a derived one. These profiles previously relied on gaining +
+  // no body-fat data falling through to bulk, which now yields lean_bulk —
+  // see the last test in this block.
+  const bulkBase = {
+    currentWeightKg: 80,
+    currentBodyFatPct: 12,
+    goalWeightKg: 87,
+    routePreference: 'roomy',
+  } as const;
+
+  const newProfile: GoalsProfile    = { ...bulkBase, trainingState: 'new' };
+  const advProfile: GoalsProfile    = { ...bulkBase, trainingState: 'advanced' };
+  const retProfile: GoalsProfile    = { ...bulkBase, trainingState: 'returning' };
+  const conProfile: GoalsProfile    = { ...bulkBase, trainingState: 'consistent' };
 
   it('new lifter gets more bulk calories than advanced lifter at identical stats', () => {
     const newResult = computeMacrosPhaseAware(sharedAnswers, newProfile)!;
@@ -257,8 +270,121 @@ describe('trainingState-scaled surplus', () => {
     expect(newResult.calories).toBe(Math.round(tdee * 1.10));
     expect(advResult.calories).toBe(Math.round(tdee * 1.05));
   });
+
+  // The other half of the gate: identical stats and the same gaining direction,
+  // but no routePreference, must land on the SMALLER lean_bulk surplus. A user
+  // who never asked for faster gain should not be handed bulk calories.
+  it('without the roomy route the same stats get the lean_bulk surplus', () => {
+    const { routePreference, ...defaultRoute } = bulkBase;
+    const profile: GoalsProfile = { ...defaultRoute, trainingState: 'new' };
+    const result = computeMacrosPhaseAware(sharedAnswers, profile)!;
+    // lean_bulk for a new trainee is +7%, against +10% for bulk.
+    expect(result.calories).toBe(Math.round(result.tdee * 1.07));
+    expect(result.calories).toBeLessThan(
+      computeMacrosPhaseAware(sharedAnswers, newProfile)!.calories,
+    );
+  });
+
+  // Above the band, the roomier route no longer unlocks any surplus at all —
+  // since 9 Aug 2026 (D0) a gaining user above their route's ceiling (roomy:
+  // 18%) derives RECOMP, the same phase the route screen shows for the same
+  // profile. This test previously expected the lean_bulk surplus, which was
+  // the roadmap-vs-badge contradiction pinned as behaviour.
+  //
+  // Note this uses a 'consistent' trainee deliberately. At 19% body fat a 'new'
+  // or 'returning' trainee hits the newbie-recomp window first and never
+  // reaches the gaining rules at all, so it would test the wrong branch.
+  it('roomy route above its ceiling derives recomp calories, not a surplus', () => {
+    const profile: GoalsProfile = {
+      ...bulkBase,
+      currentBodyFatPct: 19,
+      trainingState: 'consistent',
+    };
+    const result = computeMacrosPhaseAware(sharedAnswers, profile)!;
+    // recomp is maintenance-adjacent: tdee minus min(300, 8% of tdee).
+    expect(result.calories).toBe(
+      result.tdee - Math.min(300, Math.round(result.tdee * 0.08)),
+    );
+    expect(result.calories).toBeLessThan(result.tdee);
+  });
 });
 
 // ── Backwards-compatibility: no GoalsProfile ──────────────────────────────
 // (Not tested here — that path uses the existing computeMacros, already tested
 // implicitly by the nutrition questionnaire flow. Only the new path is new.)
+
+// ── Profile-sourced sex / age / height ─────────────────────────────────────
+//
+// These three moved onto GoalsProfile with the shared intake. The profile wins
+// where it has a value, and the questionnaire answers stay as the fallback so
+// nothing written before those fields existed breaks.
+
+describe('sex, age and height resolve from the profile first', () => {
+  const answersOnly: NutritionAnswers = {
+    gender: 'male',
+    age: 30,
+    height: 178,
+    activityLevel: 'moderate',
+    dietType: 'balanced',
+  };
+
+  const baseProfile: GoalsProfile = {
+    currentWeightKg: 80,
+    goalWeightKg: 87,
+    trainingState: 'consistent',
+  };
+
+  it('falls back to the answers when the profile has none of them', () => {
+    const result = computeMacrosPhaseAware(answersOnly, baseProfile)!;
+    // Mifflin-St Jeor, male: 10(80) + 6.25(178) - 5(30) + 5 = 1767.5
+    expect(result.bmr).toBe(1768);
+  });
+
+  it('prefers the profile height over a stale answer', () => {
+    const profile: GoalsProfile = { ...baseProfile, heightCm: 190 };
+    const result = computeMacrosPhaseAware(answersOnly, profile)!;
+    // 10(80) + 6.25(190) - 5(30) + 5 = 1842.5
+    expect(result.bmr).toBe(1843);
+  });
+
+  it('prefers the profile age over a stale answer', () => {
+    const profile: GoalsProfile = { ...baseProfile, ageYears: 50 };
+    const result = computeMacrosPhaseAware(answersOnly, profile)!;
+    // 10(80) + 6.25(178) - 5(50) + 5 = 1667.5
+    expect(result.bmr).toBe(1668);
+  });
+
+  it('prefers the profile sex over a stale answer', () => {
+    const profile: GoalsProfile = { ...baseProfile, sex: 'female' };
+    const result = computeMacrosPhaseAware(answersOnly, profile)!;
+    // Female: 10(80) + 6.25(178) - 5(30) - 161 = 1601.5
+    expect(result.bmr).toBe(1602);
+  });
+
+  it("averages the two formulas for 'prefer not to say'", () => {
+    const profile: GoalsProfile = { ...baseProfile, sex: 'prefer_not_to_say' };
+    const result = computeMacrosPhaseAware(answersOnly, profile)!;
+    // (1767.5 + 1601.5) / 2 = 1684.5
+    expect(result.bmr).toBe(1685);
+  });
+
+  it('resolves entirely from the profile when the answers carry no BMR fields', () => {
+    const profile: GoalsProfile = {
+      ...baseProfile,
+      sex: 'male',
+      ageYears: 30,
+      heightCm: 178,
+    };
+    const bare: NutritionAnswers = {
+      activityLevel: 'moderate',
+      dietType: 'balanced',
+    };
+    const result = computeMacrosPhaseAware(bare, profile)!;
+    expect(result.bmr).toBe(1768);
+  });
+
+  it('still returns null when neither source supplies them', () => {
+    const bare: NutritionAnswers = { activityLevel: 'moderate', dietType: 'balanced' };
+    expect(computeMacrosPhaseAware(bare, baseProfile)).toBeNull();
+  });
+});

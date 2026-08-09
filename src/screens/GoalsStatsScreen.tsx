@@ -16,10 +16,18 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { TrainingState } from '../utils/goalsProfile';
+import { TrainingState , Sex, ActivityLevel } from '../utils/goalsProfile';
+import BodyFatField, {
+  emptyBodyFatValue,
+  type BodyFatFieldValue,
+} from '../components/BodyFatField';
 import {
   loadGoalsProfile,
   updateGoalsProfileField,
+  AGE_MIN,
+  AGE_MAX,
+  HEIGHT_CM_MIN,
+  HEIGHT_CM_MAX,
   BODY_FAT_MIN,
   BODY_FAT_MAX,
   WEIGHT_KG_MIN,
@@ -36,12 +44,41 @@ import {
 // the cutting deficit, so a typo silently rewrote their calorie target.
 
 /** null = empty (valid, both fields are optional). string = why it's rejected. */
-function validateBodyFat(raw: string): string | null {
+const SEX_OPTIONS: Array<{ value: Sex; icon: string; title: string; subtitle: string }> = [
+  {
+    value: 'male',
+    icon: 'male-outline',
+    title: 'Male',
+    subtitle: 'Male ranges for body fat, gain rate, and energy needs.',
+  },
+  {
+    value: 'female',
+    icon: 'female-outline',
+    title: 'Female',
+    subtitle: 'Female ranges for body fat, gain rate, and energy needs.',
+  },
+  {
+    value: 'prefer_not_to_say',
+    icon: 'remove-circle-outline',
+    title: 'Prefer not to say',
+    subtitle: "We'll average the two calculations. Your targets stay usable.",
+  },
+];
+
+function validateAge(raw: string): string | null {
   if (!raw.trim()) return null;
-  const n = parseFloat(raw);
-  if (!Number.isFinite(n)) return 'Enter a number, or leave this blank.';
-  if (n < BODY_FAT_MIN || n > BODY_FAT_MAX) {
-    return `Body fat should be between ${BODY_FAT_MIN}% and ${BODY_FAT_MAX}%. Leave it blank if you're not sure.`;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 'Enter a number.';
+  if (n < AGE_MIN || n > AGE_MAX) return `Age should be between ${AGE_MIN} and ${AGE_MAX}.`;
+  return null;
+}
+
+function validateHeight(raw: string): string | null {
+  if (!raw.trim()) return null;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 'Enter a number.';
+  if (n < HEIGHT_CM_MIN || n > HEIGHT_CM_MAX) {
+    return `Height should be between ${HEIGHT_CM_MIN} and ${HEIGHT_CM_MAX} cm.`;
   }
   return null;
 }
@@ -111,6 +148,47 @@ const TRAINING_OPTIONS: Array<{
   },
 ];
 
+// Verbatim copy of GoalsIntakeScreen's ACTIVITY_OPTIONS — same deliberate
+// duplication as TRAINING_OPTIONS above, so the two screens cannot drift in
+// wording without a grep finding both.
+const ACTIVITY_OPTIONS: Array<{
+  value: ActivityLevel;
+  icon: string;
+  title: string;
+  subtitle: string;
+}> = [
+  {
+    value: 'sedentary',
+    icon: 'desktop-outline',
+    title: 'Mostly sitting',
+    subtitle: 'Desk job, not much walking outside your sessions.',
+  },
+  {
+    value: 'light',
+    icon: 'walk-outline',
+    title: 'Lightly active',
+    subtitle: 'On your feet some of the day, or a regular walk.',
+  },
+  {
+    value: 'moderate',
+    icon: 'bicycle-outline',
+    title: 'Moderately active',
+    subtitle: 'Plenty of walking, or an active job with sitting.',
+  },
+  {
+    value: 'heavy',
+    icon: 'hammer-outline',
+    title: 'Very active',
+    subtitle: 'On your feet all day, or a physical job.',
+  },
+  {
+    value: 'extreme',
+    icon: 'flame-outline',
+    title: 'Extremely active',
+    subtitle: 'Heavy manual work, on top of training.',
+  },
+];
+
 const LEANNESS_OPTIONS: Array<{
   pct: number | undefined;
   icon: string;
@@ -157,7 +235,22 @@ export default function GoalsStatsScreen() {
   const [weightDisplay, setWeightDisplay] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
   const [weightSheetVisible, setWeightSheetVisible] = useState(false);
-  const [bodyFatInput, setBodyFatInput] = useState('');
+  // The shared three-mode field, same one the intake and Quick check use.
+  // This screen previously had a plain number box, which meant the estimator
+  // was unreachable for anyone editing their stats rather than filling in the
+  // intake — the last place body fat could be entered the old way.
+  const [bodyFat, setBodyFat] = useState<BodyFatFieldValue>(emptyBodyFatValue());
+
+  // Sex, age and height live on GoalsProfile now, so the profile editor has to
+  // be able to edit them. Height in particular gates the FFMI plausibility
+  // check on the roadmap.
+  const [sex, setSex] = useState<Sex | null>(null);
+  const [ageInput, setAgeInput] = useState('');
+  const [heightInput, setHeightInput] = useState('');
+  // Day-to-day activity outside training — feeds TDEE on the nutrition side
+  // and the Athlete line in the workout prompt, so the profile editor must be
+  // able to correct it without redoing intake. Optional, like sex.
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(null);
 
   const [goalWeightInput, setGoalWeightInput] = useState('');
   const [selectedLeannessIdx, setSelectedLeannessIdx] = useState<number | null>(null);
@@ -171,8 +264,12 @@ export default function GoalsStatsScreen() {
 
       setTrainingState(profile?.trainingState ?? null);
       if (profile?.currentBodyFatPct != null) {
-        setBodyFatInput(String(profile.currentBodyFatPct));
+        setBodyFat(emptyBodyFatValue(profile.currentBodyFatPct));
       }
+      setSex(profile?.sex ?? null);
+      setActivityLevel(profile?.activityLevel ?? null);
+      if (profile?.ageYears != null) setAgeInput(String(profile.ageYears));
+      if (profile?.heightCm != null) setHeightInput(String(profile.heightCm));
       if (profile?.goalBodyFatPct !== undefined) {
         const idx = LEANNESS_OPTIONS.findIndex((o) => o.pct === profile.goalBodyFatPct);
         if (idx !== -1) setSelectedLeannessIdx(idx);
@@ -223,7 +320,7 @@ export default function GoalsStatsScreen() {
       // Re-checked here as well as in the CTA gate: the gate is the UX, this is
       // the guarantee that nothing out of range reaches the profile.
       const currentBFPct =
-        bodyFatInput && !validateBodyFat(bodyFatInput) ? parseFloat(bodyFatInput) : undefined;
+        bodyFat.bodyFatPct;
       const rawGoalWeight =
         goalWeightInput && !validateGoalWeight(goalWeightInput, weightUnit)
           ? parseFloat(goalWeightInput)
@@ -243,6 +340,21 @@ export default function GoalsStatsScreen() {
       await updateGoalsProfileField('trainingState', trainingState);
       await updateGoalsProfileField('currentWeightKg', currentWeightKg);
       await updateGoalsProfileField('currentBodyFatPct', currentBFPct);
+      if (currentBFPct != null) {
+        await updateGoalsProfileField('bodyFatSource', bodyFat.source);
+      }
+      await updateGoalsProfileField('sex', sex ?? undefined);
+      await updateGoalsProfileField('activityLevel', activityLevel ?? undefined);
+      await updateGoalsProfileField(
+        'ageYears',
+        !validateAge(ageInput) && ageInput.trim() ? parseInt(ageInput, 10) : undefined,
+      );
+      await updateGoalsProfileField(
+        'heightCm',
+        !validateHeight(heightInput) && heightInput.trim()
+          ? parseInt(heightInput, 10)
+          : undefined,
+      );
       await updateGoalsProfileField('goalWeightKg', goalWeightKg);
       await updateGoalsProfileField('goalBodyFatPct', goalBFPct);
 
@@ -252,7 +364,8 @@ export default function GoalsStatsScreen() {
     }
   };
 
-  const bodyFatError = validateBodyFat(bodyFatInput);
+  const ageError = validateAge(ageInput);
+  const heightError = validateHeight(heightInput);
   const goalWeightError = validateGoalWeight(goalWeightInput, weightUnit);
 
   // Say out loud which direction the target implies, live, while they type.
@@ -286,7 +399,11 @@ export default function GoalsStatsScreen() {
       : null;
 
   const ctaActive =
-    trainingState !== null && currentWeightKg !== null && !bodyFatError && !goalWeightError;
+    trainingState !== null &&
+    currentWeightKg !== null &&
+    !ageError &&
+    !heightError &&
+    !goalWeightError;
 
   if (loading) {
     return (
@@ -321,6 +438,65 @@ export default function GoalsStatsScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Training history ──────────────────────────────────────── */}
+          <Text style={styles.sectionLabel}>About you</Text>
+          <Text style={styles.sectionSublabel}>
+            These drive your calorie targets and whether a goal is reachable for
+            your frame.
+          </Text>
+          {SEX_OPTIONS.map((opt) => (
+            <QuestionCard
+              key={opt.value}
+              icon={opt.icon as any}
+              title={opt.title}
+              subtitle={opt.subtitle}
+              selected={sex === opt.value}
+              onPress={() => setSex(opt.value)}
+            />
+          ))}
+
+          <View style={styles.inputRow}>
+            <View style={styles.inputRowIcon}>
+              <Ionicons name="calendar-outline" size={18} color="#a1a1aa" />
+            </View>
+            <View style={styles.inputRowContent}>
+              <Text style={styles.inputRowLabel}>Age</Text>
+              <TextInput
+                style={styles.inlineInput}
+                placeholder="e.g. 28"
+                placeholderTextColor="#52525b"
+                keyboardType="number-pad"
+                value={ageInput}
+                onChangeText={(t) => setAgeInput(t.replace(/[^0-9]/g, ''))}
+                maxLength={3}
+                returnKeyType="done"
+              />
+            </View>
+          </View>
+          {ageError ? <Text style={styles.inputError}>{ageError}</Text> : null}
+
+          <View style={styles.inputRow}>
+            <View style={styles.inputRowIcon}>
+              <Ionicons name="resize-outline" size={18} color="#a1a1aa" />
+            </View>
+            <View style={styles.inputRowContent}>
+              <Text style={styles.inputRowLabel}>Height</Text>
+              <TextInput
+                style={styles.inlineInput}
+                placeholder="e.g. 178"
+                placeholderTextColor="#52525b"
+                keyboardType="number-pad"
+                value={heightInput}
+                onChangeText={(t) => setHeightInput(t.replace(/[^0-9]/g, ''))}
+                maxLength={3}
+                returnKeyType="done"
+              />
+            </View>
+            {heightInput ? <Text style={styles.unitSuffix}>cm</Text> : null}
+          </View>
+          {heightError ? <Text style={styles.inputError}>{heightError}</Text> : null}
+
+          <View style={styles.sectionDivider} />
+
           <Text style={styles.sectionLabel}>Training history</Text>
           <Text style={styles.sectionSublabel}>Shapes your starting volume and plan intensity.</Text>
           {TRAINING_OPTIONS.map((opt) => (
@@ -331,6 +507,25 @@ export default function GoalsStatsScreen() {
               subtitle={opt.subtitle}
               selected={trainingState === opt.value}
               onPress={() => setTrainingState(opt.value)}
+            />
+          ))}
+
+          <View style={styles.sectionDivider} />
+
+          {/* ── Outside the gym ───────────────────────────────────────── */}
+          <Text style={styles.sectionLabel}>Outside the gym</Text>
+          <Text style={styles.sectionSublabel}>
+            Sets your daily calorie burn — training aside, what does the rest of
+            your day look like?
+          </Text>
+          {ACTIVITY_OPTIONS.map((opt) => (
+            <QuestionCard
+              key={opt.value}
+              icon={opt.icon as any}
+              title={opt.title}
+              subtitle={opt.subtitle}
+              selected={activityLevel === opt.value}
+              onPress={() => setActivityLevel(opt.value)}
             />
           ))}
 
@@ -361,30 +556,21 @@ export default function GoalsStatsScreen() {
             <Ionicons name="chevron-forward" size={16} color="#52525b" />
           </TouchableOpacity>
 
-          <View style={styles.inputRow}>
-            <View style={styles.inputRowIcon}>
-              <Ionicons name="body-outline" size={18} color="#a1a1aa" />
-            </View>
-            <View style={styles.inputRowContent}>
-              <Text style={styles.inputRowLabel}>
-                Body fat{'  '}
-                <Text style={styles.optionalTag}>optional</Text>
-              </Text>
-              <TextInput
-                style={styles.inlineInput}
-                placeholder="e.g. 18"
-                placeholderTextColor="#52525b"
-                keyboardType="decimal-pad"
-                value={bodyFatInput}
-                onChangeText={(t) => setBodyFatInput(t.replace(/[^0-9.]/g, ''))}
-                maxLength={4}
-                returnKeyType="done"
-              />
-            </View>
-            {bodyFatInput ? <Text style={styles.unitSuffix}>%</Text> : null}
-          </View>
-
-          {bodyFatError ? <Text style={styles.inputError}>{bodyFatError}</Text> : null}
+          <Text style={styles.sectionLabel}>
+            Body fat{'  '}<Text style={styles.optionalTag}>optional</Text>
+          </Text>
+          <BodyFatField
+            value={bodyFat}
+            onChange={setBodyFat}
+            sex={sex ?? undefined}
+            heightCm={
+              !validateHeight(heightInput) && heightInput.trim()
+                ? parseInt(heightInput, 10)
+                : undefined
+            }
+            weightKg={currentWeightKg ?? undefined}
+            themeColor={themeColor}
+          />
 
           <View style={styles.sectionDivider} />
 

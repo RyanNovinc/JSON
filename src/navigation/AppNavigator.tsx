@@ -95,11 +95,11 @@ import CreateChooserScreen from '../screens/CreateChooserScreen';
 
 // Shared goals intake — runs once before either planning flow
 import GoalsIntakeScreen from '../screens/GoalsIntakeScreen';
+import RouteScreen from '../screens/RouteScreen';
 import GoalsStatsScreen from '../screens/GoalsStatsScreen';
 import ConfirmStatsScreen from '../screens/ConfirmStatsScreen';
 
 // Import questionnaire screens
-import Q1PrimaryGoalScreen from '../screens/questionnaire/Q1PrimaryGoalScreen';
 import Q2ExperienceScreen from '../screens/questionnaire/Q2ExperienceScreen';
 import Q3DaysPerWeekScreen from '../screens/questionnaire/Q3DaysPerWeekScreen';
 import Q4ProgramDurationScreen from '../screens/questionnaire/Q4ProgramDurationScreen';
@@ -113,10 +113,6 @@ import QuestionnaireSummaryScreen from '../screens/questionnaire/QuestionnaireSu
 // Import nutrition questionnaire screens
 import IntentForkModal from '../onboarding/IntentForkModal';
 import OnboardingContractScreen from '../onboarding/OnboardingContractScreen';
-import N1GoalScreen from '../screens/nutrition/questionnaire/N1GoalScreen';
-import N2RateScreen from '../screens/nutrition/questionnaire/N2RateScreen';
-import N3AboutYouScreen from '../screens/nutrition/questionnaire/N3AboutYouScreen';
-import N4ActivityScreen from '../screens/nutrition/questionnaire/N4ActivityScreen';
 import N5DietTypeScreen from '../screens/nutrition/questionnaire/N5DietTypeScreen';
 import N5bAllergiesScreen from '../screens/nutrition/questionnaire/N5bAllergiesScreen';
 import N5cSleepScreen from '../screens/nutrition/questionnaire/N5cSleepScreen';
@@ -352,13 +348,16 @@ export type RootStackParamList = {
   // Shared goals intake — first-run only, flows straight into the
   // plan-specific questions (no separate gate, no teleport to summary)
   GoalsIntake: { nextFlow: 'workout' | 'nutrition' } | undefined;
+  // The roadmap that ends the intake. flowStepOffset is threaded through
+  // rather than recomputed: this screen is a RESULT, not a numbered step, so
+  // it does not advance the count.
+  Route: { flowStepOffset?: number } | undefined;
   // Returning-user lightweight stats confirm, shown before the
   // plan-specific questions when a usable GoalsProfile already exists
   ConfirmStats: { nextFlow: 'workout' | 'nutrition'; extraParams?: Record<string, any> } | undefined;
   // Standalone, always-reachable editable view of GoalsProfile
   GoalsStats: undefined;
   // Questionnaire screens
-  Q1PrimaryGoal: { answersSoFar?: Record<string, any>; editMode?: boolean; fromOnboarding?: boolean; flowStepOffset?: number } | undefined;
   Q2Experience: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   Q3DaysPerWeek: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   Q4ProgramDuration: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
@@ -370,10 +369,6 @@ export type RootStackParamList = {
   QuestionnaireSummary: undefined;
   OnboardingContract: { flow?: 'meal' | 'workout' };
   // Nutrition questionnaire screens
-  N1Goal: { answersSoFar?: Record<string, any>; editMode?: boolean; fromOnboarding?: boolean; flowStepOffset?: number } | undefined;
-  N2Rate: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
-  N3AboutYou: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
-  N4Activity: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   N5DietType: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   N5bAllergies: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   N5cSleep: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
@@ -1442,6 +1437,17 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
+              {/* The roadmap — end of the intake, and the fork into either plan */}
+              <RootStack.Screen
+                name="Route"
+                component={RouteScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: { opacity: current.progress },
+                  }),
+                }}
+              />
               {/* Returning-user lightweight stats confirm */}
               <RootStack.Screen
                 name="ConfirmStats"
@@ -1478,14 +1484,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 }}
               />
               {/* Questionnaire screens */}
-              <RootStack.Screen name="Q1PrimaryGoal" component={Q1PrimaryGoalScreen} options={{
-                headerShown: false,
-                cardStyleInterpolator: ({ current }) => ({
-                  cardStyle: {
-                    opacity: current.progress,
-                  },
-                }),
-              }} />
               <RootStack.Screen name="Q2Experience" component={Q2ExperienceScreen} options={{ 
                 headerShown: false,
                 cardStyleInterpolator: ({ current }) => ({
@@ -1560,70 +1558,6 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
               }} />
 
               {/* Nutrition questionnaire screens */}
-              <RootStack.Screen 
-                name="N1Goal" 
-                children={() => (
-                  <NutritionThemeProvider>
-                    <N1GoalScreen />
-                  </NutritionThemeProvider>
-                )}
-                options={{ 
-                  headerShown: false,
-                  cardStyleInterpolator: ({ current }) => ({
-                    cardStyle: {
-                      opacity: current.progress,
-                    },
-                  }),
-                }} 
-              />
-              <RootStack.Screen 
-                name="N2Rate" 
-                children={() => (
-                  <NutritionThemeProvider>
-                    <N2RateScreen />
-                  </NutritionThemeProvider>
-                )}
-                options={{ 
-                  headerShown: false,
-                  cardStyleInterpolator: ({ current }) => ({
-                    cardStyle: {
-                      opacity: current.progress,
-                    },
-                  }),
-                }} 
-              />
-              <RootStack.Screen 
-                name="N3AboutYou" 
-                children={() => (
-                  <NutritionThemeProvider>
-                    <N3AboutYouScreen />
-                  </NutritionThemeProvider>
-                )}
-                options={{ 
-                  headerShown: false,
-                  cardStyleInterpolator: ({ current }) => ({
-                    cardStyle: {
-                      opacity: current.progress,
-                    },
-                  }),
-                }} 
-              />
-              <RootStack.Screen 
-                name="N4Activity" 
-                children={() => (
-                  <NutritionThemeProvider>
-                    <N4ActivityScreen />
-                  </NutritionThemeProvider>
-                )}
-                options={{ 
-                  headerShown: false,
-                  cardStyleInterpolator: ({ current }) => ({
-                    cardStyle: {
-                      opacity: current.progress,
-                    },
-                  }),
-                }} 
-              />
               <RootStack.Screen 
                 name="N5DietType" 
                 children={() => (

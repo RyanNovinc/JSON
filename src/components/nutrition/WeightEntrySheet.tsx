@@ -30,8 +30,14 @@ import { finalizeNutrition } from '../../utils/nutritionMacros';
  * WeightEntrySheet — the single reusable bottom sheet for logging weight.
  *
  * Used from:
- *   1. N3AboutYouScreen during the nutrition questionnaire (entry context)
- *   2. WeightTrackerScreen from Profile (dashboard context)
+ *   1. WeightTrackerScreen from Profile (dashboard context)
+ *   2. ConfirmStatsScreen, the returning-user stats check (entry context)
+ *
+ * It was previously opened from N3AboutYouScreen too. That screen was removed
+ * on 9 Aug 2026 when sex, age, height and weight moved onto GoalsProfile via
+ * the shared intake, so the nutrition questionnaire no longer asks for weight
+ * at all. The finalizeNutrition-on-save behaviour below still matters for the
+ * remaining callers.
  *
  * Why one component and not two flows:
  *   - The actual entry UI is identical in both contexts (number + unit + notes)

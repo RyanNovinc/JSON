@@ -16,17 +16,27 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { TrainingState, derivePhase } from '../utils/goalsProfile';
+import { TrainingState, Sex, ActivityLevel } from '../utils/goalsProfile';
+import BodyFatField, {
+  emptyBodyFatValue,
+  type BodyFatFieldValue,
+} from '../components/BodyFatField';
+import {
+  leanMassKg,
+  weightAtBodyFat,
+  physiqueTargets,
+  classifyGoal,
+} from '../utils/roadmap';
 import {
   saveGoalsProfile,
-  BODY_FAT_MIN,
-  BODY_FAT_MAX,
   WEIGHT_KG_MIN,
   WEIGHT_KG_MAX,
+  AGE_MIN,
+  AGE_MAX,
+  HEIGHT_CM_MIN,
+  HEIGHT_CM_MAX,
 } from '../utils/goalsProfileStorage';
 import { WorkoutStorage } from '../utils/storage';
-import { mergeNutritionAnswers } from '../utils/nutritionQuestionnaireStorage';
-import { deriveSyntheticNutritionAnswers } from '../utils/questionnaireRouting';
 import QuestionCard from './questionnaire/QuestionCard';
 import QuestionnaireHeader from './questionnaire/QuestionnaireHeader';
 import WeightEntrySheet from '../components/nutrition/WeightEntrySheet';
@@ -112,12 +122,90 @@ const LEANNESS_OPTIONS: Array<{
 // here silently rewrote someone's calorie target for every plan they generated.
 
 /** null = empty (valid, both fields are optional). string = why it's rejected. */
-function validateBodyFat(raw: string): string | null {
+/** Sex, age and height moved here from nutrition N3 so BOTH plans can use
+ *  them: they drive BMR, muscle-gain rate scaling, the body-fat operating
+ *  band and the FFMI plausibility check. */
+const SEX_OPTIONS: Array<{ value: Sex; icon: string; title: string; subtitle: string }> = [
+  {
+    value: 'male',
+    icon: 'male-outline',
+    title: 'Male',
+    subtitle: 'Male ranges for body fat, gain rate, and energy needs.',
+  },
+  {
+    value: 'female',
+    icon: 'female-outline',
+    title: 'Female',
+    subtitle: 'Female ranges for body fat, gain rate, and energy needs.',
+  },
+  {
+    value: 'prefer_not_to_say',
+    icon: 'remove-circle-outline',
+    title: 'Prefer not to say',
+    subtitle: "We'll average the two calculations. Your targets stay usable.",
+  },
+];
+
+/**
+ * Day-to-day activity OUTSIDE training. Moved here from nutrition N4: it is a
+ * fact about the person rather than a food preference, it doesn't change
+ * between plans, and it sits naturally next to training history — one question
+ * covers the gym, the other covers the remaining twenty-three hours.
+ *
+ * Values match ACTIVITY_MULTIPLIERS in nutritionMacros.ts exactly.
+ */
+const ACTIVITY_OPTIONS: Array<{
+  value: ActivityLevel;
+  icon: string;
+  title: string;
+  subtitle: string;
+}> = [
+  {
+    value: 'sedentary',
+    icon: 'desktop-outline',
+    title: 'Mostly sitting',
+    subtitle: 'Desk job, not much walking outside your sessions.',
+  },
+  {
+    value: 'light',
+    icon: 'walk-outline',
+    title: 'Lightly active',
+    subtitle: 'On your feet some of the day, or a regular walk.',
+  },
+  {
+    value: 'moderate',
+    icon: 'bicycle-outline',
+    title: 'Moderately active',
+    subtitle: 'Plenty of walking, or an active job with sitting.',
+  },
+  {
+    value: 'heavy',
+    icon: 'hammer-outline',
+    title: 'Very active',
+    subtitle: 'On your feet all day, or a physical job.',
+  },
+  {
+    value: 'extreme',
+    icon: 'flame-outline',
+    title: 'Extremely active',
+    subtitle: 'Heavy manual work, on top of training.',
+  },
+];
+
+function validateAge(raw: string): string | null {
   if (!raw.trim()) return null;
-  const n = parseFloat(raw);
-  if (!Number.isFinite(n)) return 'Enter a number, or leave this blank.';
-  if (n < BODY_FAT_MIN || n > BODY_FAT_MAX) {
-    return `Body fat should be between ${BODY_FAT_MIN}% and ${BODY_FAT_MAX}%. Leave it blank if you're not sure.`;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 'Enter a number.';
+  if (n < AGE_MIN || n > AGE_MAX) return `Age should be between ${AGE_MIN} and ${AGE_MAX}.`;
+  return null;
+}
+
+function validateHeight(raw: string): string | null {
+  if (!raw.trim()) return null;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 'Enter a number.';
+  if (n < HEIGHT_CM_MIN || n > HEIGHT_CM_MAX) {
+    return `Height should be between ${HEIGHT_CM_MIN} and ${HEIGHT_CM_MAX} cm.`;
   }
   return null;
 }
@@ -146,19 +234,29 @@ export default function GoalsIntakeScreen() {
   // ── Step management ────────────────────────────────────────────────────────
   const [step, setStep] = useState(1);
 
-  // ── Step 1: Training state ─────────────────────────────────────────────────
-  const [trainingState, setTrainingState] = useState<TrainingState | null>(null);
+  // ── Step 1: About you ──────────────────────────────────────────────────────
+  const [sex, setSex] = useState<Sex | null>(null);
+  const [ageInput, setAgeInput] = useState('');
+  const [heightInput, setHeightInput] = useState('');
 
-  // ── Step 2: Body composition ───────────────────────────────────────────────
+  // ── Step 2: Training state ─────────────────────────────────────────────────
+  const [trainingState, setTrainingState] = useState<TrainingState | null>(null);
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(null);
+
+  // ── Step 3: Body composition ───────────────────────────────────────────────
   const [currentWeightKg, setCurrentWeightKg] = useState<number | null>(null);
   const [weightDisplay, setWeightDisplay] = useState('');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
   const [weightSheetVisible, setWeightSheetVisible] = useState(false);
-  const [bodyFatInput, setBodyFatInput] = useState('');
+  // The shared three-mode field (typed / tier picker / tape). One
+  // implementation, also used by ConfirmStatsScreen.
+  const [bodyFat, setBodyFat] = useState<BodyFatFieldValue>(emptyBodyFatValue());
 
-  // ── Step 3: Goals ──────────────────────────────────────────────────────────
+  // ── Step 4: Goals ──────────────────────────────────────────────────────────
   const [goalWeightInput, setGoalWeightInput] = useState('');
   const [selectedLeannessIdx, setSelectedLeannessIdx] = useState<number | null>(null);
+  // Plenty of people know how they want to LOOK without knowing the numbers.
+  const [showTargets, setShowTargets] = useState(false);
 
   // These are the numbered opening steps of the questionnaire — the
   // progress bar spans profile setup AND the plan-specific questions that
@@ -166,10 +264,15 @@ export default function GoalsIntakeScreen() {
   // Nutrition's count reacts to the target-weight input: a filled-in goal
   // weight means N1/N2 will be skipped (see handleComplete), so the total
   // is 2 shorter — computed here so the bar never jumps once N3 appears.
-  const willSkipNutritionGoalRate = nextFlow === 'nutrition' && goalWeightInput.trim().length > 0;
+  // No skip/non-skip split any more: N1, N2 and N3 are all gone from the
+  // nutrition flow, so it is a flat 9 screens for everyone.
   const PLAN_STEP_COUNT =
-    nextFlow === 'workout' ? 6 : willSkipNutritionGoalRate ? 10 : 12;
-  const totalFlowSteps = 3 + PLAN_STEP_COUNT;
+    nextFlow === 'workout' ? 5 : 8;
+  // 4, not 3: sex/age/height became the opening step when they moved off
+  // nutrition N3. Every downstream screen derives its numbering from
+  // flowStepOffset, so this and the offsets in handleComplete are the only
+  // places that know the intake got longer.
+  const totalFlowSteps = 4 + PLAN_STEP_COUNT;
 
   // ── Save state ─────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -202,11 +305,23 @@ export default function GoalsIntakeScreen() {
 
   // ── Step actions ───────────────────────────────────────────────────────────
   const handleStep1Continue = () => {
-    if (trainingState) setStep(2);
+    if (
+      sex &&
+      ageInput.trim() &&
+      heightInput.trim() &&
+      !validateAge(ageInput) &&
+      !validateHeight(heightInput)
+    ) {
+      setStep(2);
+    }
   };
 
   const handleStep2Continue = () => {
-    if (currentWeightKg) setStep(3);
+    if (trainingState && activityLevel) setStep(3);
+  };
+
+  const handleStep3Continue = () => {
+    if (currentWeightKg) setStep(4);
   };
 
   const handleComplete = async () => {
@@ -216,8 +331,7 @@ export default function GoalsIntakeScreen() {
       // Re-check at the save site as well as in the CTA gate. The gate is the
       // UX; this is the guarantee — nothing out of range reaches the profile
       // even if a future edit changes how the button is enabled.
-      const currentBFPct =
-        bodyFatInput && !validateBodyFat(bodyFatInput) ? parseFloat(bodyFatInput) : undefined;
+      const currentBFPct = bodyFat.bodyFatPct;
       const rawGoalWeight =
         goalWeightInput && !validateGoalWeight(goalWeightInput, weightUnit)
           ? parseFloat(goalWeightInput)
@@ -233,52 +347,35 @@ export default function GoalsIntakeScreen() {
           ? LEANNESS_OPTIONS[selectedLeannessIdx].pct
           : undefined;
 
+      const ageYears =
+        !validateAge(ageInput) && ageInput.trim() ? parseInt(ageInput, 10) : undefined;
+      const heightCm =
+        !validateHeight(heightInput) && heightInput.trim()
+          ? parseInt(heightInput, 10)
+          : undefined;
+
       await saveGoalsProfile({
         currentWeightKg,
         currentBodyFatPct: currentBFPct,
         goalWeightKg,
         goalBodyFatPct: goalBFPct,
         trainingState,
+        sex: sex ?? undefined,
+        ageYears,
+        heightCm,
+        activityLevel: activityLevel ?? undefined,
+        // Provenance matters: a tier picked from a description and a DEXA scan
+        // are both "20%", but only one should be trusted when the app later
+        // compares readings to decide whether the user has progressed.
+        bodyFatSource: currentBFPct != null ? bodyFat.source : undefined,
       });
 
-      // First-run always flows straight into the plan-specific questions —
-      // no completeness check here. Checking hasCompleteQuestionnaire (or
-      // its nutrition equivalent) at this point is exactly what caused the
-      // old teleport-to-summary bug for users with stale/legacy answers.
-      if (nextFlow === 'workout') {
-        navigation.navigate('Q1PrimaryGoal', {
-          answersSoFar: {},
-          flowStepOffset: 3,
-        });
-      } else if (goalWeightKg != null) {
-        // A goal weight was just set, so the profile can supply a direction
-        // — skip N1 (goal) and N2 (rate), mirroring continueNutritionFlow's
-        // returning-user logic. flowStepOffset drops by 2 (N1+N2 removed)
-        // so N3 onward still number continuously against the reduced total.
-        const phase = derivePhase({
-          currentWeightKg,
-          currentBodyFatPct: currentBFPct,
-          goalWeightKg,
-          goalBodyFatPct: goalBFPct,
-          trainingState,
-        });
-        const synth = deriveSyntheticNutritionAnswers(phase);
-        // Merge, don't replace: saveNutritionAnswers(synth) overwrote the whole
-        // draft, so a user who had already answered some nutrition questions
-        // before a GoalsProfile existed lost them here. mergeNutritionAnswers
-        // also guards against a non-object write, which previously vanished
-        // into a swallowed catch and left the flow with no goal at all.
-        const merged = await mergeNutritionAnswers(synth);
-        navigation.navigate('N3AboutYou', {
-          answersSoFar: merged,
-          flowStepOffset: 1,
-        });
-      } else {
-        navigation.navigate('N1Goal', {
-          answersSoFar: {},
-          flowStepOffset: 3,
-        });
-      }
+      // Everything lands on the roadmap first. It is the payoff for answering
+      // four steps, and it is where the user picks WHICH plan to build — so
+      // the workout/nutrition fork lives there, not here. flowStepOffset stays
+      // at 4: the roadmap is a result, not a numbered step, so the plan
+      // questions still resume at step 5.
+      navigation.navigate('Route', { flowStepOffset: 4 });
     } catch {
       setSaving(false);
     }
@@ -287,7 +384,38 @@ export default function GoalsIntakeScreen() {
   // ── Derived UI state ───────────────────────────────────────────────────────
   // Both fields stay optional; they just can't hold a number that isn't a
   // body fat percentage or a body weight.
-  const bodyFatError = validateBodyFat(bodyFatInput);
+  // The weight that means "no change" in whatever unit they're using, so the
+  // maintain option writes a real goal rather than leaving the field blank.
+  const maintainWeightText =
+    currentWeightKg != null
+      ? (weightUnit === 'lbs' ? currentWeightKg / 0.453592 : currentWeightKg).toFixed(1)
+      : '';
+
+  const ageError = validateAge(ageInput);
+  const heightError = validateHeight(heightInput);
+  const resolvedBodyFat = bodyFat.bodyFatPct;
+
+  // Live read of the goal, so the plausibility verdict lands on the step where
+  // the goal is SET rather than three screens later. Height is what makes it
+  // possible: the same lean target is reachable at one height and past the
+  // natural range at another, so without it we show nothing rather than guess.
+  const heightCmLive =
+    !validateHeight(heightInput) && heightInput.trim() ? parseInt(heightInput, 10) : undefined;
+  const goalWeightKgLive = (() => {
+    const raw = parseFloat(goalWeightInput);
+    if (!Number.isFinite(raw) || validateGoalWeight(goalWeightInput, weightUnit)) return undefined;
+    return weightUnit === 'lbs' ? raw * 0.453592 : raw;
+  })();
+  const goalBodyFatLive =
+    selectedLeannessIdx !== null ? LEANNESS_OPTIONS[selectedLeannessIdx].pct : undefined;
+  const leanTargetLive =
+    goalWeightKgLive != null && goalBodyFatLive != null
+      ? leanMassKg(goalWeightKgLive, goalBodyFatLive)
+      : undefined;
+  const goalVerdict =
+    leanTargetLive != null && heightCmLive != null
+      ? classifyGoal(leanTargetLive, heightCmLive, sex ?? undefined)
+      : undefined;
   const goalWeightError = validateGoalWeight(goalWeightInput, weightUnit);
 
   // Say out loud which direction the target implies, live, while they type.
@@ -323,14 +451,21 @@ export default function GoalsIntakeScreen() {
       : null;
 
   const ctaActive =
-    step === 1 ? trainingState !== null
-    : step === 2 ? currentWeightKg !== null && !bodyFatError
-    : !goalWeightError; // step 3 is completable with everything blank, just not with a bad number
+    step === 1
+      ? sex !== null &&
+        ageInput.trim().length > 0 &&
+        heightInput.trim().length > 0 &&
+        !ageError &&
+        !heightError
+    : step === 2 ? trainingState !== null && activityLevel !== null
+    : step === 3 ? currentWeightKg !== null
+    : !goalWeightError; // step 4 is completable with everything blank, just not with a bad number
 
-  const ctaLabel = step === 3 ? 'Build my plan' : 'Continue';
+  const ctaLabel = step === 4 ? 'See my route' : 'Continue';
 
   const handleCta = step === 1 ? handleStep1Continue
     : step === 2 ? handleStep2Continue
+    : step === 3 ? handleStep3Continue
     : handleComplete;
 
   return (
@@ -353,8 +488,85 @@ export default function GoalsIntakeScreen() {
           showsVerticalScrollIndicator={false}
         >
 
-          {/* ── Step 1: Training history ─────────────────────────────────── */}
+          {/* ── Step 1: About you ────────────────────────────────────────── */}
           {step === 1 && (
+            <>
+              <Text style={styles.title}>First, a bit about you</Text>
+              <Text style={styles.subtitle}>
+                These shape everything else: how fast you can build, how lean is
+                realistic, and what your calories should be.
+              </Text>
+
+              <Text style={styles.sectionLabel}>Sex</Text>
+              <Text style={styles.sectionSublabel}>
+                Muscle-gain rates and healthy body-fat ranges differ, so this
+                changes the targets we set.
+              </Text>
+              {SEX_OPTIONS.map((opt) => (
+                <QuestionCard
+                  key={opt.value}
+                  icon={opt.icon as any}
+                  title={opt.title}
+                  subtitle={opt.subtitle}
+                  selected={sex === opt.value}
+                  onPress={() => setSex(opt.value)}
+                />
+              ))}
+
+              <View style={styles.sectionDivider} />
+
+              <View style={styles.inputRow}>
+                <View style={styles.inputRowIcon}>
+                  <Ionicons name="calendar-outline" size={18} color="#a1a1aa" />
+                </View>
+                <View style={styles.inputRowContent}>
+                  <Text style={styles.inputRowLabel}>Age</Text>
+                  <TextInput
+                    style={styles.inlineInput}
+                    placeholder="e.g. 28"
+                    placeholderTextColor="#52525b"
+                    keyboardType="number-pad"
+                    value={ageInput}
+                    onChangeText={(t) => setAgeInput(t.replace(/[^0-9]/g, ''))}
+                    maxLength={3}
+                    returnKeyType="done"
+                  />
+                </View>
+              </View>
+              {ageError ? <Text style={styles.inputError}>{ageError}</Text> : null}
+
+              <View style={styles.inputRow}>
+                <View style={styles.inputRowIcon}>
+                  <Ionicons name="resize-outline" size={18} color="#a1a1aa" />
+                </View>
+                <View style={styles.inputRowContent}>
+                  <Text style={styles.inputRowLabel}>Height</Text>
+                  <TextInput
+                    style={styles.inlineInput}
+                    placeholder="e.g. 178"
+                    placeholderTextColor="#52525b"
+                    keyboardType="number-pad"
+                    value={heightInput}
+                    onChangeText={(t) => setHeightInput(t.replace(/[^0-9]/g, ''))}
+                    maxLength={3}
+                    returnKeyType="done"
+                  />
+                </View>
+                {heightInput ? <Text style={styles.unitSuffix}>cm</Text> : null}
+              </View>
+              {heightError ? (
+                <Text style={styles.inputError}>{heightError}</Text>
+              ) : (
+                <Text style={styles.hint}>
+                  Height is what lets us tell you whether a goal is realistically
+                  reachable for your frame.
+                </Text>
+              )}
+            </>
+          )}
+
+          {/* ── Step 2: Training history ─────────────────────────────────── */}
+          {step === 2 && (
             <>
               <Text style={styles.title}>What's your training history?</Text>
               <Text style={styles.subtitle}>
@@ -370,11 +582,29 @@ export default function GoalsIntakeScreen() {
                   onPress={() => setTrainingState(opt.value)}
                 />
               ))}
+
+              <View style={styles.sectionDivider} />
+
+              <Text style={styles.sectionLabel}>Outside the gym</Text>
+              <Text style={styles.sectionSublabel}>
+                Your day-to-day activity sets your calorie baseline, so this
+                matters as much as the training itself.
+              </Text>
+              {ACTIVITY_OPTIONS.map((opt) => (
+                <QuestionCard
+                  key={opt.value}
+                  icon={opt.icon as any}
+                  title={opt.title}
+                  subtitle={opt.subtitle}
+                  selected={activityLevel === opt.value}
+                  onPress={() => setActivityLevel(opt.value)}
+                />
+              ))}
             </>
           )}
 
-          {/* ── Step 2: Body composition ─────────────────────────────────── */}
-          {step === 2 && (
+          {/* ── Step 3: Body composition ─────────────────────────────────── */}
+          {step === 3 && (
             <>
               <Text style={styles.title}>Your body right now</Text>
               <Text style={styles.subtitle}>
@@ -403,44 +633,27 @@ export default function GoalsIntakeScreen() {
                 <Ionicons name="chevron-forward" size={16} color="#52525b" />
               </TouchableOpacity>
 
-              {/* Body fat % (optional) */}
-              <View style={styles.inputRow}>
-                <View style={styles.inputRowIcon}>
-                  <Ionicons name="body-outline" size={18} color="#a1a1aa" />
-                </View>
-                <View style={styles.inputRowContent}>
-                  <Text style={styles.inputRowLabel}>
-                    Body fat{'  '}
-                    <Text style={styles.optionalTag}>optional</Text>
-                  </Text>
-                  <TextInput
-                    style={styles.inlineInput}
-                    placeholder="e.g. 18"
-                    placeholderTextColor="#52525b"
-                    keyboardType="decimal-pad"
-                    value={bodyFatInput}
-                    onChangeText={(t) => setBodyFatInput(t.replace(/[^0-9.]/g, ''))}
-                    maxLength={4}
-                    returnKeyType="done"
-                  />
-                </View>
-                {bodyFatInput ? (
-                  <Text style={styles.unitSuffix}>%</Text>
-                ) : null}
-              </View>
+              <Text style={styles.sectionLabel}>
+                Body fat{'  '}<Text style={styles.optionalTag}>optional</Text>
+              </Text>
+              <Text style={styles.sectionSublabel}>
+                Most people don't know theirs. Any of these is fine — we read the
+                trend over time, not the single number.
+              </Text>
+              <BodyFatField
+                value={bodyFat}
+                onChange={setBodyFat}
+                sex={sex ?? undefined}
+                heightCm={heightCmLive}
+                weightKg={currentWeightKg ?? undefined}
+                themeColor={themeColor}
+              />
 
-              {bodyFatError ? (
-                <Text style={styles.inputError}>{bodyFatError}</Text>
-              ) : (
-                <Text style={styles.hint}>
-                  Don't know your body fat? Leave it blank — the app works fine without it.
-                </Text>
-              )}
             </>
           )}
 
-          {/* ── Step 3: Goals ────────────────────────────────────────────── */}
-          {step === 3 && (
+          {/* ── Step 4: Goals ────────────────────────────────────────────── */}
+          {step === 4 && (
             <>
               <Text style={styles.title}>What are you working toward?</Text>
               <Text style={styles.subtitle}>
@@ -492,6 +705,143 @@ export default function GoalsIntakeScreen() {
               <Text style={styles.sectionSublabel}>
                 Helps calibrate your calorie target and phase direction.
               </Text>
+
+              {/* An explicit answer, not an inference from silence. With the
+                  nutrition goal question gone, skipping this used to hand the
+                  user a maintenance plan they never chose. */}
+              <TouchableOpacity
+                style={[
+                  styles.maintainBtn,
+                  goalWeightInput.trim() === maintainWeightText &&
+                    maintainWeightText.length > 0 && {
+                      borderColor: themeColor,
+                      backgroundColor: '#14181b',
+                    },
+                ]}
+                onPress={() => {
+                  setGoalWeightInput(maintainWeightText);
+                  setShowTargets(false);
+                }}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                disabled={!maintainWeightText}
+              >
+                <Ionicons name="remove-circle-outline" size={16} color="#a1a1aa" />
+                <Text style={styles.maintainTxt}>
+                  Keep me where I am
+                  {maintainWeightText ? ` (${maintainWeightText} ${weightUnit})` : ''}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.idkBtn}
+                onPress={() => setShowTargets((v) => !v)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+              >
+                <Ionicons name="help-circle-outline" size={16} color="#a1a1aa" />
+                <Text style={styles.idkTxt}>
+                  {showTargets ? 'Hide suggestions' : "I don't know \u2014 show me what to aim for"}
+                </Text>
+              </TouchableOpacity>
+
+              {showTargets && heightCmLive != null
+                ? physiqueTargets(heightCmLive, sex ?? undefined).map((target) => {
+                    // Snap to whichever leanness option is closest so the goal
+                    // has ONE source of truth, then recompute the weight at
+                    // that snapped body fat — otherwise the stored pair drifts
+                    // away from the number shown on the card.
+                    const idx = LEANNESS_OPTIONS.reduce<number | null>((best, o, i) => {
+                      if (o.pct == null) return best;
+                      if (best === null) return i;
+                      const bestPct = LEANNESS_OPTIONS[best].pct as number;
+                      return Math.abs(o.pct - target.goalBodyFatPct) <
+                        Math.abs(bestPct - target.goalBodyFatPct)
+                        ? i
+                        : best;
+                    }, null);
+                    const snappedPct =
+                      idx !== null ? (LEANNESS_OPTIONS[idx].pct as number) : target.goalBodyFatPct;
+                    const lean = leanMassKg(target.goalWeightKg, target.goalBodyFatPct);
+                    const snappedKg = weightAtBodyFat(lean, snappedPct);
+                    const shown = weightUnit === 'lbs' ? snappedKg / 0.453592 : snappedKg;
+                    return (
+                      <TouchableOpacity
+                        key={target.id}
+                        style={styles.targetCard}
+                        onPress={() => {
+                          setGoalWeightInput(shown.toFixed(1));
+                          if (idx !== null) setSelectedLeannessIdx(idx);
+                        }}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                      >
+                        <View style={styles.targetBody}>
+                          <Text style={styles.targetName}>{target.name}</Text>
+                          <Text style={styles.targetDesc}>{target.description}</Text>
+                        </View>
+                        <View style={styles.targetNums}>
+                          <Text style={[styles.targetWeight, { color: themeColor }]}>
+                            {shown.toFixed(0)} {weightUnit}
+                          </Text>
+                          <Text style={styles.targetPct}>at {snappedPct}% body fat</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                : null}
+
+              {showTargets && heightCmLive == null ? (
+                <Text style={styles.hint}>
+                  Add your height on the first step and we can work these out for
+                  your frame.
+                </Text>
+              ) : null}
+
+              {goalVerdict && leanTargetLive != null ? (
+                <View
+                  style={[
+                    styles.fbBox,
+                    goalVerdict.plausibility !== 'reachable' && styles.fbBoxWarn,
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      goalVerdict.plausibility === 'reachable'
+                        ? 'checkmark-circle-outline'
+                        : 'alert-circle-outline'
+                    }
+                    size={16}
+                    color={goalVerdict.plausibility === 'reachable' ? themeColor : '#f0b429'}
+                  />
+                  <Text style={styles.fbText}>
+                    That needs{' '}
+                    <Text style={styles.fbStrong}>
+                      {leanTargetLive.toFixed(1)} kg of lean mass
+                    </Text>
+                    {currentWeightKg != null && resolvedBodyFat != null ? (
+                      <>
+                        , so you're{' '}
+                        <Text style={styles.fbStrong}>
+                          {(
+                            leanTargetLive - leanMassKg(currentWeightKg, resolvedBodyFat)
+                          ).toFixed(1)}{' '}
+                          kg of muscle
+                        </Text>{' '}
+                        away
+                      </>
+                    ) : null}
+                    .{' '}
+                    {goalVerdict.plausibility === 'reachable'
+                      ? "That's a body composition drug-free lifters reach. A long project, but the target is sound."
+                      : goalVerdict.plausibility === 'borderline'
+                      ? "That's near the upper end of what's been recorded in drug-free lifters. Some people get there, many don't, and that isn't a failure."
+                      : "That's beyond what's typically been recorded in drug-free lifters at your height. Genetics vary, but a nearer target would serve you better."}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.sectionDivider} />
 
               {LEANNESS_OPTIONS.map((opt, idx) => (
                 <QuestionCard
@@ -627,6 +977,64 @@ const styles = StyleSheet.create({
     color: '#71717a',
     fontWeight: '500',
   },
+  maintainBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    backgroundColor: '#131316',
+    marginBottom: 8,
+  },
+  maintainTxt: { fontSize: 13, fontWeight: '600', color: '#a1a1aa' },
+  idkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#3f3f46',
+    marginBottom: 10,
+  },
+  idkTxt: { fontSize: 13, fontWeight: '600', color: '#a1a1aa' },
+  targetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#131316',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  targetBody: { flex: 1 },
+  targetName: { fontSize: 14, fontWeight: '600', color: '#ffffff' },
+  targetDesc: { fontSize: 11.5, lineHeight: 16, color: '#71717a', marginTop: 2 },
+  targetNums: { alignItems: 'flex-end' },
+  targetWeight: { fontSize: 14, fontWeight: '700' },
+  targetPct: { fontSize: 10.5, fontWeight: '600', color: '#71717a', marginTop: 1 },
+  fbBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    backgroundColor: '#101416',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#1c3238',
+    borderRadius: 12,
+    padding: 13,
+    marginTop: 14,
+  },
+  fbBoxWarn: { backgroundColor: '#141310', borderColor: '#33291a' },
+  fbText: { flex: 1, fontSize: 12.5, lineHeight: 19, color: '#a1a1aa' },
+  fbStrong: { color: '#ffffff', fontWeight: '600' },
   optionalTag: {
     fontSize: 11,
     color: '#52525b',

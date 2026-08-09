@@ -214,7 +214,7 @@ interface Day {
 export default function DaysScreen() {
   const navigation = useNavigation<DaysScreenNavigationProp>();
   const route = useRoute<DaysScreenRouteProp>();
-  const { themeColor } = useTheme();
+  const { themeColor, isPinkTheme } = useTheme();
   const { block, routineName, initialWeek } = route.params;
 
   const [localBlock, setLocalBlock] = useState(block);
@@ -346,13 +346,92 @@ export default function DaysScreen() {
     reloadBlockData();
   }, []);
 
+  // Day names that came from the `manual_days_<block>` key rather than the plan
+  // file. Only these may be deleted — a day the program depends on must never
+  // offer the option.
+  const [manualDayNames, setManualDayNames] = useState<string[]>([]);
+
+  /**
+   * Remove a user-added day. Manual days are stored per BLOCK, not per week, so
+   * this removes it from every week — the confirmation says so rather than
+   * pretending otherwise.
+   *
+   * Logged sets live under separate `workout_<block>_<day>_week<n>_sets` keys and
+   * are deliberately left alone: they are harmless orphans, and someone who
+   * deletes by accident and re-adds the same name gets their history back.
+   */
+  const handleDeleteManualDay = (day: Day) => {
+    const dayName = day.day_name || 'this day';
+
+    Alert.alert(
+      `Delete "${dayName}"?`,
+      'This day was added by you, so it will be removed from every week of this block. Any sets you logged on it stay in your history.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const manualDaysKey = `manual_days_${localBlock.block_name}`;
+              const existing = await AsyncStorage.getItem(manualDaysKey);
+              const manualDaysArray = existing ? JSON.parse(existing) : [];
+
+              const remaining = (Array.isArray(manualDaysArray) ? manualDaysArray : [])
+                .filter((entry: any) => entry?.day_name !== day.day_name);
+
+              if (remaining.length > 0) {
+                await AsyncStorage.setItem(manualDaysKey, JSON.stringify(remaining));
+              } else {
+                // Removing the key entirely rather than storing an empty array,
+                // so reloadBlockData takes its no-manual-days path cleanly.
+                await AsyncStorage.removeItem(manualDaysKey);
+              }
+
+              setManualDayNames(
+                remaining
+                  .map((entry: any) => entry?.day_name)
+                  .filter((name: any): name is string => typeof name === 'string')
+              );
+
+              // Rebuild from the plan file's days plus what survived, rather than
+              // filtering localBlock — that keeps the merge rule in one shape.
+              setLocalBlock({
+                ...localBlock,
+                days: [...block.days, ...remaining],
+              });
+
+              setShowExerciseModal(false);
+              setSelectedDay(null);
+            } catch (error) {
+              console.error('Failed to delete manual day:', error);
+              Alert.alert('Could not delete', 'Something went wrong removing that day. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const reloadBlockData = async () => {
     try {
       const manualDaysKey = `manual_days_${localBlock.block_name}`;
       const manualDaysData = await AsyncStorage.getItem(manualDaysKey);
 
+      if (!manualDaysData) {
+        // No user-added days for this block. Clearing the list matters: it is
+        // what decides whether the delete row renders, and a stale list would
+        // offer to delete a day that came from the plan file.
+        setManualDayNames([]);
+      }
+
       if (manualDaysData) {
         const manualDays = JSON.parse(manualDaysData);
+        setManualDayNames(
+          (Array.isArray(manualDays) ? manualDays : [])
+            .map((day: any) => day?.day_name)
+            .filter((name: any): name is string => typeof name === 'string')
+        );
         const mergedDays = [...block.days, ...manualDays];
         const updatedBlock = {
           ...localBlock,
@@ -880,6 +959,26 @@ export default function DaysScreen() {
   // Filter days for the FlatList — exclude the NEXT UP day from the list (rendered separately)
   const listDays = visibleDays.filter(day => day.day_name !== nextUpDayName);
 
+  // The old single "THIS WEEK" section held two different things: days already
+  // done and days still ahead. Splitting them is what makes the section labels
+  // mean something — COMING UP is a to-do list, DONE is a receipt.
+  const upcomingDays = listDays.filter(day => !isWorkoutCompleted(day.day_name || 'unknown'));
+  const completedDays = listDays.filter(day => isWorkoutCompleted(day.day_name || 'unknown'));
+
+  // Position within the FULL week (rest days included) so the hero badge can say
+  // "DAY 3 OF 7". This is deliberately NOT dayPositionMap: that one counts only
+  // workout days so the row badges stay stable when the rest toggle flips, which
+  // is the right behaviour for rows and the wrong number for the hero.
+  const weekPositionMap = useMemo(() => {
+    const map = new Map<string, number>();
+    (localBlock.days || []).forEach((day: any, idx: number) => {
+      map.set(day.day_name || 'unknown', idx + 1);
+    });
+    return map;
+  }, [localBlock.days]);
+
+  const weekLength = (localBlock.days || []).length;
+
   // For pending day rows we need a 1-based position within the workout days (not visibleDays)
   // so the index badge is stable regardless of rest-toggle state.
   const dayPositionMap = useMemo(() => {
@@ -924,9 +1023,17 @@ export default function DaysScreen() {
       </View>
 
       <FlatList
-        data={listDays}
+        data={upcomingDays}
         keyExtractor={(item, index) => `${item.day_name}-${index}`}
-        ListHeaderComponent={() => (
+        /* Passed as an ELEMENT, not a function. `ListHeaderComponent={() => (...)}`
+           creates a new function identity on every render of this screen, which
+           React reconciles as a DIFFERENT component type and therefore unmounts
+           and remounts the entire header subtree — hero included. This screen
+           re-renders several times on entry as completions, stats, the bookmark
+           and the saved week land, so the hero was being torn down and rebuilt
+           each time, resetting its resolved thumbnails to empty and re-resolving.
+           That was the tile flicker. Same reasoning applies to the footer. */
+        ListHeaderComponent={(
           <>
             {/* Title block */}
             <View style={styles.titleBlock}>
@@ -1033,32 +1140,39 @@ export default function DaysScreen() {
               </View>
             </View>
 
-            {/* NEXT UP hero */}
+            {/* NEXT UP hero — the label now lives inside the card, so the card
+                itself carries the emphasis rather than a heading above a row. */}
             {nextUpDay && (
-              <>
-                <Text style={[styles.sectionLabel, styles.sectionLabelAccent, { color: themeColor }]}>
-                  NEXT UP
-                </Text>
-                <DayRow
-                  day={nextUpDay}
-                  dayNumber={dayPositionMap.get(nextUpDay.day_name || 'unknown') || 1}
-                  onPress={() => handleDayPress(nextUpDay)}
-                  onLongPress={() => handleDayLongPress(nextUpDay)}
-                  isCompleted={false}
-                  isNextUp={true}
-                  currentWeek={currentWeek}
-                  themeColor={themeColor}
-                  blockName={localBlock.block_name}
-                  refreshTrigger={refreshTrigger}
-                />
-              </>
+              <DayRow
+                day={nextUpDay}
+                dayNumber={dayPositionMap.get(nextUpDay.day_name || 'unknown') || 1}
+                weekPosition={weekPositionMap.get(nextUpDay.day_name || 'unknown')}
+                weekLength={weekLength}
+                isPinkTheme={isPinkTheme}
+                onPress={() => handleDayPress(nextUpDay)}
+                onLongPress={() => handleDayLongPress(nextUpDay)}
+                isCompleted={false}
+                isNextUp={true}
+                currentWeek={currentWeek}
+                themeColor={themeColor}
+                blockName={localBlock.block_name}
+                refreshTrigger={refreshTrigger}
+              />
             )}
 
-            {/* THIS WEEK label — only show when there are more days */}
-            {listDays.length > 0 && (
-              <Text style={[styles.sectionLabel, styles.sectionLabelMuted]}>
-                {nextUpDay ? 'THIS WEEK' : 'WORKOUTS'}
-              </Text>
+            {/* COMING UP — only what is still ahead, with the count so the shape
+                of the remaining week reads at a glance. */}
+            {upcomingDays.length > 0 && (
+              <View style={styles.sectionHeaderRow}>
+                <Text
+                  style={[styles.sectionLabel, styles.sectionHeaderLabel, styles.sectionLabelMuted]}
+                >
+                  {nextUpDay ? 'COMING UP' : 'WORKOUTS'}
+                </Text>
+                <Text style={styles.sectionHeaderCount}>
+                  {upcomingDays.length} {upcomingDays.length === 1 ? 'day' : 'days'} left
+                </Text>
+              </View>
             )}
           </>
         )}
@@ -1075,6 +1189,36 @@ export default function DaysScreen() {
             blockName={localBlock.block_name}
             refreshTrigger={refreshTrigger}
           />
+        )}
+        ListFooterComponent={(
+          completedDays.length > 0 ? (
+            <>
+              <View style={styles.sectionSpacer} />
+              <View style={styles.sectionHeaderRow}>
+                <Text
+                  style={[styles.sectionLabel, styles.sectionHeaderLabel, styles.sectionHeaderCount]}
+                >
+                  DONE
+                </Text>
+                <Text style={styles.sectionHeaderCount}>{completedDays.length}</Text>
+              </View>
+              {completedDays.map((item, index) => (
+                <DayRow
+                  key={`done-${item.day_name}-${index}`}
+                  day={item}
+                  dayNumber={dayPositionMap.get(item.day_name || 'unknown') || 1}
+                  onPress={() => handleDayPress(item)}
+                  onLongPress={() => handleDayLongPress(item)}
+                  isCompleted={true}
+                  currentWeek={currentWeek}
+                  completionStats={getCompletionStats(item.day_name)}
+                  themeColor={themeColor}
+                  blockName={localBlock.block_name}
+                  refreshTrigger={refreshTrigger}
+                />
+              ))}
+            </>
+          ) : null
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -1215,6 +1359,25 @@ export default function DaysScreen() {
                       </View>
                     ))}
                   </View>
+
+                  {/* Only for days the user added themselves. A day that came
+                      from the plan file never renders this, so the program's own
+                      structure cannot be deleted from here. */}
+                  {selectedDay.day_name && manualDayNames.includes(selectedDay.day_name) && (
+                    <View style={styles.deleteDaySection}>
+                      <TouchableOpacity
+                        style={styles.deleteDayRow}
+                        onPress={() => handleDeleteManualDay(selectedDay)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="trash-outline" size={15} color="#b04a4a" />
+                        <Text style={styles.deleteDayText}>Delete this day</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.deleteDayHint}>
+                        You added this day. It isn't part of the program.
+                      </Text>
+                    </View>
+                  )}
                 </>
               )}
             </ScrollView>
