@@ -25,6 +25,14 @@ import {
   updateNutritionField,
 } from '../../utils/nutritionQuestionnaireStorage';
 import { finalizeNutrition } from '../../utils/nutritionMacros';
+import { useNavigation } from '@react-navigation/native';
+import {
+  evaluateTransition,
+  shouldPromptForCrossing,
+  markCrossingDismissed,
+  clearCrossingDismissals,
+} from '../../utils/phaseTransition';
+import type { TransitionCheck, BodyFatReading } from '../../utils/phaseTransition';
 
 /**
  * WeightEntrySheet — the single reusable bottom sheet for logging weight.
@@ -86,6 +94,50 @@ import { finalizeNutrition } from '../../utils/nutritionMacros';
  *   - Macro recalc runs only after the weight is confirmed saved.
  */
 
+// Where "Update plans" lands: the create chooser, which holds the route card
+// and both plan cards. AppNavigator registers CreateChooserScreen as
+// 'CreateFlow' (modal presentation, the center-button flow) — verified
+// against AppNavigator.tsx:658 on 9 Aug 2026. Change ONLY this constant if
+// that registration ever moves.
+const CREATE_CHOOSER_ROUTE = 'CreateFlow';
+
+// Phase-kind vocabulary for the transition prompt, lowercase because these
+// land mid-sentence.
+const TRANSITION_KIND_LABELS: Record<string, string> = {
+  recomp: 'recomp',
+  build: 'build',
+  trim: 'trim',
+  reveal: 'final cut',
+};
+
+/** Title + message for the transition alert. The single-phase (HARD RULE 4)
+ *  crossing has no next phase — that is the journey ENDING, not a phase
+ *  change, and it gets its own copy. */
+function transitionAlertContent(check: TransitionCheck): {
+  title: string;
+  message: string;
+} {
+  const kind = TRANSITION_KIND_LABELS[check.currentKind] ?? check.currentKind;
+  if (!check.nextKind) {
+    return {
+      title: 'You\u2019ve reached your goal body fat',
+      message:
+        `Your body-fat trend has reached ~${check.thresholdPct}% \u2014 the ${kind} ` +
+        'that finishes your route is complete. That was the plan, and you did it.',
+    };
+  }
+  const next = TRANSITION_KIND_LABELS[check.nextKind] ?? check.nextKind;
+  const nextTarget =
+    check.nextExitBodyFatPct != null ? ` to ~${check.nextExitBodyFatPct}%` : '';
+  return {
+    title: `Your ${kind} is done`,
+    message:
+      `Your body-fat trend has reached ~${check.thresholdPct}% \u2014 the phase that ` +
+      `opened your route is complete. Next up: a ${next}${nextTarget}. ` +
+      'Update your plans so they target the new phase.',
+  };
+}
+
 interface WeightEntry {
   id: string;
   weight: number;
@@ -146,6 +198,10 @@ export default function WeightEntrySheet({
   // weigh-in and draw a flat BF line that looks like measured data. The
   // previous reading shows as a hint instead, same as the weight.
   const [bodyFat, setBodyFat] = useState('');
+  // For the transition prompt's "Update plans" action. Both parents
+  // (WeightTrackerScreen, ConfirmStatsScreen) are registered screens, so the
+  // hook always has a navigator to reach.
+  const navigation = useNavigation<any>();
   const [bfFocused, setBfFocused] = useState(false);
   const [lastBodyFatPct, setLastBodyFatPct] = useState<number | null>(null);
 
@@ -347,6 +403,30 @@ export default function WeightEntrySheet({
         console.error('WeightEntrySheet profile sync failed', e);
       }
 
+      // Transition detection (9 Aug 2026): only when THIS save carried a
+      // body-fat reading, and never fatally — the weigh-in is already safely
+      // stored, so a failure here costs a prompt, not data. The trend reads
+      // the just-confirmed history (new entry included), and the roadmap is
+      // derived fresh from the just-mirrored profile, so the check sees
+      // exactly what the prompts will see on regeneration.
+      let transition: TransitionCheck | null = null;
+      if (entry.bodyFatPct != null) {
+        try {
+          const profileNow = await loadGoalsProfile();
+          if (profileNow) {
+            const readings: BodyFatReading[] = [entry, ...history]
+              .filter((e: any) => typeof e?.bodyFatPct === 'number' && e?.date)
+              .map((e: any) => ({ dateISO: e.date, bodyFatPct: e.bodyFatPct }));
+            const check = evaluateTransition(profileNow, readings);
+            if (check?.crossed && (await shouldPromptForCrossing(check))) {
+              transition = check;
+            }
+          }
+        } catch (e) {
+          console.error('WeightEntrySheet transition check failed', e);
+        }
+      }
+
       // If the nutrition questionnaire has been completed, push the new
       // weight through finalizeNutrition() so calories/macros stay in
       // sync. This replaces the old inline BMR recalc in WeightTracker.
@@ -375,6 +455,36 @@ export default function WeightEntrySheet({
 
       onSaved?.(entry);
       handleClose();
+
+      // After the modal is gone — an Alert raised while a statusBarTranslucent
+      // modal is dismissing can be swallowed on iOS, hence the delay.
+      if (transition) {
+        const check = transition;
+        const { title, message } = transitionAlertContent(check);
+        setTimeout(() => {
+          if (!check.nextKind) {
+            // Journey complete — acknowledge and stop re-firing.
+            Alert.alert(title, message, [
+              { text: 'OK', onPress: () => { markCrossingDismissed(check); } },
+            ]);
+            return;
+          }
+          Alert.alert(title, message, [
+            {
+              text: 'Not now',
+              style: 'cancel',
+              onPress: () => { markCrossingDismissed(check); },
+            },
+            {
+              text: 'Update plans',
+              onPress: () => {
+                clearCrossingDismissals();
+                navigation.navigate(CREATE_CHOOSER_ROUTE);
+              },
+            },
+          ]);
+        }, 350);
+      }
     } catch (e) {
       console.error('WeightEntrySheet save failed', e);
       // The old version failed silently here: the sheet stayed open with

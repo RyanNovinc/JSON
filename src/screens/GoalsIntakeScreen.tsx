@@ -16,7 +16,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { TrainingState, Sex, ActivityLevel } from '../utils/goalsProfile';
+import { TrainingState, Sex, ActivityLevel, PeakLeanness } from '../utils/goalsProfile';
 import BodyFatField, {
   emptyBodyFatValue,
   type BodyFatFieldValue,
@@ -154,6 +154,34 @@ const SEX_OPTIONS: Array<{ value: Sex; icon: string; title: string; subtitle: st
  *
  * Values match ACTIVITY_MULTIPLIERS in nutritionMacros.ts exactly.
  */
+// Coarse on purpose: nobody remembers their body fat from four years ago,
+// but everyone can say lean / average / soft. See PeakLeanness in goalsProfile.
+const PEAK_LEANNESS_OPTIONS: Array<{
+  value: PeakLeanness;
+  icon: string;
+  title: string;
+  subtitle: string;
+}> = [
+  {
+    value: 'lean',
+    icon: 'flash-outline',
+    title: 'Lean',
+    subtitle: 'Visible definition, tight midsection.',
+  },
+  {
+    value: 'average',
+    icon: 'remove-outline',
+    title: 'Average',
+    subtitle: 'Solid without much definition.',
+  },
+  {
+    value: 'soft',
+    icon: 'ellipse-outline',
+    title: 'Soft',
+    subtitle: 'Carrying noticeable extra around the middle.',
+  },
+];
+
 const ACTIVITY_OPTIONS: Array<{
   value: ActivityLevel;
   icon: string;
@@ -242,6 +270,12 @@ export default function GoalsIntakeScreen() {
   // ── Step 2: Training state ─────────────────────────────────────────────────
   const [trainingState, setTrainingState] = useState<TrainingState | null>(null);
   const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(null);
+  // Previous peak — shown only on the 'returning' branch. Both optional:
+  // skipping keeps today's behaviour (the whole lean gap is treated as novel
+  // growth). splitGap() consumes them to credit muscle-memory regain, worth
+  // roughly a year on a returning lifter's estimate.
+  const [peakWeightInput, setPeakWeightInput] = useState('');
+  const [peakLeanness, setPeakLeanness] = useState<PeakLeanness | null>(null);
 
   // ── Step 3: Body composition ───────────────────────────────────────────────
   const [currentWeightKg, setCurrentWeightKg] = useState<number | null>(null);
@@ -364,6 +398,15 @@ export default function GoalsIntakeScreen() {
         ageYears,
         heightCm,
         activityLevel: activityLevel ?? undefined,
+        // Peak fields only from the returning branch, and leanness only
+        // alongside a weight — the sanitiser drops an orphan peakLeanness,
+        // so never write one (a half-answer that reads as data).
+        peakWeightKg:
+          trainingState === 'returning' && peakWeightKg != null ? peakWeightKg : undefined,
+        peakLeanness:
+          trainingState === 'returning' && peakWeightKg != null
+            ? peakLeanness ?? undefined
+            : undefined,
         // Provenance matters: a tier picked from a description and a DEXA scan
         // are both "20%", but only one should be trusted when the app later
         // compares readings to decide whether the user has progressed.
@@ -390,6 +433,15 @@ export default function GoalsIntakeScreen() {
     currentWeightKg != null
       ? (weightUnit === 'lbs' ? currentWeightKg / 0.453592 : currentWeightKg).toFixed(1)
       : '';
+
+  // Peak weight parses in kg only (the picker's kg/lbs toggle belongs to the
+  // weight sheet; this is a rough recall box). Out-of-range commits nothing —
+  // same plausibility bounds as every other weight (30–300 kg).
+  const peakWeightParsed = parseFloat(peakWeightInput);
+  const peakWeightKg =
+    Number.isFinite(peakWeightParsed) && peakWeightParsed >= 30 && peakWeightParsed <= 300
+      ? peakWeightParsed
+      : null;
 
   const ageError = validateAge(ageInput);
   const heightError = validateHeight(heightInput);
@@ -582,6 +634,52 @@ export default function GoalsIntakeScreen() {
                   onPress={() => setTrainingState(opt.value)}
                 />
               ))}
+
+              {trainingState === 'returning' && (
+                <>
+                  <Text style={styles.sectionLabel}>Your previous peak</Text>
+                  <Text style={styles.sectionSublabel}>
+                    Best shape you've ever been in — even a rough guess helps.
+                    Muscle memory makes regained size much faster than new size.
+                  </Text>
+                  <View style={styles.inputRow}>
+                    <View style={styles.inputRowIcon}>
+                      <Ionicons name="barbell-outline" size={18} color="#a1a1aa" />
+                    </View>
+                    <View style={styles.inputRowContent}>
+                      <Text style={styles.inputRowLabel}>Weight at your peak (optional)</Text>
+                      <TextInput
+                        style={styles.inlineInput}
+                        placeholder="e.g. 85"
+                        placeholderTextColor="#52525b"
+                        keyboardType="decimal-pad"
+                        value={peakWeightInput}
+                        onChangeText={(t) => setPeakWeightInput(t.replace(/[^0-9.]/g, ''))}
+                        maxLength={5}
+                        returnKeyType="done"
+                      />
+                    </View>
+                    {peakWeightInput ? <Text style={styles.unitSuffix}>kg</Text> : null}
+                  </View>
+                  {peakWeightKg != null && (
+                    <>
+                      <Text style={styles.sectionSublabel}>How lean were you then?</Text>
+                      {PEAK_LEANNESS_OPTIONS.map((opt) => (
+                        <QuestionCard
+                          key={opt.value}
+                          icon={opt.icon as any}
+                          title={opt.title}
+                          subtitle={opt.subtitle}
+                          selected={peakLeanness === opt.value}
+                          onPress={() =>
+                            setPeakLeanness(peakLeanness === opt.value ? null : opt.value)
+                          }
+                        />
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
 
               <View style={styles.sectionDivider} />
 

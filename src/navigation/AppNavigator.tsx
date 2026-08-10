@@ -96,6 +96,7 @@ import CreateChooserScreen from '../screens/CreateChooserScreen';
 // Shared goals intake — runs once before either planning flow
 import GoalsIntakeScreen from '../screens/GoalsIntakeScreen';
 import RouteScreen from '../screens/RouteScreen';
+import RouteRevealScreen from '../screens/RouteRevealScreen';
 import GoalsStatsScreen from '../screens/GoalsStatsScreen';
 import ConfirmStatsScreen from '../screens/ConfirmStatsScreen';
 
@@ -352,6 +353,7 @@ export type RootStackParamList = {
   // rather than recomputed: this screen is a RESULT, not a numbered step, so
   // it does not advance the count.
   Route: { flowStepOffset?: number } | undefined;
+  RouteReveal: { flowStepOffset?: number } | undefined;
   // Returning-user lightweight stats confirm, shown before the
   // plan-specific questions when a usable GoalsProfile already exists
   ConfirmStats: { nextFlow: 'workout' | 'nutrition'; extraParams?: Record<string, any> } | undefined;
@@ -1443,6 +1445,21 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 component={RouteScreen}
                 options={{
                   headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: { opacity: current.progress },
+                  }),
+                }}
+              />
+              {/* The payoff after locking. gestureEnabled is OFF on purpose:
+                  the screen has no back button because the user just confirmed
+                  the lock, and a swipe back would undo exactly what the
+                  confirmation was there to protect. */}
+              <RootStack.Screen
+                name="RouteReveal"
+                component={RouteRevealScreen}
+                options={{
+                  headerShown: false,
+                  gestureEnabled: false,
                   cardStyleInterpolator: ({ current }) => ({
                     cardStyle: { opacity: current.progress },
                   }),

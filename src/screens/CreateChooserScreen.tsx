@@ -28,7 +28,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path, Rect, Circle, Text as SvgText } from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,15 +60,6 @@ const PHASE_NAME: Record<string, string> = {
   build: 'Build',
   trim: 'Trim',
   reveal: 'The reveal',
-};
-
-const PHASE_BLURB: Record<string, (r: Roadmap, weightKg: number) => string> = {
-  recomp: (r, w) =>
-    `Hold around ${Math.round(w)} kg while body fat drifts toward ${r.band.ceiling}%. Ends on a number, not a date.`,
-  build: (r) =>
-    `A controlled surplus, growing toward ${r.band.ceiling}% body fat. Ends on a number, not a date.`,
-  trim: (r) => `Trim back to ${r.band.floor}% body fat, then build again.`,
-  reveal: (r) => `A final trim to ${r.phases[r.phases.length - 1].exitBodyFatPct}%.`,
 };
 
 export default function CreateChooserScreen() {
@@ -142,11 +133,10 @@ export default function CreateChooserScreen() {
         {/* ── The route ──────────────────────────────────────────────────── */}
         {checked ? (
           <>
-            <Text style={styles.sectionLabel}>{hasRoute ? 'Your route' : 'Start here'}</Text>
             {hasRoute && roadmap && profile ? (
               <RouteSummary
                 roadmap={roadmap}
-                weightKg={profile.currentWeightKg}
+                currentBodyFatPct={profile.currentBodyFatPct}
                 themeColor={themeColor}
                 onPress={openRoute}
               />
@@ -162,9 +152,7 @@ export default function CreateChooserScreen() {
         {checked && !hasRoute ? (
           <View style={styles.lockNote}>
             <Ionicons name="lock-closed-outline" size={13} color="#71717a" />
-            <Text style={styles.lockNoteText}>
-              Set your route first — it decides what both plans aim at.
-            </Text>
+            <Text style={styles.lockNoteText}>Unlocks once your route is set</Text>
           </View>
         ) : null}
 
@@ -208,9 +196,9 @@ export default function CreateChooserScreen() {
                       ]}
                     >
                       <Ionicons
-                        name="arrow-forward"
-                        size={20}
-                        color={locked ? '#71717a' : '#0a0a0b'}
+                        name={locked ? 'lock-closed' : 'arrow-forward'}
+                        size={locked ? 17 : 20}
+                        color={locked ? '#8e8e93' : '#0a0a0b'}
                       />
                     </View>
                   </View>
@@ -229,36 +217,27 @@ export default function CreateChooserScreen() {
 function RouteInvite({ themeColor, onPress }: { themeColor: string; onPress: () => void }) {
   return (
     <TouchableOpacity
-      style={[styles.invite, { borderColor: `${themeColor}6b` }]}
+      style={[styles.summary, { borderColor: `${themeColor}59` }]}
       onPress={onPress}
       activeOpacity={0.9}
       accessibilityRole="button"
+      accessibilityLabel="Map your route"
     >
-      <LinearGradient
-        colors={[`${themeColor}29`, `${themeColor}0a`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      <View style={styles.inviteTop}>
-        <View style={[styles.inviteIcon, { backgroundColor: `${themeColor}24` }]}>
-          <Ionicons name="trending-up-outline" size={21} color={themeColor} />
-        </View>
+      <View style={styles.inviteRow}>
         <View style={styles.inviteHeadings}>
-          <Text style={[styles.inviteEyebrow, { color: themeColor }]}>YOUR ROUTE</Text>
-          <Text style={styles.inviteTitle}>Where are you headed?</Text>
+          <Text style={[styles.summaryEyebrow, { color: themeColor }]}>START HERE</Text>
+          <Text style={styles.summaryPhase}>Map your route</Text>
+          <Text style={styles.inviteBody}>
+            The fastest path from where you are to the physique you want, phase by phase.
+          </Text>
         </View>
-      </View>
-      <Text style={styles.inviteBody}>
-        Four quick questions. We'll tell you whether your goal is reachable for your frame, and
-        the phases to get there — before you build anything.
-      </Text>
-      <View style={styles.inviteFoot}>
-        <Text style={styles.inviteMeta}>About 2 minutes · both plans use it</Text>
         <View style={[styles.inviteGo, { backgroundColor: themeColor, shadowColor: themeColor }]}>
           <Ionicons name="arrow-forward" size={20} color="#0a0a0b" />
         </View>
+      </View>
+
+      <View style={styles.journey}>
+        <JourneyLine color={themeColor} ghost startLabel="You" endLabel="Goal physique" />
       </View>
     </TouchableOpacity>
   );
@@ -266,18 +245,22 @@ function RouteInvite({ themeColor, onPress }: { themeColor: string; onPress: () 
 
 function RouteSummary({
   roadmap,
-  weightKg,
+  currentBodyFatPct,
   themeColor,
   onPress,
 }: {
   roadmap: Roadmap;
-  weightKg: number;
+  currentBodyFatPct?: number;
   themeColor: string;
   onPress: () => void;
 }) {
   const current = roadmap.phases[0];
-  const totalPhases = roadmap.phases[roadmap.phases.length - 1].index;
-  const blurb = PHASE_BLURB[current.kind]?.(roadmap, weightKg) ?? '';
+  const last = roadmap.phases[roadmap.phases.length - 1];
+  const totalPhases = last.index;
+
+  const startLabel =
+    currentBodyFatPct != null ? `You · ${Math.round(currentBodyFatPct)}%` : 'You';
+  const endLabel = `Goal · ${last.exitBodyFatPct}%`;
 
   return (
     <TouchableOpacity
@@ -288,75 +271,94 @@ function RouteSummary({
       accessibilityLabel="Review or change your route"
     >
       <View style={styles.summaryTop}>
-        <Text style={styles.summaryEyebrow}>YOUR ROUTE</Text>
-        <View style={[styles.summaryPill, { backgroundColor: `${themeColor}24` }]}>
-          <Text style={[styles.summaryPillText, { color: themeColor }]}>
-            Phase 1 of {totalPhases}
+        <View style={styles.inviteHeadings}>
+          <Text style={[styles.summaryEyebrow, { color: themeColor }]}>YOUR ROUTE</Text>
+          <Text style={styles.summaryPhase}>
+            {PHASE_NAME[current.kind] ?? current.kind}
+            <Text style={styles.summaryPhaseCount}>  ·  Phase 1 of {totalPhases}</Text>
           </Text>
         </View>
+        <Ionicons name="chevron-forward" size={18} color="#6b6b70" />
       </View>
 
-      <Text style={styles.summaryPhase}>{PHASE_NAME[current.kind] ?? current.kind}</Text>
-      <Text style={styles.summaryBlurb}>{blurb}</Text>
-
-      <View style={styles.spark}>
-        <MiniBand
-          floor={roadmap.band.floor}
-          ceiling={roadmap.band.ceiling}
+      <View style={styles.journey}>
+        <JourneyLine
           color={themeColor}
+          startLabel={startLabel}
+          endLabel={endLabel}
         />
-      </View>
-
-      <View style={styles.summaryStats}>
-        {roadmap.gapKg != null ? (
-          <View>
-            <Text style={styles.statKey}>Muscle to add</Text>
-            <Text style={styles.statVal}>{roadmap.gapKg.toFixed(1)} kg</Text>
-          </View>
-        ) : null}
-        <View>
-          <Text style={styles.statKey}>Horizon</Text>
-          <Text style={styles.statVal}>
-            {roadmap.estYears[0]}–{roadmap.estYears[1]} yr
-          </Text>
-        </View>
-        <View>
-          <Text style={styles.statKey}>Band</Text>
-          <Text style={styles.statVal}>
-            {roadmap.band.floor}–{roadmap.band.ceiling}%
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.summaryLink}>
-        <Ionicons name="create-outline" size={12} color="#71717a" />
-        <Text style={styles.summaryLinkText}>Tap to review or change your route</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-/** Miniature of the band chart from RouteScreen — same shape, no axes. */
-function MiniBand({
-  floor,
-  ceiling,
+/**
+ * The journey as a single line: the operating band as a soft tint, the route
+ * curving through it, a marker at YOUR end and the goal ringed at the other.
+ * `ghost` renders the dashed grey placeholder for the no-route state — same
+ * geometry, so setting the route reads as the card FILLING IN, not the screen
+ * rearranging.
+ *
+ * The marker sits at the start deliberately: the roadmap is re-derived fresh
+ * from the current profile, so the user is always at the beginning of the
+ * REMAINING journey (same reason the card says phase 1 of N). If a
+ * travelled-distance marker is ever wanted, it derives from the BASELINE
+ * roadmap snapshot (loadBaselineRoadmapSnapshot) — display is what snapshots
+ * are for — never by mutating this fresh view.
+ */
+function JourneyLine({
   color,
+  ghost,
+  startLabel,
+  endLabel,
 }: {
-  floor: number;
-  ceiling: number;
   color: string;
+  ghost?: boolean;
+  startLabel: string;
+  endLabel: string;
 }) {
-  const pts = [
-    [0, 10], [14, 20], [24, 66], [38, 18], [46, 66],
-    [60, 18], [68, 66], [82, 18], [90, 66], [100, 74],
-  ];
-  const d = pts
-    .map(([x, y], i) => `${i ? 'L' : 'M'} ${(x * 2.6 + 4).toFixed(1)} ${(y * 0.36 + 4).toFixed(1)}`)
-    .join(' ');
+  const stroke = ghost ? '#3f3f46' : color;
+  const labelColor = ghost ? '#71717a' : color;
   return (
-    <Svg width="100%" height={36} viewBox="0 0 275 36">
-      <Rect x={4} y={10} width={267} height={16} rx={2} fill={`${color}1f`} />
-      <Path d={d} stroke={color} strokeWidth={1.8} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+    <Svg width="100%" height={78} viewBox="0 0 320 78">
+      <Rect
+        x={0}
+        y={20}
+        width={320}
+        height={24}
+        rx={6}
+        fill={ghost ? 'rgba(255,255,255,0.04)' : `${color}1a`}
+      />
+      <Path
+        d="M 14 14 C 44 22, 60 38, 84 44 S 120 32, 142 38 S 176 48, 198 40 S 232 32, 252 42 C 276 50, 294 54, 308 56"
+        stroke={stroke}
+        strokeWidth={2.5}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray={ghost ? '1 7' : undefined}
+      />
+      {ghost ? (
+        <Circle cx={14} cy={14} r={4.5} fill="#3f3f46" />
+      ) : (
+        <>
+          <Circle cx={14} cy={14} r={9} fill={`${color}2e`} />
+          <Circle cx={14} cy={14} r={4.5} fill={color} />
+        </>
+      )}
+      <Circle
+        cx={308}
+        cy={56}
+        r={3}
+        fill="none"
+        stroke={ghost ? '#3f3f46' : '#8e8e93'}
+        strokeWidth={1.5}
+      />
+      <SvgText x={28} y={12} fontSize={11} fill={labelColor}>
+        {startLabel}
+      </SvgText>
+      <SvgText x={308} y={74} fontSize={11} fill="#71717a" textAnchor="end">
+        {endLabel}
+      </SvgText>
     </Svg>
   );
 }
@@ -398,38 +400,9 @@ const styles = StyleSheet.create({
   sectionLabelSpaced: { marginTop: 26 },
 
   // ── Route invite ──────────────────────────────────────────────────────────
-  invite: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    overflow: 'hidden',
-    backgroundColor: '#131316',
-  },
-  inviteTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  inviteIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  inviteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   inviteHeadings: { flex: 1 },
-  inviteEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4 },
-  inviteTitle: {
-    fontSize: 21,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: -0.3,
-    marginTop: 3,
-  },
-  inviteBody: { fontSize: 13, lineHeight: 20, color: '#a1a1aa' },
-  inviteFoot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  inviteMeta: { fontSize: 12, color: '#71717a', flex: 1 },
+  inviteBody: { fontSize: 13, lineHeight: 19.5, color: '#a1a1aa', marginTop: 4 },
   inviteGo: {
     width: 44,
     height: 44,
@@ -453,40 +426,18 @@ const styles = StyleSheet.create({
   },
   summaryTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
-  summaryEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, color: '#71717a' },
-  summaryPill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 7 },
-  summaryPillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  summaryEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, marginBottom: 6 },
   summaryPhase: {
-    fontSize: 19,
+    fontSize: 21,
     fontWeight: '700',
     color: '#ffffff',
     letterSpacing: -0.3,
-    marginBottom: 3,
   },
-  summaryBlurb: { fontSize: 12.5, lineHeight: 19, color: '#71717a' },
-  spark: { marginTop: 14, marginBottom: 12 },
-  summaryStats: {
-    flexDirection: 'row',
-    gap: 20,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#27272a',
-  },
-  statKey: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    color: '#71717a',
-    textTransform: 'uppercase',
-    marginBottom: 3,
-  },
-  statVal: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
-  summaryLink: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12 },
-  summaryLinkText: { fontSize: 12, color: '#71717a' },
+  summaryPhaseCount: { fontSize: 13, fontWeight: '400', color: '#8e8e93', letterSpacing: 0 },
+  journey: { marginTop: 12 },
 
   // ── Lock note ─────────────────────────────────────────────────────────────
   lockNote: {

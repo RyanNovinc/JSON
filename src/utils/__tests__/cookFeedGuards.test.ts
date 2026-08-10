@@ -108,7 +108,19 @@ function mealVideoKeys(): string[] {
   const block = stripComments(
     blockBetween(SOURCE, 'const MEAL_VIDEOS', '\n};', 'MEAL_VIDEOS'),
   );
-  return [...block.matchAll(/^\s*([a-z0-9_]+)\s*:/gm)].map((m) => m[1]);
+  // MEAL_VIDEOS entries became nested objects ({ video, poster }) with the
+  // remote-manifest work, so a flat key regex also swallowed every entry's
+  // FIELD names ('video', 'poster'). Entry keys are distinguished by INDENT:
+  // they sit at the block's minimum indentation, fields sit deeper. Derived
+  // from the block itself rather than hardcoding two spaces, so a reformat
+  // moves the baseline instead of breaking the guard — and never by listing
+  // field names to exclude, which would drift the first time one is added.
+  const matches = [...block.matchAll(/^([ \t]*)([a-z0-9_]+)\s*:/gm)].map(
+    (m) => ({ indent: m[1].length, key: m[2] }),
+  );
+  if (matches.length === 0) return [];
+  const minIndent = Math.min(...matches.map((m) => m.indent));
+  return matches.filter((m) => m.indent === minIndent).map((m) => m.key);
 }
 
 function adjusterSlugs(): string[] {

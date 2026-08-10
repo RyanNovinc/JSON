@@ -65,6 +65,10 @@ const FFMI_LIMITS: Record<'male' | 'female', { ok: number; edge: number }> = {
 const limitsFor = (sex?: Sex) =>
   FFMI_LIMITS[sex === 'female' ? 'female' : 'male'];
 
+/** Exported for the frame gauge on RouteScreen: the same boundaries
+ *  classifyGoal decides with, so the picture and the verdict cannot drift. */
+export const ffmiLimitsFor = limitsFor;
+
 export function classifyGoal(
   leanTargetKg: number,
   heightCm: number,
