@@ -48,9 +48,8 @@ import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { loadGoalsProfile, updateGoalsProfileField } from '../utils/goalsProfileStorage';
 import { emptyBodyFatValue, type BodyFatFieldValue } from '../components/BodyFatField';
 import RouteBodyFatField from '../components/route/RouteBodyFatField';
-import BodyPictogram from '../components/route/BodyPictogram';
 import ScaleRuler from '../components/route/ScaleRuler';
-import { FrameCurve } from '../components/route/GoalInstruments';
+import LeanGauge from '../components/route/LeanGauge';
 import JourneyChart from '../components/route/JourneyChart';
 import EvidenceSheet from '../components/route/EvidenceSheet';
 import { recordRoadmapSnapshot } from '../utils/roadmapStorage';
@@ -63,10 +62,7 @@ import {
   FFMI_UNTRAINED,
   type Roadmap,
 } from '../utils/roadmap';
-import {
-  ATTRACTIVE_BF_RANGE,
-  ATTRACTIVE_BF_CENTRE,
-} from '../utils/attractivenessTargets';
+import { ATTRACTIVE_BF_RANGE, ATTRACTIVE_BF_CENTRE } from '../utils/attractivenessTargets';
 import { frameZoneFor, evidenceTopicFor, type EvidenceTopic } from '../utils/routeZones';
 import type { GoalsProfile, RoutePreference, Sex } from '../utils/goalsProfile';
 
@@ -115,29 +111,6 @@ const TONE: Record<string, string> = {
 /** 'theme' is resolved at render, since the palette is not a constant. */
 const toneColour = (tone: string, themeColor: string) =>
   TONE[tone] === 'theme' ? themeColor : TONE[tone];
-const TONE_ICON: Record<string, string> = {
-  neutral: 'ellipse-outline',
-  rated: 'sparkles',
-  good: 'checkmark-circle-outline',
-  caution: 'alert-circle-outline',
-  stop: 'close-circle-outline',
-};
-
-/**
- * Fades its children in on mount. Give it a key that changes when the content
- * changes and React remounts it, which is what produces the fade.
- *
- * There is deliberately no exit animation: animating out means holding the old
- * content in the tree while the new one arrives, which either overlaps them or
- * shifts the layout, and shifting the layout is the thing this is here to stop.
- */
-function Fade({ children, style }: { children: React.ReactNode; style?: any }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-  }, [opacity]);
-  return <Animated.View style={[style, { opacity }]}>{children}</Animated.View>;
-}
 
 // Conversion happens only at the edges. currentWeightKg stays kilograms and
 // heightCm stays centimetres no matter what the user is looking at, so nothing
@@ -217,7 +190,14 @@ function helpFor(beat: number, sex?: Sex): BeatHelp | null {
         'Body fat ranges and muscle limits differ between male and female bodies, so your answer changes the numbers this app works from. It is used for those calculations and nothing else.',
     };
   }
-  if (beat === 5) {
+  if (beat === 7) {
+    return {
+      title: 'Why it takes this long',
+      body:
+        'That number is the distance to the finish, and almost nobody sets a finish this far out. You do not wait until the end to see it.\n\nMuscle comes fastest at the start and slows from there, so the first year moves your appearance more than any year after it. Everything past that is the difference between looking like you train and looking like you have trained for years.',
+    };
+  }
+  if (beat === 6) {
     // Two genuinely different findings, not the same one reworded. For men the
     // research produces a peak. For women it does not.
     if (sex === 'female') {
@@ -240,20 +220,21 @@ function helpFor(beat: number, sex?: Sex): BeatHelp | null {
   return null;
 }
 
-/** Range of the goal body fat scale, before the female shift. */
-const GOAL_BF_MIN = 8;
-const GOAL_BF_MAX = 24;
+/**
+ * The flow reads as three short conversations rather than one queue of eight.
+ * Deliberately uneven: they group by what they are about, not by length, and a
+ * two beat section is a feature because it is over almost as soon as it starts.
+ */
+const SECTIONS: Array<{ label: string; beats: Beat[]; quiet?: boolean }> = [
+  { label: 'ABOUT YOU', beats: [1, 2, 3, 4] },
+  { label: 'YOUR GOAL', beats: [5, 6] },
+  { label: 'HOW YOU GET THERE', beats: [7] },
+  // quiet: the summary names itself on the screen, so repeating it in the top
+  // bar is the same word twice, thirty points apart.
+  { label: 'SUMMARY', beats: [8], quiet: true },
+];
 
-function goalZoneName(v: number, shift: number): string {
-  if (v < 11 + shift) return 'Very lean';
-  if (v < 15 + shift) return 'Athletic';
-  if (v < 19 + shift) return 'Fit';
-  return 'Soft';
-}
-
-/** Only the summary draws figures now: the goal beat's before and after pair
- *  was a weaker copy of it. */
-const SUMMARY_FIGURE_HEIGHT = 104;
+const sectionFor = (beat: Beat) => SECTIONS.find((s) => s.beats.includes(beat)) ?? SECTIONS[0];
 
 export default function RouteScreen() {
   const navigation = useNavigation<Nav>();
@@ -425,11 +406,6 @@ export default function RouteScreen() {
     }
   };
 
-  const saveAndLeave = async () => {
-    if (profile && roadmap) await recordRoadmapSnapshot(profile, preference, roadmap);
-    navigation.popToTop();
-  };
-
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -465,11 +441,6 @@ export default function RouteScreen() {
     profile.sex !== 'female' &&
     provisionalGoalBf >= ATTRACTIVE_BF_RANGE[0] &&
     provisionalGoalBf <= ATTRACTIVE_BF_RANGE[1];
-  const belowRated = profile.sex !== 'female' && provisionalGoalBf < ATTRACTIVE_BF_RANGE[0];
-  // The researched band is male and unknown sex only, matching the guard the
-  // sweet spot marks already use.
-  const showRated = profile.sex !== 'female';
-  const bfShift = profile.sex === 'female' ? 9 : 0;
 
   // The beat label already names the field and the chevron already says
   // forward, so a CTA announcing the next question was a second navigation
@@ -480,6 +451,17 @@ export default function RouteScreen() {
   // was doing.
   const ctaBlocked = beat === 3 && profile.sex == null;
   const beatHelp = helpFor(beat, profile.sex);
+  const section = sectionFor(beat);
+
+  // On the goal weight beat the only context that helps is the distance from
+  // where they are now. Everything else waits for the leanness beat.
+  const weightDeltaKg = goalW - currentWeight;
+  const weightDelta =
+    Math.abs(weightDeltaKg) < 0.05
+      ? 'the same as you weigh now'
+      : imperial
+        ? `${weightDeltaKg > 0 ? '+' : ''}${(kgToLb(weightDeltaKg)).toFixed(0)} lbs from where you are now`
+        : `${weightDeltaKg > 0 ? '+' : ''}${weightDeltaKg.toFixed(1)} kg from where you are now`;
 
   const CTA: Record<Beat, string> = {
     1: 'Continue',
@@ -492,18 +474,26 @@ export default function RouteScreen() {
     8: 'Lock in my plan',
   };
 
-  const verdictPill = zone ? (
+  // Only shown when there is something to warn about. Printing "in range for a
+  // drug-free lifter" under every ordinary choice is the app congratulating the
+  // user on nothing, and it buries the two states that actually matter.
+  const verdictWorthShowing = zone != null && (zone.tone === 'caution' || zone.tone === 'stop');
+
+  const verdictLine = verdictWorthShowing && zone ? (
     <TouchableOpacity
-      style={[styles.verdict, { backgroundColor: `${toneColour(zone.tone, themeColor)}1a` }]}
+      style={styles.verdict}
       onPress={() => setEvidence(evidenceTopicFor(zone.key))}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
       accessibilityRole="button"
     >
-      <Ionicons name={TONE_ICON[zone.tone] as any} size={15} color={toneColour(zone.tone, themeColor)} />
       <Text style={[styles.verdictText, { color: toneColour(zone.tone, themeColor) }]}>
         {zone.label}
-        {zone.showYears ? ` \u00b7 ${yrLo} to ${yrHi} yr` : ''}
       </Text>
+      {zone.showYears ? (
+        <Text style={styles.verdictYears}>
+          {'\u00b7'} {yrLo} to {yrHi} yr
+        </Text>
+      ) : null}
       <View style={[styles.qmark, { borderColor: toneColour(zone.tone, themeColor) }]}>
         <Text style={[styles.qmarkText, { color: toneColour(zone.tone, themeColor) }]}>?</Text>
       </View>
@@ -520,15 +510,28 @@ export default function RouteScreen() {
         >
           <Ionicons name="chevron-back" size={20} color="#d4d4d8" />
         </TouchableOpacity>
-        {/* The dots take the title's place. "Your route" was the same six
-            words on every screen, and the CTA already names where you are. */}
-        <View style={styles.dots}>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <View
-              key={i}
-              style={[styles.dot, i === beat && [styles.dotOn, { backgroundColor: themeColor }]]}
-            />
-          ))}
+        {/* Only the current section's dots, and the section is named. Eight in
+            a row reads as a form; two to four reads as a short errand. */}
+        <View style={styles.progress}>
+          {section.quiet ? null : (
+            <Text style={[styles.progressLabel, { color: themeColor }]}>{section.label}</Text>
+          )}
+          {/* A lone dot conveys nothing, so single beat sections show only
+              their name. */}
+          <View style={styles.dots}>
+            {section.beats.length < 2
+              ? null
+              : section.beats.map((b) => (
+                <View
+                  key={b}
+                  style={[
+                    styles.dot,
+                    b < beat && styles.dotDone,
+                    b === beat && [styles.dotOn, { backgroundColor: themeColor }],
+                  ]}
+                />
+              ))}
+          </View>
         </View>
 
         {/* Balances the back button so the dots stay centred, and carries the
@@ -562,7 +565,16 @@ export default function RouteScreen() {
         )}
       </View>
 
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {/* Locked on every beat that fits, because a vertical scroll wrapping
+          horizontal drag instruments means a slightly off swipe scrolls the
+          page instead of moving the value. Only the route picker and the
+          summary have content that can overflow. */}
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={beat === 8}
+      >
         <Animated.View
           style={[
             styles.beatWrap,
@@ -723,72 +735,79 @@ export default function RouteScreen() {
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
+        {/* Weight first. "I want to be 90 kg" is a thought people have; "I
+            want to be 12%" mostly is not. No curve and no verdict here: at this
+            point the number does not yet mean a body. */}
         {beat === 5 ? (
           <>
             <View style={styles.beat1Body}>
-            <Text style={styles.beatLabel}>TARGET BODY FAT</Text>
-            <View style={styles.bigNum}>
-              <Text style={styles.bigValue}>{Math.round(provisionalGoalBf)}</Text>
-              <Text style={styles.bigUnit}>%</Text>
-            </View>
-            {/* Same instrument as every other numeric beat. The zones live in
-                the tick colours and the researched band is a marked span drawn
-                in place, rather than a separate widget with its own gestures. */}
-            <ScaleRuler
-              value={Math.round(provisionalGoalBf)}
-              min={GOAL_BF_MIN + bfShift}
-              max={GOAL_BF_MAX + bfShift}
-              step={1}
-              pxPerUnit={24}
-              isMajor={(v) => Math.round(v) % 2 === 0}
-              formatLabel={(v) => String(Math.round(v))}
-              // Neutral ticks with one coloured band. A full zone ramp meant
-              // four colours competing with the one span that actually carries
-              // a finding, and it put a blue tick next to a blue needle.
-              tickColor={(v, major) =>
-                showRated && v >= ATTRACTIVE_BF_RANGE[0] && v <= ATTRACTIVE_BF_RANGE[1]
-                  ? themeColor
-                  : major
-                    ? '#6b6b70'
-                    : '#3f3f46'
-              }
-              rangeLabel={
-                showRated
-                  ? {
-                      from: ATTRACTIVE_BF_RANGE[0],
-                      to: ATTRACTIVE_BF_RANGE[1],
-                      text: 'MOST ATTRACTIVE',
-                      colour: themeColor,
-                    }
-                  : undefined
-              }
-              onChange={(pct, persist) => {
-                setProfile((prev) => (prev ? { ...prev, goalBodyFatPct: pct } : prev));
-                if (persist) updateGoalsProfileField('goalBodyFatPct', pct);
-              }}
-              themeColor={themeColor}
-            />
+              <Text style={styles.beatLabel}>GOAL WEIGHT</Text>
+              <View style={styles.bigNum}>
+                <Text style={styles.bigValue}>
+                  {imperial ? Math.round(kgToLb(goalW)) : goalW.toFixed(1)}
+                </Text>
+                <Text style={styles.bigUnit}>{imperial ? 'lbs' : 'kg'}</Text>
+              </View>
+              <ScaleRuler
+                value={imperial ? Math.round(kgToLb(goalW)) : Math.round(goalW * 10) / 10}
+                min={imperial ? 77 : 35}
+                max={imperial ? 440 : 200}
+                step={imperial ? 1 : 0.5}
+                tickStep={imperial ? 1 : 0.5}
+                pxPerUnit={imperial ? 6 : 13}
+                isMajor={(v) => Math.round(v) % (imperial ? 10 : 5) === 0 && Math.abs(v - Math.round(v)) < 0.01}
+                formatLabel={(v) => String(Math.round(v))}
+                onChange={(next, persist) => {
+                  const kg = imperial ? lbToKg(next) : next;
+                  setProfile((prev) => (prev ? { ...prev, goalWeightKg: kg } : prev));
+                  if (persist) updateGoalsProfileField('goalWeightKg', kg);
+                }}
+                themeColor={themeColor}
+              />
 
-            {/* Names the zone, the same as the body fat beat does. It used to
-                repeat the band's own label back at the user, which is why the
-                screen said most attractive twice. */}
-            <View style={styles.subSlot}>
-              <Text style={styles.bigSub}>{goalZoneName(provisionalGoalBf, bfShift)}</Text>
+              {/* Under the scale, matching where the leanness beat puts its
+                  read-out. Above the scale it separated the number from the
+                  instrument that sets it. */}
+              <Text style={styles.weightDelta}>{weightDelta}</Text>
             </View>
+          </>
+        ) : null}
 
-            {/* Fixed height, so crossing a boundary fades the contents rather
-                than moving everything above it. */}
-            </View>
-            <View style={styles.beat3Slot}>
-              {belowRated ? (
-                <Fade key="lean-warning">
-                  <Text style={styles.leanWarn}>
-                    Leaner than this rated slightly worse in the same studies, and nothing ties any
-                    percentage to facial definition.
-                  </Text>
-                </Fade>
-              ) : !inRated && profile.sex !== 'female' ? (
-                <Fade key="snap-button">
+        {/* ---------------------------------------------------------------- */}
+        {/* Leanness second, and this is where the verdict lives now: at a fixed
+            weight, leanness is what sets the muscle, so it is the choice that
+            decides whether the goal is reachable. */}
+        {beat === 6 ? (
+          <>
+            {/* Flush variant: this beat reserves an empty slot for the snap
+                button, and the centring container's bottom padding on top of
+                that pushed the visible content above the optical centre. */}
+            <View style={[styles.beat1Body, styles.beat1BodyFlush]}>
+              <Text style={styles.beatLabel}>GOAL BODY FAT</Text>
+              <View style={styles.bigNum}>
+                <Text style={styles.bigValue}>{Math.round(provisionalGoalBf)}</Text>
+                <Text style={styles.bigUnit}>%</Text>
+              </View>
+              <LeanGauge
+                profile={effProfile!}
+                goalWeightKg={goalW}
+                goalBodyFatPct={provisionalGoalBf}
+                themeColor={themeColor}
+                onChange={(pct, persist) => {
+                  setProfile((prev) => (prev ? { ...prev, goalBodyFatPct: pct } : prev));
+                  if (persist) updateGoalsProfileField('goalBodyFatPct', pct);
+                }}
+              />
+
+              {/* No verdict text here. The gauge already shades and dashes the
+                  region past the ceiling, so a sentence saying it again is the
+                  same warning twice. The summary beat still prints it, which is
+                  the last look before locking. */}
+
+              {/* Fixed height so the button appearing and disappearing does not
+                  move the gauge above it. */}
+              <View style={styles.snapSlot}>
+                {!inRated && profile.sex !== 'female' ? (
                   <TouchableOpacity
                     style={styles.snapBtn}
                     onPress={() => {
@@ -798,173 +817,135 @@ export default function RouteScreen() {
                       updateGoalsProfileField('goalBodyFatPct', ATTRACTIVE_BF_CENTRE);
                     }}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
                   >
-                    <Ionicons name="sparkles" size={14} color={themeColor} />
                     <Text style={[styles.snapBtnText, { color: themeColor }]}>
-                      Take me to {ATTRACTIVE_BF_CENTRE}%
+                      Take me to most aesthetic
                     </Text>
-                    <Text style={styles.snapBtnSub}>centre of the rated range</Text>
                   </TouchableOpacity>
-                </Fade>
-              ) : null}
+                ) : null}
+              </View>
             </View>
-          </>
-        ) : null}
-
-        {/* ---------------------------------------------------------------- */}
-        {beat === 6 ? (
-          <>
-            <Text style={styles.beatLabel}>TARGET WEIGHT</Text>
-
-            <View style={styles.bigNum}>
-              <Text style={styles.bigValue}>{goalW.toFixed(1)}</Text>
-              <Text style={styles.bigUnit}>kg</Text>
-            </View>
-            <Text style={styles.bigSubDim}>
-              <Text style={{ color: themeColor, fontWeight: '600' }}>
-                {goalLean.toFixed(1)} kg
-              </Text>{' '}
-              of lean mass at {Math.round(provisionalGoalBf)}%
-            </Text>
-
-            <FrameCurve
-              profile={effProfile!}
-              goalWeightKg={goalW}
-              goalBodyFatPct={provisionalGoalBf}
-              zoneKey={zone?.key ?? 'ok'}
-              themeColor={themeColor}
-              onGoalWeight={(w, persist) => {
-                setProfile((prev) => (prev ? { ...prev, goalWeightKg: w } : prev));
-                if (persist) updateGoalsProfileField('goalWeightKg', w);
-              }}
-              onLandmarkPress={(topic) => setEvidence(topic)}
-            />
-
-            {verdictPill}
           </>
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
         {beat === 7 && roadmap ? (
           <>
-            <Text style={styles.beatLabel}>CHOOSE YOUR ROUTE</Text>
+            <View style={styles.beat1Body}>
+              <Text style={styles.beatLabel}>CHOOSE YOUR ROUTE</Text>
 
-            <View style={styles.chartCard}>
-              <View style={styles.chartHead}>
-                <Text style={styles.eyebrow}>YOUR JOURNEY</Text>
-                <Text style={[styles.chartYears, { color: themeColor }]}>
-                  {yrLo} to {yrHi} yr
-                </Text>
+              {/* The picker is a control and the chart is its answer. As three
+                  cards it was ragged, because only the selected one carried the
+                  paragraph that explained the line. */}
+              <View style={styles.routeSeg}>
+                {ROUTE_OPTIONS.map((opt) => {
+                  const active = preference === opt.id;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[styles.routeSegBtn, active && styles.routeSegBtnOn]}
+                      onPress={() => choose(opt.id)}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text style={[styles.routeSegText, active && styles.routeSegTextOn]}>
+                        {opt.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              <JourneyChart profile={profile} roadmap={roadmap} color={themeColor} />
-            </View>
 
-            {ROUTE_OPTIONS.map((opt) => {
-              const active = preference === opt.id;
-              const preview = deriveRoadmap(effProfile!, opt.id);
-              const trims = preview.phases.find((ph) => ph.kind === 'trim')?.repeats ?? 0;
-              return (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[
-                    styles.routeCard,
-                    active && { borderColor: themeColor, backgroundColor: '#14181b' },
-                  ]}
-                  onPress={() => choose(opt.id)}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                >
-                  <View style={styles.routeHead}>
-                    <Text style={styles.routeName}>{opt.name}</Text>
-                    {active ? (
-                      <Ionicons name="checkmark-circle" size={17} color={themeColor} />
-                    ) : null}
-                  </View>
-                  <Text style={styles.routeDesc}>{opt.trade}</Text>
-                  {active ? (
-                    <Text style={styles.routeFeel}>
-                      {opt.feel(preview.band.floor, preview.band.ceiling, trims)}
-                    </Text>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
+              {/* Named. Nothing on this screen used to say what was being
+                  plotted, which is why the line read as decoration. */}
+              <Text style={styles.chartTitle}>BODY FAT OVER TIME</Text>
+              <JourneyChart profile={profile} roadmap={roadmap} color={themeColor} bare />
+              <View style={styles.chartEnds}>
+                <Text style={styles.chartEnd}>TODAY</Text>
+                <Text style={styles.chartEnd}>{yrHi} YEARS</Text>
+              </View>
+
+              {/* The three numbers that actually differ between the routes. The
+                  sentence said the same things in prose and took four lines to
+                  do it. */}
+              <View style={styles.stats}>
+                <View style={styles.stat}>
+                  <Text style={styles.statKey}>TIME</Text>
+                  <Text style={[styles.statValue, { color: themeColor }]}>
+                    {yrLo} to {yrHi} yr
+                  </Text>
+                </View>
+                <View style={styles.stat}>
+                  <Text style={styles.statKey}>BODY FAT</Text>
+                  <Text style={styles.statValue}>
+                    {roadmap.band.floor}&ndash;{roadmap.band.ceiling}%
+                  </Text>
+                </View>
+                <View style={styles.stat}>
+                  <Text style={styles.statKey}>TRIMS</Text>
+                  <Text style={styles.statValue}>
+                    {roadmap.phases.find((ph) => ph.kind === 'trim')?.repeats ?? 0}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </>
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
         {beat === 8 && roadmap ? (
           <>
-            <Text style={styles.beatLabel}>YOUR PLAN</Text>
-            <Text style={styles.titleSm}>This is where you end up.</Text>
+            {/* Built in the reveal screens' language rather than the beats':
+                left aligned, big type, numbers doing the talking. This is the
+                arrival, not another question. */}
+            <View style={styles.summaryBody}>
+              <Text style={styles.summaryEyebrow}>YOUR PLAN</Text>
+              <Text style={styles.summaryTitle}>This is where{'\n'}you end up.</Text>
 
-            <View style={styles.beforeAfter}>
-              <View style={styles.baCol}>
-                <Text style={styles.baTag}>TODAY</Text>
-                <View style={styles.figureGhostStatic}>
-                  <BodyPictogram
-                    bodyFatPct={Math.round(currentBf ?? 20)}
-                    sex={profile.sex}
-                    height={SUMMARY_FIGURE_HEIGHT}
-                    color="#52525b"
-                    />
-                </View>
-                <Text style={styles.baNum}>{currentWeight.toFixed(1)} kg</Text>
-                {currentBf != null ? (
-                  <Text style={styles.baBf}>{Math.round(currentBf)}% body fat</Text>
-                ) : null}
+              <View style={styles.summaryPair}>
+                <Text style={styles.summaryFrom}>
+                  {imperial ? Math.round(kgToLb(currentWeight)) : currentWeight.toFixed(1)}
+                </Text>
+                <Text style={styles.summaryArrow}>{'\u2192'}</Text>
+                <Text style={[styles.summaryTo, { color: themeColor }]}>
+                  {imperial ? Math.round(kgToLb(goalW)) : goalW.toFixed(1)}
+                </Text>
+                <Text style={styles.summaryUnit}>{imperial ? 'lbs' : 'kg'}</Text>
               </View>
 
-              <Ionicons name="arrow-forward" size={18} color="#3f3f46" style={styles.baArrow} />
-
-              <View style={styles.baCol}>
-                <Text style={[styles.baTag, { color: themeColor }]}>
-                  {inRated ? 'MOST ATTRACTIVE' : 'YOUR GOAL'}
+              <View style={styles.summaryPairSm}>
+                <Text style={styles.summaryFromSm}>{Math.round(currentBf ?? 20)}</Text>
+                <Text style={styles.summaryArrowSm}>{'\u2192'}</Text>
+                <Text style={[styles.summaryToSm, { color: themeColor }]}>
+                  {Math.round(provisionalGoalBf)}
                 </Text>
-                <BodyPictogram
-                  bodyFatPct={Math.round(provisionalGoalBf)}
-                  sex={profile.sex}
-                  height={SUMMARY_FIGURE_HEIGHT}
-                  color={themeColor}
-                  />
-                <Text style={[styles.baNum, styles.baNumGoal]}>{goalW.toFixed(1)} kg</Text>
-                <Text style={[styles.baBf, { color: themeColor }]}>
-                  {Math.round(provisionalGoalBf)}% body fat
-                </Text>
+                <Text style={styles.summaryUnitSm}>% body fat</Text>
               </View>
-            </View>
 
-            <View style={styles.tiles}>
-              <View style={styles.tile}>
-                <Text style={styles.tileKey}>MUSCLE TO BUILD</Text>
-                <Text style={[styles.tileValue, { color: themeColor }]}>
-                  {roadmap.gapKg != null ? `${roadmap.gapKg > 0 ? '+' : ''}${roadmap.gapKg.toFixed(1)} kg` : '\u2014'}
-                </Text>
-              </View>
-              <View style={styles.tile}>
-                <Text style={styles.tileKey}>HOW LONG</Text>
-                <Text style={styles.tileValue}>
+              {/* The choices they made, in the order they made them. */}
+              <Text style={styles.summaryMeta}>
+                <Text style={styles.summaryMetaStrong}>{selected?.name}</Text>
+                {'  \u00b7  '}
+                <Text style={styles.summaryMetaStrong}>
                   {yrLo} to {yrHi} yr
                 </Text>
-              </View>
-              <View style={styles.tile}>
-                <Text style={styles.tileKey}>YOUR ROUTE</Text>
-                <Text style={[styles.tileValue, styles.tileValueSm]}>{selected?.name}</Text>
-              </View>
-            </View>
-
-            <View style={styles.chartCard}>
-              <View style={styles.chartHead}>
-                <Text style={styles.eyebrow}>THE PLAN</Text>
-                <Text style={[styles.chartYears, { color: themeColor }]}>
-                  {roadmap.phases.length} phases
+                {'  \u00b7  '}
+                <Text style={styles.summaryMetaStrong}>
+                  {roadmap.gapKg != null
+                    ? `${roadmap.gapKg > 0 ? '+' : ''}${roadmap.gapKg.toFixed(1)} kg`
+                    : '\u2014'}
                 </Text>
-              </View>
-              <JourneyChart profile={profile} roadmap={roadmap} color={themeColor} />
-            </View>
+                {' of muscle'}
+              </Text>
 
-            {verdictPill}
+              <View style={styles.summaryChart}>
+                <JourneyChart profile={profile} roadmap={roadmap} color={themeColor} bare strip />
+              </View>
+
+              {verdictLine}
+            </View>
           </>
         ) : null}
         </Animated.View>
@@ -986,11 +967,6 @@ export default function RouteScreen() {
             <Ionicons name="chevron-forward" size={16} color={themeColor} />
           )}
         </TouchableOpacity>
-        {beat >= 7 ? (
-          <TouchableOpacity style={styles.secondary} onPress={saveAndLeave} activeOpacity={0.7}>
-            <Text style={styles.secondaryText}>Not now, just save my route</Text>
-          </TouchableOpacity>
-        ) : null}
       </View>
 
       {zone ? (
@@ -1074,7 +1050,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  dots: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  progress: { flex: 1, alignItems: 'center', gap: 7 },
+  progressLabel: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.6 },
+  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  dotDone: { backgroundColor: '#3f3f46' },
   iconSpacer: { width: 36, height: 36 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#27272a' },
   dotOn: { width: 18 },
@@ -1096,7 +1075,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 14,
   },
-  beatSub: { fontSize: 12.5, lineHeight: 18, color: '#4b4b52', textAlign: 'center', marginTop: -8, marginBottom: 12 },
 
   sexPair: { flexDirection: 'row', gap: 12, marginTop: 14 },
   sexPick: {
@@ -1125,8 +1103,7 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 12, fontWeight: '600', color: '#5b5b62' },
   unitTextOn: { color: '#ffffff' },
   beat1Body: { flex: 1, justifyContent: 'center', paddingBottom: 40 },
-  titleSm: { fontSize: 25, fontWeight: '600', color: '#ffffff', letterSpacing: -0.4, lineHeight: 31, textAlign: 'center', marginBottom: 12 },
-  hint: { fontSize: 11.5, lineHeight: 17, color: '#5b5b62', textAlign: 'center', marginTop: 12 },
+  beat1BodyFlush: { paddingBottom: 0 },
 
   bigNum: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 7, marginTop: 12, marginBottom: 6 },
   bigValue: {
@@ -1146,86 +1123,61 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bigUnit: { fontSize: 21, fontWeight: '600', color: '#52525b' },
-  bigSub: { fontSize: 13, fontWeight: '600', textAlign: 'center', color: '#6b6b70' },
-  subSlot: { height: 21, justifyContent: 'center', marginBottom: 8 },
   // Tall enough for the two line warning, which is the taller of the two
   // things that can live here.
-  beat3Slot: { height: 72, justifyContent: 'center' },
-  bigSubDim: { fontSize: 13, color: '#6b6b70', textAlign: 'center', marginBottom: 18 },
+  weightDelta: { fontSize: 13, color: '#6b6b70', textAlign: 'center', marginTop: 8 },
 
-  figureGhostStatic: { opacity: 0.55 },
 
+
+  verdict: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20 },
+  snapSlot: { height: 62, justifyContent: 'center' },
   snapBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    alignSelf: 'center',
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
   },
-  snapBtnText: { fontSize: 12.5, fontWeight: '600' },
-  snapBtnSub: { fontSize: 11.5, color: '#5b5b62' },
-  leanWarn: { fontSize: 11.5, lineHeight: 17, color: '#6b6b70', textAlign: 'center' },
-
-  verdict: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 13, marginTop: 18 },
-  verdictText: { flex: 1, fontSize: 12.5, lineHeight: 18 },
+  snapBtnText: { fontSize: 13, fontWeight: '600' },
+  verdictText: { fontSize: 13.5, fontWeight: '600' },
+  verdictYears: { fontSize: 13.5, color: '#5b5b62' },
   qmark: { width: 19, height: 19, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', opacity: 0.6 },
   qmarkText: { fontSize: 11, fontWeight: '700' },
 
-  chartCard: {
-    backgroundColor: '#131316',
+  routeSeg: {
+    flexDirection: 'row',
+    backgroundColor: '#111114',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
+    borderColor: '#1f1f23',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 18,
   },
-  chartHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 },
-  eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, color: '#6b6b70' },
-  chartYears: { fontSize: 12.5, fontWeight: '700' },
+  routeSegBtn: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
+  routeSegBtnOn: { backgroundColor: '#1e1e22' },
+  routeSegText: { fontSize: 12.5, fontWeight: '600', color: '#6b6b70' },
+  routeSegTextOn: { color: '#ffffff' },
 
-  routeCard: {
-    backgroundColor: '#131316',
+  chartTitle: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.6, color: '#4b4b52', marginTop: 26, marginBottom: 8 },
+  chartEnds: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  chartEnd: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.1, color: '#3f3f46' },
+  stats: { flexDirection: 'row', gap: 8, marginTop: 24 },
+  stat: {
+    flex: 1,
+    backgroundColor: '#0f0f11',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 8,
+    borderColor: '#1c1c20',
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
+    alignItems: 'center',
   },
-  routeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  routeName: { fontSize: 14.5, fontWeight: '600', color: '#ffffff' },
-  routeDesc: { fontSize: 12, color: '#71717a', marginTop: 3, lineHeight: 17 },
-  routeFeel: {
-    fontSize: 12,
-    color: '#a1a1aa',
-    marginTop: 8,
-    lineHeight: 18,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#1f2427',
-    paddingTop: 8,
-  },
+  statKey: { fontSize: 8.5, fontWeight: '700', letterSpacing: 1.1, color: '#4b4b52' },
+  statValue: { fontSize: 14.5, fontWeight: '700', color: '#e4e4e7', marginTop: 5 },
 
-  beforeAfter: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 6, marginTop: 6 },
-  baCol: { flex: 1, alignItems: 'center' },
-  baTag: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, color: '#4b4b52', marginBottom: 4 },
-  baNum: { fontSize: 20, fontWeight: '700', color: '#e4e4e7', marginTop: 8, letterSpacing: -0.4 },
-  baNumGoal: { color: '#ffffff' },
-  baBf: { fontSize: 11.5, color: '#5b5b62', marginTop: 1 },
-  baArrow: { paddingBottom: 44 },
-
-  tiles: { flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 12 },
-  tile: { flex: 1, backgroundColor: '#111114', borderWidth: StyleSheet.hairlineWidth, borderColor: '#1c1c20', borderRadius: 13, paddingVertical: 11, paddingHorizontal: 10 },
-  tileKey: { fontSize: 9, fontWeight: '700', letterSpacing: 1.1, color: '#4b4b52' },
-  tileValue: { fontSize: 14.5, fontWeight: '700', color: '#e4e4e7', marginTop: 4 },
-  tileValueSm: { fontSize: 13 },
-
-  // No divider: it was drawing a box under a screen that has nothing else
-  // boxed on it.
+  // No divider above the bar: it was drawing a box under a screen that has
+  // nothing else boxed on it.
   ctaBar: { paddingHorizontal: 20, paddingTop: 8, backgroundColor: '#0a0a0b' },
   // No container either. The row stays 54pt tall so the tap target survives
   // losing the button around it.
@@ -1244,6 +1196,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
+
+  summaryBody: { flex: 1, justifyContent: 'center', paddingBottom: 20 },
+  summaryEyebrow: { fontSize: 9.5, fontWeight: '700', letterSpacing: 2, color: '#5b5b62' },
+  summaryTitle: { fontSize: 38, fontWeight: '700', color: '#ffffff', letterSpacing: -1.2, lineHeight: 43, marginTop: 10 },
+  summaryPair: { flexDirection: 'row', alignItems: 'baseline', gap: 10, marginTop: 26 },
+  summaryFrom: { fontSize: 44, fontWeight: '800', color: '#ffffff', letterSpacing: -2 },
+  summaryArrow: { fontSize: 20, color: '#3f3f46' },
+  summaryTo: { fontSize: 44, fontWeight: '800', letterSpacing: -2 },
+  summaryUnit: { fontSize: 15, fontWeight: '600', color: '#5b5b62' },
+  summaryPairSm: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 },
+  summaryFromSm: { fontSize: 22, fontWeight: '700', color: '#8e8e93' },
+  summaryArrowSm: { fontSize: 14, color: '#3f3f46' },
+  summaryToSm: { fontSize: 22, fontWeight: '700' },
+  summaryUnitSm: { fontSize: 12.5, fontWeight: '600', color: '#5b5b62' },
+  summaryMeta: { fontSize: 12.5, color: '#5b5b62', marginTop: 22 },
+  summaryMetaStrong: { color: '#c4c4c8', fontWeight: '600' },
+  summaryChart: { marginTop: 26, marginHorizontal: -6 },
+
+
   grab: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2f2f35', alignSelf: 'center', marginBottom: 16 },
   sheetCta: { height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   sheetGhost: { height: 50, borderRadius: 13, backgroundColor: '#1c1c20', alignItems: 'center', justifyContent: 'center' },

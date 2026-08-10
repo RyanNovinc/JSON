@@ -24,7 +24,7 @@ import Svg, { Path, Rect, Circle, Text as SvgText } from 'react-native-svg';
 import type { GoalsProfile } from '../../utils/goalsProfile';
 import type { Roadmap } from '../../utils/roadmap';
 
-const CHART = { X0: 12, X1: 308, Y0: 14, Y1: 104, N: 48 } as const;
+const CHART = { X0: 30, X1: 308, Y0: 14, Y1: 104, N: 48 } as const;
 
 type ChartTarget = {
   ys: number[];
@@ -35,6 +35,8 @@ type ChartTarget = {
    *  segment is absent (single phase roadmaps collapse to one segment). */
   stripB: [number, number];
   stripLabels: [string, string, string];
+  /** The vertical domain in body fat percent, so an axis can be drawn. */
+  domain: [number, number];
 };
 
 function buildChartTarget(profile: GoalsProfile, roadmap: Roadmap): ChartTarget {
@@ -43,8 +45,10 @@ function buildChartTarget(profile: GoalsProfile, roadmap: Roadmap): ChartTarget 
   const goal = roadmap.phases[roadmap.phases.length - 1].exitBodyFatPct;
   const { floor, ceiling } = roadmap.band;
 
-  const hi = Math.max(start, ceiling) + 2;
-  const lo = Math.min(goal, floor) - 2;
+  // Rounded outward to whole multiples of 2, so the axis ticks land on tidy
+  // numbers instead of 21.4 and 9.6.
+  const hi = Math.ceil((Math.max(start, ceiling) + 2) / 2) * 2;
+  const lo = Math.floor((Math.min(goal, floor) - 2) / 2) * 2;
   const yOf = (bf: number) => Y0 + ((hi - bf) / (hi - lo)) * (Y1 - Y0);
 
   const mid = (m: [number, number]) => (m[0] + m[1]) / 2;
@@ -105,6 +109,7 @@ function buildChartTarget(profile: GoalsProfile, roadmap: Roadmap): ChartTarget 
     startY: yOf(start),
     stripB,
     stripLabels,
+    domain: [lo, hi],
   };
 }
 
@@ -112,10 +117,21 @@ export default function JourneyChart({
   profile,
   roadmap,
   color,
+  bare = false,
+  strip,
 }: {
   profile: GoalsProfile;
   roadmap: Roadmap;
   color: string;
+  /** Drops every label and the phase strip, leaving the line and the band.
+   *  The route picker states the same facts around the chart, where they do
+   *  not collide with each other, so drawing them inside as well was the same
+   *  information three times over. */
+  bare?: boolean;
+  /** The phase strip, independent of `bare`. The summary wants the strip
+   *  without the floating labels, since it is the only screen that explains
+   *  the shape of the plan. */
+  strip?: boolean;
 }) {
   const target = React.useMemo(() => buildChartTarget(profile, roadmap), [profile, roadmap]);
 
@@ -155,7 +171,7 @@ export default function JourneyChart({
   }, [target, anim]);
 
   const cur = shown.current;
-  const { X0, X1, Y1, N } = CHART;
+  const { X0, X1, Y0, Y1, N } = CHART;
   const xOf = (i: number) => X0 + (i / (N - 1)) * (X1 - X0);
 
   let d = `M ${xOf(0).toFixed(1)} ${cur.ys[0].toFixed(1)}`;
@@ -177,7 +193,7 @@ export default function JourneyChart({
   const seg3w = Math.max(0, X1 - cur.stripB[1] - 2);
 
   return (
-    <Svg width="100%" height={160} viewBox="0 0 320 160">
+    <Svg width="100%" height={bare && !strip ? 124 : 160} viewBox={`0 0 320 ${bare && !strip ? 124 : 160}`}>
       <Rect
         x={X0}
         y={cur.bandTop}
@@ -186,29 +202,54 @@ export default function JourneyChart({
         rx={8}
         fill={`${color}1a`}
       />
-      <SvgText x={X1 + 2} y={cur.bandTop + 4} fontSize={9} fill="#5c5c62">
-        {`${ceiling}%`}
-      </SvgText>
-      <SvgText x={X1 + 2} y={cur.bandBottom + 3} fontSize={9} fill="#5c5c62">
-        {`${floor}%`}
-      </SvgText>
+      {/* Without ticks the space above the band reads as a gap rather than as
+          scale, which is why the chart looked emptier than the mockup. */}
+      {bare
+        ? [0, 1, 2, 3].map((i) => {
+            const [lo, hi] = target.domain;
+            const pct = hi - ((hi - lo) * i) / 3;
+            const y = Y0 + ((hi - pct) / (hi - lo)) * (Y1 - Y0);
+            return (
+              <SvgText key={i} x={X0 - 4} y={y + 3} fontSize={8.5} fill="#3f3f46" textAnchor="end">
+                {`${Math.round(pct)}%`}
+              </SvgText>
+            );
+          })
+        : null}
+
+      {bare ? null : (
+        <>
+          <SvgText x={X1 + 2} y={cur.bandTop + 4} fontSize={9} fill="#5c5c62">
+            {`${ceiling}%`}
+          </SvgText>
+          <SvgText x={X1 + 2} y={cur.bandBottom + 3} fontSize={9} fill="#5c5c62">
+            {`${floor}%`}
+          </SvgText>
+        </>
+      )}
       <Path d={d} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
       <Circle cx={X0} cy={cur.startY} r={8} fill={`${color}2e`} />
       <Circle cx={X0} cy={cur.startY} r={4.5} fill={color} />
       <Circle cx={X1} cy={cur.ys[N - 1]} r={3.5} fill="#131316" stroke="#8e8e93" strokeWidth={1.5} />
-      <SvgText x={X0 + 14} y={Math.max(11, cur.startY - 9)} fontSize={11} fill={color}>
-        {startBf != null ? `You \u00b7 ${Math.round(startBf)}%` : 'You'}
-      </SvgText>
-      <SvgText
-        x={X1 - 2}
-        y={Math.min(Y1 + 12, cur.ys[N - 1] + 16)}
-        fontSize={11}
-        fill="#8e8e93"
-        textAnchor="end"
-      >
-        {`Goal \u00b7 ${goalBf}%`}
-      </SvgText>
+      {bare ? null : (
+        <>
+          <SvgText x={X0 + 14} y={Math.max(11, cur.startY - 9)} fontSize={11} fill={color}>
+            {startBf != null ? `You \u00b7 ${Math.round(startBf)}%` : 'You'}
+          </SvgText>
+          <SvgText
+            x={X1 - 2}
+            y={Math.min(Y1 + 12, cur.ys[N - 1] + 16)}
+            fontSize={11}
+            fill="#8e8e93"
+            textAnchor="end"
+          >
+            {`Goal \u00b7 ${goalBf}%`}
+          </SvgText>
+        </>
+      )}
 
+      {(strip ?? !bare) ? (
+        <>
       {seg1w > 0 ? <Rect x={X0} y={stripY} width={seg1w} height={6} rx={3} fill={color} /> : null}
       <Rect
         x={seg1w > 0 ? cur.stripB[0] + 2 : X0}
@@ -250,6 +291,8 @@ export default function JourneyChart({
       >
         {cur.stripLabels[2]}
       </SvgText>
+        </>
+      ) : null}
     </Svg>
   );
 }

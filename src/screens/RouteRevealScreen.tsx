@@ -49,6 +49,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import PhaseLine from '../components/route/PhaseLine';
 import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 import { getCreateImage } from '../assets/createImages';
 import { loadGoalsProfile } from '../utils/goalsProfileStorage';
@@ -182,13 +183,45 @@ export default function RouteRevealScreen() {
                 <Text style={styles.eyebrow}>
                   PHASE 1 OF {roadmap ? roadmap.phases.length : '\u2014'}
                 </Text>
-                <Text style={styles.huge}>{phaseName}.</Text>
+                {/* No full stop. At this size it read as a brand slide rather
+                    than a plan. */}
+                <Text style={styles.huge}>{phaseName}</Text>
+
+                {/* What actually changes in this phase, which is the question
+                    the card is answering. */}
+                {roadmap ? (
+                  <View style={styles.fromTo}>
+                    <Text style={styles.fromToNum}>
+                      {Math.round(profile?.currentBodyFatPct ?? roadmap.band.ceiling + 2)}
+                    </Text>
+                    <Text style={styles.fromToArrow}>{'\u2192'}</Text>
+                    <Text style={[styles.fromToNum, { color: themeColor }]}>
+                      {Math.round(roadmap.phases[0].exitBodyFatPct)}
+                    </Text>
+                    <Text style={styles.fromToUnit}>% body fat</Text>
+                  </View>
+                ) : null}
+
                 {months ? (
                   <View style={styles.durRow}>
                     <Text style={styles.durValue}>
                       {months[0]} to {months[1]} months
                     </Text>
                     <Text style={styles.durTag}>ESTIMATE</Text>
+                  </View>
+                ) : null}
+
+                {/* The plan they just locked in, with this phase lit. The wow
+                    on this screen should come from seeing their own line, not
+                    from bigger type. */}
+                {roadmap && profile ? (
+                  <View style={styles.phaseLine}>
+                    <PhaseLine
+                      profile={profile}
+                      roadmap={roadmap}
+                      phaseIndex={0}
+                      color={themeColor}
+                    />
                   </View>
                 ) : null}
               </>
@@ -332,9 +365,14 @@ const styles = StyleSheet.create({
   beat: { flex: 1, paddingHorizontal: 30 },
 
   eyebrow: { fontSize: 10.5, fontWeight: '700', letterSpacing: 1.8, color: '#5b5b62', marginBottom: 14 },
-  huge: { fontSize: 62, fontWeight: '800', letterSpacing: -2.6, color: '#ffffff', marginBottom: 16 },
+  huge: { fontSize: 40, fontWeight: '700', letterSpacing: -1.2, color: '#ffffff', marginTop: 6, marginBottom: 0 },
   durRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   durValue: { fontSize: 21, fontWeight: '700', color: '#ffffff', letterSpacing: -0.4 },
+  fromTo: { flexDirection: 'row', alignItems: 'baseline', gap: 9, marginTop: 18 },
+  fromToNum: { fontSize: 44, fontWeight: '800', color: '#ffffff', letterSpacing: -2 },
+  fromToArrow: { fontSize: 20, color: '#3f3f46' },
+  fromToUnit: { fontSize: 15, fontWeight: '600', color: '#5b5b62' },
+  phaseLine: { marginTop: 28, marginHorizontal: -4 },
   durTag: {
     fontSize: 10,
     fontWeight: '700',
