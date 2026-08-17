@@ -77,7 +77,6 @@ import GoalEntrySheet from '../components/nutrition/GoalEntrySheet';
  *   2. Pace / ETA / 7-day avg folded into the hero as a mini-stat row.
  *   3. The goal block opens GoalEntrySheet, which writes GoalsProfile —
  *      the same store the questionnaire reads.
- *   4. The track's start anchor prefers goalProfile.startWeightKg.
  *   5. Recomp-style targets (start ≈ goal) get the gap pill instead of
  *      a meaningless track.
  *   6. Sparkline gained a small "GOAL <x>" label on the dashed line.
@@ -131,13 +130,6 @@ interface WeightEntry {
   /** Optional body composition reading logged alongside the weight. */
   bodyFatPct?: number;
 }
-
-// GoalsProfile doesn't declare startWeightKg yet (add it to the type when
-// convenient). GoalEntrySheet snapshots it whenever the goal weight is
-// set or changed; the questionnaire should do the same where it writes
-// goalWeightKg. This screen reads the field defensively and falls back
-// to the oldest logged entry for goals that predate the snapshot.
-type GoalsProfileMaybeStart = GoalsProfile & { startWeightKg?: number | null };
 
 const PHOTO_TYPES = [
   'front',
@@ -268,10 +260,6 @@ function hexToRgba(hex: string, alpha: number): string {
 // RN's DimensionValue is a `${number}%` template-literal type, which a
 // computed template string doesn't satisfy on its own. Keeps call sites
 // tidy for the progress track's percentage positioning.
-function pctString(n: number): `${number}%` {
-  return `${n}%` as `${number}%`;
-}
-
 // ---------- Range selector ----------
 
 type Range = '1M' | '3M' | '6M' | 'ALL';
@@ -714,40 +702,9 @@ export default function WeightTrackerScreen() {
     };
   }, [history]);
 
-  // Start anchor for the progress track. Prefers the snapshot that
-  // GoalEntrySheet writes when a goal is set/changed; falls back to the
-  // first-ever entry for goals that predate the snapshot.
-  const startWeightKg = useMemo(() => {
-    const snap = (goalProfile as GoalsProfileMaybeStart | null)?.startWeightKg;
-    if (snap != null && snap > 0) return snap;
-    if (history.length > 0) {
-      const first = history[history.length - 1];
-      return toKg(first.weight, first.unit);
-    }
-    return null;
-  }, [goalProfile, history]);
-
-  const startDisplay = useMemo(() => {
-    if (startWeightKg == null) return null;
-    return displayUnit === 'lbs' ? startWeightKg / 0.453592 : startWeightKg;
-  }, [startWeightKg, displayUnit]);
-
-  // 0..1 progress along start → goal, clamped so overshoot and pre-start
-  // noise don't break the bar. Null when there's no goal, no start, or
-  // start ≈ goal (recomp-style targets render the gap pill instead of a
-  // meaningless track).
-  const goalProgress = useMemo(() => {
-    if (!latest || goalWeightKg == null || startWeightKg == null) return null;
-    const total = goalWeightKg - startWeightKg;
-    if (Math.abs(total) < 0.25) return null;
-    const done = toKg(latest.weight, latest.unit) - startWeightKg;
-    return Math.max(0, Math.min(1, done / total));
-  }, [latest, goalWeightKg, startWeightKg]);
-
-  // Direction-aware gap to goal — mirrors totalDelta's unit-conversion
-  // pattern. "At goal" within a small threshold rather than a precise
-  // zero, since scale noise makes exact matches unrealistic. Doubles as
-  // the progress track's right-hand label.
+  // Direction-aware gap to goal, in the user's display unit. "At goal" within
+  // a small threshold rather than a precise zero, since scale noise makes
+  // exact matches unrealistic.
   const goalGap = useMemo(() => {
     if (!latest || goalWeightKg == null) return null;
     const currentKg = toKg(latest.weight, latest.unit);
@@ -762,23 +719,18 @@ export default function WeightTrackerScreen() {
       : { text: `${absDisplay.toFixed(1)} ${displayUnit} to go`, direction: 'below' as const };
   }, [latest, goalWeightKg, displayUnit]);
 
-  // Difference since the very first entry (in whichever unit the latest
-  // entry is in)
-  const totalDelta = useMemo(() => {
-    if (history.length < 2) return null;
-    const first = history[history.length - 1];
-    const latestKg = toKg(latest.weight, latest.unit);
-    const firstKg = toKg(first.weight, first.unit);
-    const diffKg = latestKg - firstKg;
-    const value =
-      displayUnit === 'lbs' ? diffKg / 0.453592 : diffKg;
-    return { value, positive: diffKg > 0 };
-  }, [history, displayUnit, latest]);
+  /**
+   * Dated body fat readings inside the detector's 45 day window. Counted from
+   * the weight history, which is where readings logged alongside a weigh-in
+   * live. Fewer than three and the phase detector cannot see anything.
+   */
+  const bfReadingCount = useMemo(() => {
+    const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+    return history.filter(
+      (e) => e.bodyFatPct != null && new Date(e.date).getTime() >= cutoff,
+    ).length;
+  }, [history]);
 
-  // Short-horizon delta for the hero pill: change across entries in the
-  // last 7 days. The track already communicates change-since-start, so
-  // the pill carries the fresher signal; falls back to totalDelta when
-  // there isn't enough recent data.
   const weekDelta = useMemo(() => {
     if (!latest || history.length < 2) return null;
     const latestMs = new Date(latest.date).getTime();
@@ -865,7 +817,6 @@ export default function WeightTrackerScreen() {
   );
 
   // The hero pill prefers the 7-day delta; falls back to since-start.
-  const heroPill = weekDelta ?? totalDelta;
 
   // ---------- Handlers ----------
 
@@ -1221,255 +1172,51 @@ export default function WeightTrackerScreen() {
             showsVerticalScrollIndicator={false}
           >
             {/* Hero card: current + goal + progress track + goal stats */}
-            <View style={styles.heroCard}>
-              <View style={styles.heroTop}>
-                <View style={styles.heroLeft}>
-                  <Text style={styles.heroLabel}>Current</Text>
-                  <View style={styles.heroRow}>
-                    <Text style={styles.heroValue}>
-                      {latest.weight.toFixed(1)}
-                    </Text>
-                    <Text style={styles.heroUnit}>{latest.unit}</Text>
-                  </View>
-                  <View style={styles.heroMeta}>
-                    {heroPill && (
-                      <View
-                        style={[
-                          styles.deltaPill,
-                          { backgroundColor: hexToRgba(themeColor, 0.1) },
-                        ]}
-                      >
-                        <Ionicons
-                          name={heroPill.positive ? 'trending-up' : 'trending-down'}
-                          size={12}
-                          color={themeColor}
-                        />
-                        <Text style={[styles.deltaText, { color: themeColor }]}>
-                          {heroPill.positive ? '+' : ''}
-                          {heroPill.value.toFixed(1)}
-                          {weekDelta ? ' this wk' : ` ${displayUnit}`}
-                        </Text>
-                      </View>
-                    )}
-                    <Text style={styles.heroSub}>{formatRelative(latest.date)}</Text>
-                  </View>
+            {/* ============================================================
+                THE HEADLINE, not a card.
 
-                  {/* Current BF% mirrors the goal's BF target chip on
-                      the right, so the two read as a pair. */}
-                  {bodyFat && (
-                    <View
-                      style={[
-                        styles.bfChip,
-                        styles.bfChipLeft,
-                        { borderColor: hexToRgba(themeColor, 0.3) },
-                      ]}
-                    >
-                      <Text style={[styles.bfChipText, { color: themeColor }]}>
-                        {bodyFat.current}% BF
-                        {bodyFat.delta != null && Math.abs(bodyFat.delta) >= 0.1
-                          ? ` (${bodyFat.delta > 0 ? '+' : ''}${bodyFat.delta.toFixed(1)})`
-                          : ''}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                The old hero stacked current weight, a delta pill, the
+                date, a body fat chip, the goal, a progress track and
+                three stats into one bordered box. Six things competing
+                inside a border is why this screen looked like it came
+                from a different app than the route flow.
 
-                {/* Goal — tap to edit in place via GoalEntrySheet. */}
-                {hasGoal && (
-                  <TouchableOpacity
-                    style={styles.goalSide}
-                    onPress={() => setGoalSheetVisible(true)}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel="Edit goal"
-                  >
-                    <View style={styles.goalLabelRow}>
-                      <Ionicons name="flag-outline" size={12} color="#71717a" />
-                      <Text style={styles.microLabel}>Goal</Text>
-                      <Ionicons name="chevron-forward" size={12} color="#52525b" />
-                    </View>
-                    <View style={styles.goalNumRow}>
-                      <Text style={[styles.goalValue, { color: themeColor }]}>
-                        {goalDisplay!.toFixed(1)}
-                      </Text>
-                      <Text style={styles.goalUnit}>{displayUnit}</Text>
-                    </View>
-                    {goalProfile?.goalBodyFatPct != null && (
-                      <View
-                        style={[
-                          styles.bfChip,
-                          { borderColor: hexToRgba(themeColor, 0.3) },
-                        ]}
-                      >
-                        <Text style={[styles.bfChipText, { color: themeColor }]}>
-                          {goalProfile.goalBodyFatPct}% BF target
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                )}
-              </View>
+                Now the number is just the number, with one line under it
+                saying what it means. The goal moved to its own row below
+                the chart, where it is obviously a door rather than a
+                tappable region inside a card.
 
-              {hasGoal && goalProgress != null ? (
-                // Progress track: start → goal, % on the marker,
-                // remaining on the right (goalGap doubles as the label).
-                <View style={styles.trackArea}>
-                  <Text
-                    style={[
-                      styles.trackPct,
-                      {
-                        color: themeColor,
-                        left: pctString(
-                          Math.min(Math.max(goalProgress, 0.07), 0.93) * 100
-                        ),
-                      },
-                    ]}
-                  >
-                    {Math.round(goalProgress * 100)}%
-                  </Text>
-                  <View style={styles.track}>
-                    <View
-                      style={[
-                        styles.trackFill,
-                        {
-                          width: pctString(goalProgress * 100),
-                          backgroundColor: themeColor,
-                        },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.trackMarker,
-                        {
-                          left: pctString(goalProgress * 100),
-                          backgroundColor: themeColor,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <View style={styles.trackLabels}>
-                    <Text style={styles.trackStart}>
-                      {startDisplay != null
-                        ? `${startDisplay.toFixed(1)} start`
-                        : ''}
-                    </Text>
-                    {goalGap && (
-                      <Text
-                        style={[
-                          styles.trackToGo,
-                          goalGap.direction === 'at' && { color: '#34d399' },
-                        ]}
-                      >
-                        {goalGap.text}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              ) : hasGoal && goalGap ? (
-                // Start ≈ goal (recomp-style target): a track would be
-                // meaningless, so keep the gap pill.
-                <View
-                  style={[
-                    styles.goalGapPill,
-                    {
-                      backgroundColor:
-                        goalGap.direction === 'at'
-                          ? 'rgba(52, 211, 153, 0.12)'
-                          : hexToRgba(themeColor, 0.1),
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      goalGap.direction === 'at'
-                        ? 'checkmark-circle'
-                        : 'navigate-outline'
-                    }
-                    size={12}
-                    color={goalGap.direction === 'at' ? '#34d399' : themeColor}
-                  />
-                  <Text
-                    style={[
-                      styles.goalGapText,
-                      {
-                        color:
-                          goalGap.direction === 'at' ? '#34d399' : themeColor,
-                      },
-                    ]}
-                  >
-                    {goalGap.text}
-                  </Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.setGoalPill}
-                  onPress={() => setGoalSheetVisible(true)}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Set a goal"
-                >
-                  <Ionicons name="flag-outline" size={12} color={themeColor} />
-                  <Text style={[styles.setGoalText, { color: themeColor }]}>Set a goal</Text>
-                  <Ionicons name="chevron-forward" size={12} color={themeColor} />
-                </TouchableOpacity>
-              )}
-
-              <View style={styles.heroDivider} />
-
-              {/* Mini stats — replaces the old standalone stats row */}
-              <View style={styles.msRow}>
-                <View style={styles.msCell}>
-                  <Text style={styles.msLabel}>Pace</Text>
-                  <Text style={styles.msValue}>
-                    {stats?.pace != null
-                      ? `${stats.pace > 0 ? '+' : ''}${stats.pace.toFixed(2)}`
-                      : '—'}
-                    <Text style={styles.msUnit}>/wk</Text>
-                  </Text>
-                </View>
-                {hasGoal ? (
-                  <View style={[styles.msCell, styles.msCellCenter]}>
-                    <Text style={styles.msLabel}>To goal</Text>
-                    <Text
-                      style={styles.msValue}
-                      accessibilityLabel={
-                        goalEtaWeeks != null
-                          ? `About ${goalEtaWeeks} ${goalEtaWeeks === 1 ? 'week' : 'weeks'} to goal at current pace`
-                          : undefined
-                      }
-                    >
-                      {goalEtaWeeks != null ? `~${goalEtaWeeks}` : '—'}
-                      {goalEtaWeeks != null && (
-                        <Text style={styles.msUnit}>
-                          {' '}
-                          {goalEtaWeeks === 1 ? 'wk' : 'wks'}
-                        </Text>
-                      )}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[styles.msCell, styles.msCellCenter]}>
-                    <Text style={styles.msLabel}>7-day avg</Text>
-                    <Text style={styles.msValue}>
-                      {stats?.avg7 != null ? stats.avg7.toFixed(1) : '—'}
-                    </Text>
-                  </View>
-                )}
-                {hasGoal ? (
-                  <View style={[styles.msCell, styles.msCellRight]}>
-                    <Text style={styles.msLabel}>7-day avg</Text>
-                    <Text style={styles.msValue}>
-                      {stats?.avg7 != null ? stats.avg7.toFixed(1) : '—'}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[styles.msCell, styles.msCellRight]}>
-                    <Text style={styles.msLabel}>Entries</Text>
-                    <Text style={styles.msValue}>{history.length}</Text>
-                  </View>
-                )}
-              </View>
+                THE PROGRESS TRACK IS GONE on purpose. A start-to-goal bar
+                moves imperceptibly week to week and turns a body into a
+                loading indicator. The chart below already shows progress,
+                and shows it honestly, including the weeks it went the
+                wrong way.
+                ============================================================ */}
+            <Text style={styles.eyebrow}>CURRENT</Text>
+            <View style={styles.headline}>
+              <Text style={styles.headlineValue}>{latest.weight.toFixed(1)}</Text>
+              <Text style={styles.headlineUnit}>{latest.unit}</Text>
+              <Text style={styles.headlineAge}>{formatRelative(latest.date)}</Text>
             </View>
+            <Text style={styles.headlineSub}>
+              {weekDelta && Math.abs(weekDelta.value) >= 0.05 ? (
+                <>
+                  <Text style={styles.headlineStrong}>
+                    {weekDelta.positive ? 'Up' : 'Down'} {Math.abs(weekDelta.value).toFixed(1)}{' '}
+                    {displayUnit}
+                  </Text>
+                  {' this week'}
+                </>
+              ) : (
+                'Holding steady this week'
+              )}
+              {goalGap ? (
+                <>
+                  {'  \u00b7  '}
+                  <Text style={styles.headlineStrong}>{goalGap.text}</Text>
+                </>
+              ) : null}
+            </Text>
 
             {/* Chart */}
             <View style={styles.chartCard}>
@@ -1517,6 +1264,72 @@ export default function WeightTrackerScreen() {
                 )}
               </View>
             </View>
+
+            {/* ============================================================
+                THE THREE NUMBERS. Same tile row the route screens use.
+
+                The third one is new and is the reason this screen matters
+                beyond curiosity: phase transitions are detected from a
+                body fat TREND, which needs three readings inside a 45 day
+                window. Until now, a user with too few had no way to know
+                the detector was blind — the app simply never told them a
+                phase had ended.
+                ============================================================ */}
+            <View style={styles.statRow}>
+              <View style={styles.statCell}>
+                <Text style={styles.statKey}>PACE</Text>
+                <Text style={[styles.statValue, { color: themeColor }]}>
+                  {stats?.pace != null
+                    ? `${stats.pace > 0 ? '+' : ''}${stats.pace.toFixed(1)}/wk`
+                    : '\u2014'}
+                </Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statKey}>{hasGoal ? 'TO GOAL' : '7-DAY AVG'}</Text>
+                <Text style={styles.statValue}>
+                  {hasGoal
+                    ? goalEtaWeeks != null
+                      ? `~${goalEtaWeeks} ${goalEtaWeeks === 1 ? 'wk' : 'wks'}`
+                      : '\u2014'
+                    : stats?.avg7 != null
+                      ? stats.avg7.toFixed(1)
+                      : '\u2014'}
+                </Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statKey}>BF READINGS</Text>
+                <Text
+                  style={[
+                    styles.statValue,
+                    bfReadingCount < 3 && styles.statValueShort,
+                  ]}
+                >
+                  {bfReadingCount} of 3
+                </Text>
+              </View>
+            </View>
+
+            {/* The goal, as a row rather than a region inside a card, so it
+                reads as the door it is. */}
+            <TouchableOpacity
+              style={styles.goalRow}
+              onPress={() => setGoalSheetVisible(true)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Edit your goal"
+            >
+              <Text style={styles.goalRowLabel}>Goal</Text>
+              <Text style={styles.goalRowValue}>
+                {hasGoal && goalDisplay != null
+                  ? `${goalDisplay.toFixed(1)} ${displayUnit}${
+                      goalProfile?.goalBodyFatPct != null
+                        ? ` at ${goalProfile.goalBodyFatPct}%`
+                        : ''
+                    }`
+                  : 'Not set'}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color="#3f3f46" />
+            </TouchableOpacity>
 
             {/* Recent entries */}
             <View style={styles.recentHeader}>
@@ -1635,6 +1448,51 @@ export default function WeightTrackerScreen() {
 // ---------- Styles ----------
 
 const styles = StyleSheet.create({
+  eyebrow: { fontSize: 9, fontWeight: '700', letterSpacing: 1.9, color: '#5b5b62', marginTop: 4 },
+  headline: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 8 },
+  headlineValue: {
+    fontSize: 52,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: -2.2,
+    fontVariant: ['tabular-nums'],
+  },
+  headlineUnit: { fontSize: 15, fontWeight: '600', color: '#5b5b62' },
+  headlineAge: { marginLeft: 'auto', fontSize: 10.5, color: '#4b4b52' },
+  headlineSub: { fontSize: 12.5, lineHeight: 18, color: '#6b6b70', marginTop: 7 },
+  headlineStrong: { color: '#c4c4c8', fontWeight: '600' },
+
+  statRow: { flexDirection: 'row', gap: 7, marginTop: 16 },
+  statCell: {
+    flex: 1,
+    backgroundColor: '#0f0f11',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#1c1c20',
+    borderRadius: 11,
+    paddingVertical: 9,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+  },
+  statKey: { fontSize: 7.5, fontWeight: '700', letterSpacing: 1, color: '#4b4b52' },
+  statValue: { fontSize: 12.5, fontWeight: '700', color: '#e4e4e7', marginTop: 4 },
+  // Amber rather than red: too few readings is a gap to close, not a failure.
+  statValueShort: { color: '#f0b429' },
+
+  goalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#0f0f11',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#1c1c20',
+    borderRadius: 13,
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+    marginTop: 9,
+  },
+  goalRowLabel: { flex: 1, fontSize: 13, color: '#8e8e93' },
+  goalRowValue: { fontSize: 13.5, fontWeight: '600', color: '#e4e4e7' },
+
   container: { flex: 1, backgroundColor: '#0a0a0b' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -1662,105 +1520,8 @@ const styles = StyleSheet.create({
   },
 
   // Hero card (current + goal + track + mini stats)
-  heroCard: {
-    backgroundColor: '#131316',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 14,
-    marginBottom: 14,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  heroLeft: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  heroLabel: {
-    fontSize: 11,
-    color: '#71717a',
-    letterSpacing: 0.3,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    fontWeight: '500',
-  },
-  microLabel: {
-    fontSize: 10,
-    color: '#71717a',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    fontWeight: '600',
-  },
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-    marginBottom: 8,
-  },
-  heroValue: {
-    fontSize: 38,
-    fontWeight: '600',
-    color: '#ffffff',
-    letterSpacing: -1,
-    lineHeight: 40,
-  },
-  heroUnit: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#71717a',
-  },
-  heroMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  deltaPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  deltaText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  heroSub: {
-    fontSize: 11,
-    color: '#71717a',
-  },
 
   // Goal side of the hero — taps through to GoalEntrySheet
-  goalSide: {
-    alignItems: 'flex-end',
-  },
-  goalLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginBottom: 5,
-  },
-  goalNumRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  goalValue: {
-    fontSize: 22,
-    fontWeight: '600',
-    letterSpacing: -0.4,
-  },
-  goalUnit: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#71717a',
-  },
   bfChip: {
     marginTop: 8,
     borderWidth: 1,
@@ -1774,130 +1535,12 @@ const styles = StyleSheet.create({
   },
   // Same chip, aligned to the hero's left column rather than the goal
   // column's right edge.
-  bfChipLeft: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-  },
 
   // Progress track
-  trackArea: {
-    marginTop: 24,
-  },
-  trackPct: {
-    position: 'absolute',
-    top: -18,
-    width: 48,
-    marginLeft: -24,
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  track: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: '#26262b',
-  },
-  trackFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 999,
-  },
-  trackMarker: {
-    position: 'absolute',
-    top: -4,
-    marginLeft: -7,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 3,
-    borderColor: '#0a0a0b',
-  },
-  trackLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 7,
-  },
-  trackStart: {
-    fontSize: 11,
-    color: '#71717a',
-  },
-  trackToGo: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#d4d4d8',
-  },
 
   // Recomp fallback + no-goal pill
-  goalGapPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
-    marginTop: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  goalGapText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  setGoalPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
-    marginTop: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-  },
-  setGoalText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
 
   // Hero divider + mini stats row
-  heroDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#27272a',
-    marginTop: 14,
-    marginBottom: 11,
-  },
-  msRow: {
-    flexDirection: 'row',
-  },
-  msCell: {
-    flex: 1,
-  },
-  msCellCenter: {
-    alignItems: 'center',
-  },
-  msCellRight: {
-    alignItems: 'flex-end',
-  },
-  msLabel: {
-    fontSize: 10,
-    color: '#71717a',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    fontWeight: '600',
-    marginBottom: 3,
-  },
-  msValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  msUnit: {
-    fontSize: 10,
-    color: '#71717a',
-    fontWeight: '500',
-  },
 
   // Chart card
   chartCard: {

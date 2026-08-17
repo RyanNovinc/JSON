@@ -97,8 +97,11 @@ import CreateChooserScreen from '../screens/CreateChooserScreen';
 import GoalsIntakeScreen from '../screens/GoalsIntakeScreen';
 import RouteScreen from '../screens/RouteScreen';
 import RouteRevealScreen from '../screens/RouteRevealScreen';
+import RouteSummaryScreen from '../screens/RouteSummaryScreen';
+import PhasePositionScreen from '../screens/PhasePositionScreen';
 import GoalsStatsScreen from '../screens/GoalsStatsScreen';
 import ConfirmStatsScreen from '../screens/ConfirmStatsScreen';
+import CheckInScreen from '../screens/CheckInScreen';
 
 // Import questionnaire screens
 import Q2ExperienceScreen from '../screens/questionnaire/Q2ExperienceScreen';
@@ -352,13 +355,24 @@ export type RootStackParamList = {
   // The roadmap that ends the intake. flowStepOffset is threaded through
   // rather than recomputed: this screen is a RESULT, not a numbered step, so
   // it does not advance the count.
-  Route: { flowStepOffset?: number } | undefined;
+  // startBeat and single are how RouteSummary opens one question: jump
+  // straight to the beat that sets a value, and return here on Done instead of
+  // walking the beats the user has already answered.
+  Route:
+    | { flowStepOffset?: number; startBeat?: number; single?: boolean }
+    | undefined;
   RouteReveal: { flowStepOffset?: number } | undefined;
+  RouteSummary: undefined;
+  // Manual override for which phase of the roadmap the user is standing on.
+  // Reached from the WHERE YOU ARE row on RouteSummary.
+  PhasePosition: undefined;
   // Returning-user lightweight stats confirm, shown before the
   // plan-specific questions when a usable GoalsProfile already exists
   ConfirmStats: { nextFlow: 'workout' | 'nutrition'; extraParams?: Record<string, any> } | undefined;
   // Standalone, always-reachable editable view of GoalsProfile
   GoalsStats: undefined;
+  // Weekly check-in: log today's numbers, then see where that leaves you
+  CheckIn: undefined;
   // Questionnaire screens
   Q2Experience: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   Q3DaysPerWeek: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
@@ -1465,6 +1479,28 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                   }),
                 }}
               />
+              {/* Where a returning user lands instead of the flow: their route
+                  as a list, with every row a door back into the beat that set
+                  it. */}
+              <RootStack.Screen
+                name="RouteSummary"
+                component={RouteSummaryScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: { opacity: current.progress },
+                  }),
+                }}
+              />
+              {/* Pushed FROM RouteSummary, so it keeps the default slide
+                  rather than the fade used above. The fade reads as "this
+                  replaced the screen"; this one is a step deeper into it and
+                  the user needs to feel they can come back. */}
+              <RootStack.Screen
+                name="PhasePosition"
+                component={PhasePositionScreen}
+                options={{ headerShown: false }}
+              />
               {/* Returning-user lightweight stats confirm */}
               <RootStack.Screen
                 name="ConfirmStats"
@@ -1498,6 +1534,17 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                       },
                     };
                   },
+                }}
+              />
+              {/* Weekly check-in: log today's numbers, then see where that leaves you */}
+              <RootStack.Screen
+                name="CheckIn"
+                component={CheckInScreen}
+                options={{
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: { opacity: current.progress },
+                  }),
                 }}
               />
               {/* Questionnaire screens */}

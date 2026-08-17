@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GoalsProfile, RoutePreference } from './goalsProfile';
 import { deriveRoadmap } from './roadmap';
 import type { RoadmapPhaseKind } from './roadmap';
+import { phasesAt } from './phaseJourney';
 
 export interface BodyFatReading {
   /** ISO date of the reading. */
@@ -111,11 +112,28 @@ export function evaluateTransition(
   readings: BodyFatReading[],
   route?: RoutePreference,
   now: number = Date.now(),
+  completedPhases = 0,
 ): TransitionCheck | null {
   const roadmap = deriveRoadmap(profile, route ?? profile.routePreference ?? 'balanced');
   if (!roadmap || roadmap.phases.length === 0) return null;
 
-  const current = roadmap.phases[0];
+  /**
+   * phasesAt, NOT roadmap.phases[0].
+   *
+   * phases[0] is always the OPENER — a definition, not a position. Reading it
+   * here meant detection could only ever notice the FIRST crossing: once the
+   * user moved on, this kept testing the opener's threshold against a body
+   * that had left it behind, so nobody was ever advanced automatically past
+   * phase one. CheckInScreen already had this right, with a comment about the
+   * same bug biting it earlier; the detector simply never received the count.
+   *
+   * The default of 0 keeps every existing caller behaving exactly as before
+   * rather than silently changing meaning.
+   */
+  const legs = phasesAt(roadmap, completedPhases);
+  const current = legs.current;
+  if (!current) return null;
+
   const trendPct = bodyFatTrend(readings, now);
 
   return {
@@ -123,8 +141,8 @@ export function evaluateTransition(
     trendPct,
     thresholdPct: current.exitBodyFatPct,
     currentKind: current.kind,
-    nextKind: roadmap.phases[1]?.kind,
-    nextExitBodyFatPct: roadmap.phases[1]?.exitBodyFatPct,
+    nextKind: legs.next?.kind,
+    nextExitBodyFatPct: legs.next?.exitBodyFatPct,
   };
 }
 

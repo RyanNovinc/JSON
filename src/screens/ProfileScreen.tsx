@@ -21,6 +21,7 @@ import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { WorkoutStorage } from '../utils/storage';
 import { getWriteReviewUrl } from '../utils/storeLinks';
 import { markRatingEngaged } from '../utils/reviewGate';
+import { loadCheckInState, isCheckInDue, daysUntilDue } from '../utils/checkIn';
 import { FeedbackModal } from '../components/FeedbackTab';
 import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 import TermsOfServiceModal from '../components/TermsOfServiceModal';
@@ -142,6 +143,24 @@ export default function ProfileScreen() {
     }, [])
   );
 
+  // ===== Weekly check-in =====
+  // Reloaded on focus so the row settles the moment a check-in closes, rather
+  // than still inviting the user to do the thing they just did.
+  const [checkIn, setCheckIn] = useState<{ due: boolean; days: number }>({ due: false, days: 7 });
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      loadCheckInState().then((state) => {
+        if (cancelled) return;
+        setCheckIn({ due: isCheckInDue(state), days: Math.max(0, daysUntilDue(state)) });
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
   // ===== Handlers =====
   const openWeightTracker = () => {
     navigation.navigate('WeightTracker' as never);
@@ -149,6 +168,10 @@ export default function ProfileScreen() {
 
   const openGoalsStats = () => {
     navigation.navigate('GoalsStats' as never);
+  };
+
+  const openCheckIn = () => {
+    navigation.navigate('CheckIn' as never);
   };
 
   const openExternalUrl = (url: string) => {
@@ -258,26 +281,84 @@ export default function ProfileScreen() {
         )}
 
         {/* ============================================================
-            WEIGHT TRACKER — hero link at top.
-            Weight is user-level data (not just nutrition), so this is
-            where it belongs long-term. Styled to match the home-screen
-            hero language: black surface, 1.5px themed border + glow.
+            WEEKLY CHECK-IN — the only row on this screen that changes
+            state. When it is due it takes the hero treatment and sits
+            above everything; when it is not, it drops to a plain row and
+            says when the next one lands.
+
+            It clears on completion rather than on view: clearing when
+            someone glances at Profile forgets that they meant to come
+            back, and this exists to reach people who are NOT already
+            logging. What keeps it from nagging is that it never
+            escalates — one dot, no count, no second surface, and the
+            flow itself offers to stand the week down.
+            ============================================================ */}
+        {checkIn.due ? (
+          <TouchableOpacity
+            style={[styles.heroLink, { borderColor: themeColor, shadowColor: themeColor }]}
+            onPress={openCheckIn}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Start your weekly check-in"
+          >
+            <View style={[styles.heroLinkIcon, { backgroundColor: themeColor }]}>
+              <Ionicons name="checkmark-circle-outline" size={22} color="#0a0a0b" />
+            </View>
+            <View style={styles.heroLinkText}>
+              <View style={styles.checkInTitleRow}>
+                <View style={[styles.checkInDot, { backgroundColor: themeColor }]} />
+                <Text style={styles.heroLinkTitle}>Weekly check-in</Text>
+              </View>
+              <Text style={styles.heroLinkSub}>Ready &middot; takes about a minute</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#71717a" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.row}
+            onPress={openCheckIn}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Weekly check-in"
+          >
+            <View style={styles.rowIcon}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#a1a1aa" />
+            </View>
+            <View style={styles.rowText}>
+              <Text style={styles.rowTitle}>Weekly check-in</Text>
+              <Text style={styles.rowSub}>
+                {checkIn.days <= 0
+                  ? 'Ready when you are'
+                  : `Next one in ${checkIn.days} ${checkIn.days === 1 ? 'day' : 'days'}`}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={14} color="#71717a" />
+          </TouchableOpacity>
+        )}
+
+        {/* ============================================================
+            WEIGHT — demoted from a hero to a plain row.
+
+            It used to carry the same glowing border as the check-in, and
+            two heroes stacked on one screen means neither is one. The
+            check-in keeps the treatment because it EXPIRES; weight is
+            history, always there, and never needs to shout.
             ============================================================ */}
         <TouchableOpacity
-          style={[styles.heroLink, { borderColor: themeColor, shadowColor: themeColor }]}
+          style={styles.row}
           onPress={openWeightTracker}
-          activeOpacity={0.85}
+          activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Open weight tracker"
+          accessibilityLabel="Open weight history"
         >
-          <View style={[styles.heroLinkIcon, { backgroundColor: themeColor }]}>
-            <Ionicons name="scale-outline" size={22} color="#0a0a0b" />
+          <View style={styles.rowIcon}>
+            <Ionicons name="scale-outline" size={20} color="#a1a1aa" />
           </View>
-          <View style={styles.heroLinkText}>
-            <Text style={styles.heroLinkTitle}>Weight tracker</Text>
-            <Text style={styles.heroLinkSub}>Log your weight and see progress over time</Text>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Weight</Text>
+            <Text style={styles.rowSub}>Your history, trend, and goal</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#71717a" />
+          <Ionicons name="chevron-forward" size={14} color="#71717a" />
         </TouchableOpacity>
 
         {/* ============================================================
@@ -646,6 +727,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroLinkText: { flex: 1 },
+  // The dot sits inline with the title rather than floating on the icon: it is
+  // a state marker, not a count, and it should read as part of the sentence.
+  checkInTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  checkInDot: { width: 7, height: 7, borderRadius: 4 },
   heroLinkTitle: {
     fontSize: 16,
     fontWeight: '600',

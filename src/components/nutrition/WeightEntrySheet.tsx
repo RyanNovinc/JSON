@@ -33,6 +33,7 @@ import {
   clearCrossingDismissals,
 } from '../../utils/phaseTransition';
 import type { TransitionCheck, BodyFatReading } from '../../utils/phaseTransition';
+import { loadPhaseJourney } from '../../utils/phaseJourney';
 
 /**
  * WeightEntrySheet — the single reusable bottom sheet for logging weight.
@@ -417,7 +418,19 @@ export default function WeightEntrySheet({
             const readings: BodyFatReading[] = [entry, ...history]
               .filter((e: any) => typeof e?.bodyFatPct === 'number' && e?.date)
               .map((e: any) => ({ dateISO: e.date, bodyFatPct: e.bodyFatPct }));
-            const check = evaluateTransition(profileNow, readings);
+            // The journey count is what tells evaluateTransition WHERE the
+            // user is standing. Without it the detector falls back to
+            // roadmap.phases[0] — the opener, a definition rather than a
+            // position — so it could only ever notice the FIRST crossing and
+            // nobody was advanced automatically past phase one.
+            const journey = await loadPhaseJourney();
+            const check = evaluateTransition(
+              profileNow,
+              readings,
+              undefined,
+              Date.now(),
+              journey.length,
+            );
             if (check?.crossed && (await shouldPromptForCrossing(check))) {
               transition = check;
             }

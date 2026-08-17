@@ -16,6 +16,7 @@ import { WorkoutStorage } from './storage';
 import { deriveSyntheticNutritionAnswers } from './syntheticNutritionAnswers';
 import { derivePhase } from './goalsProfile';
 import { loadGoalsProfile } from './goalsProfileStorage';
+import { leanGainKgPerYear } from './roadmap';
 
 const KEY = '@nutrition_questionnaire_answers';
 
@@ -161,7 +162,15 @@ async function recoverGoalFromProfile(
     const profile = await loadGoalsProfile();
     if (!profile?.goalWeightKg) return a;
 
-    const synth = deriveSyntheticNutritionAnswers(derivePhase(profile));
+    // Hand the lifter's own capped lean-gain rate across so a synthetic BULK
+    // rate follows what they can actually build. Without it the fallback
+    // constant applies, which is fine but generic — see the note on
+    // PHASE_SYNTH about 0.5%/wk prescribing more fat than muscle.
+    const rate = leanGainKgPerYear(profile);
+    const synth = deriveSyntheticNutritionAnswers(derivePhase(profile), {
+      leanGainKgPerWeek: rate ? (rate[0] + rate[1]) / 2 / 52 : undefined,
+      currentWeightKg: profile.currentWeightKg,
+    });
     const recovered: NutritionAnswers = { ...a, goal: synth.goal };
     if (isBlank(a.targetRatePercentage) && synth.targetRatePercentage != null) {
       recovered.targetRatePercentage = synth.targetRatePercentage;

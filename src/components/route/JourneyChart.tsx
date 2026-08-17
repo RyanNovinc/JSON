@@ -39,48 +39,87 @@ type ChartTarget = {
   domain: [number, number];
 };
 
-function buildChartTarget(profile: GoalsProfile, roadmap: Roadmap): ChartTarget {
+function buildChartTarget(
+  profile: GoalsProfile,
+  roadmap: Roadmap,
+  sparkline = false,
+): ChartTarget {
   const { X0, X1, Y0, Y1, N } = CHART;
   const start = profile.currentBodyFatPct ?? roadmap.band.ceiling + 2;
   const goal = roadmap.phases[roadmap.phases.length - 1].exitBodyFatPct;
   const { floor, ceiling } = roadmap.band;
 
   // Rounded outward to whole multiples of 2, so the axis ticks land on tidy
-  // numbers instead of 21.4 and 9.6.
-  const hi = Math.ceil((Math.max(start, ceiling) + 2) / 2) * 2;
-  const lo = Math.floor((Math.min(goal, floor) - 2) / 2) * 2;
-  const yOf = (bf: number) => Y0 + ((hi - bf) / (hi - lo)) * (Y1 - Y0);
+  // numbers instead of 21.4 and 9.6 — but ONLY when there are ticks to land
+  // on. In sparkline mode that padding is dead space: the axis ran 20 to 10
+  // while the line only ever occupied 18 to 13, leaving a third of the chart
+  // empty with a stray "10%" floating in it.
+  const hi = sparkline
+    ? Math.max(start, ceiling) + 0.6
+    : Math.ceil((Math.max(start, ceiling) + 2) / 2) * 2;
+  const lo = sparkline
+    ? Math.min(goal, floor) - 0.6
+    : Math.floor((Math.min(goal, floor) - 2) / 2) * 2;
+  // Vertical extent, not the constant. In sparkline mode the canvas is 44 tall
+  // rather than 124, so plotting against CHART.Y1 draws most of the line
+  // outside the viewBox — it renders, then gets clipped.
+  const yTop = sparkline ? 6 : Y0;
+  const yBottom = sparkline ? 38 : Y1;
+  const yOf = (bf: number) => yTop + ((hi - bf) / (hi - lo)) * (yBottom - yTop);
 
   const mid = (m: [number, number]) => (m[0] + m[1]) / 2;
+
+  /**
+   * The reveal is CONDITIONAL. When the band floor already sits below the
+   * user's goal body fat the cycles leave them leaner than they asked, and
+   * deriveRoadmap correctly omits a terminal "cut" that would run upward — so
+   * a roadmap can be three phases, not four.
+   *
+   * This used to destructure four positionally, which made `reveal` undefined
+   * and threw "Cannot read property 'estMonths' of undefined" on render.
+   */
+  const phases = roadmap.phases;
+  const hasReveal = phases.length > 1 && phases[phases.length - 1].kind === 'reveal';
+
   const way: Array<[number, number]> = [];
-  if (roadmap.phases.length === 1) {
-    way.push([mid(roadmap.phases[0].estMonths), goal]);
+  if (phases.length === 1) {
+    way.push([mid(phases[0].estMonths), goal]);
   } else {
-    const [opener, blockA, blockB, reveal] = roadmap.phases;
+    const opener = phases[0];
+    const blockA = phases[1];
+    const blockB = phases[2];
     way.push([mid(opener.estMonths), opener.exitBodyFatPct]);
-    for (let i = 0; i < blockA.repeats; i++) {
-      way.push([mid(blockA.estMonths), blockA.exitBodyFatPct]);
-      way.push([mid(blockB.estMonths), blockB.exitBodyFatPct]);
+    if (blockA && blockB) {
+      for (let i = 0; i < blockA.repeats; i++) {
+        way.push([mid(blockA.estMonths), blockA.exitBodyFatPct]);
+        way.push([mid(blockB.estMonths), blockB.exitBodyFatPct]);
+      }
     }
-    way.push([mid(reveal.estMonths), reveal.exitBodyFatPct]);
+    if (hasReveal) {
+      const reveal = phases[phases.length - 1];
+      way.push([mid(reveal.estMonths), reveal.exitBodyFatPct]);
+    }
   }
 
   const total = way.reduce((a, w) => a + w[0], 0);
 
   let stripB: [number, number] = [X0, X0];
-  let stripLabels: [string, string, string] = ['', '', 'Reveal'];
-  if (roadmap.phases.length > 1) {
-    const [opener, blockA, , reveal] = roadmap.phases;
+  let stripLabels: [string, string, string] = ['', '', ''];
+  if (phases.length > 1) {
+    const opener = phases[0];
     const openerShare = mid(opener.estMonths) / total;
-    const revealShare = mid(reveal.estMonths) / total;
+    // No reveal means the cycles run to the end of the chart, so the third
+    // segment has zero width and no label rather than an empty box marked
+    // "Reveal".
+    const revealShare = hasReveal ? mid(phases[phases.length - 1].estMonths) / total : 0;
     stripB = [X0 + openerShare * (X1 - X0), X0 + (1 - revealShare) * (X1 - X0)];
-    const a = roadmap.phases[1];
-    const b = roadmap.phases[2];
+    const a = phases[1];
+    const b = phases[2];
     const cap = (k: string) => k.charAt(0).toUpperCase() + k.slice(1);
     stripLabels = [
-      cap(opener.kind === 'recomp' ? 'recomp' : opener.kind),
-      `${cap(a.kind)} and ${b.kind} \u00d7${a.repeats}`,
-      'Reveal',
+      cap(opener.kind),
+      a && b ? `${cap(a.kind)} and ${b.kind} \u00d7${a.repeats}` : '',
+      hasReveal ? 'Reveal' : '',
     ];
   }
 
@@ -119,6 +158,7 @@ export default function JourneyChart({
   color,
   bare = false,
   strip,
+  sparkline = false,
 }: {
   profile: GoalsProfile;
   roadmap: Roadmap;
@@ -132,8 +172,22 @@ export default function JourneyChart({
    *  without the floating labels, since it is the only screen that explains
    *  the shape of the plan. */
   strip?: boolean;
+  /**
+   * Line only: no band, no endpoint dots, no labels, no axis, no strip, and a
+   * domain tightened to the line itself.
+   *
+   * For places where the roadmap is CONTEXT rather than the subject — the
+   * Create screen sits it under a question about today, where a full chart
+   * with axis ticks reads as a widget bolted to the bottom of the screen. It
+   * still draws the user's real phases; it just stops asking to be read as
+   * data.
+   */
+  sparkline?: boolean;
 }) {
-  const target = React.useMemo(() => buildChartTarget(profile, roadmap), [profile, roadmap]);
+  const target = React.useMemo(
+    () => buildChartTarget(profile, roadmap, sparkline),
+    [profile, roadmap, sparkline],
+  );
 
   const shown = useRef<ChartTarget>({ ...target, ys: target.ys.slice() });
   const anim = useRef(new Animated.Value(1)).current;
@@ -158,6 +212,10 @@ export default function JourneyChart({
           from.stripB[1] + (target.stripB[1] - from.stripB[1]) * value,
         ],
         stripLabels: target.stripLabels,
+        // Was omitted, which is the tsc error on this object: the axis ticks
+        // read target.domain directly so nothing broke visually, but the frame
+        // object was not a ChartTarget.
+        domain: target.domain,
       };
       bump((v) => v + 1);
     });
@@ -186,6 +244,14 @@ export default function JourneyChart({
   const goalBf = roadmap.phases[roadmap.phases.length - 1].exitBodyFatPct;
   const { floor, ceiling } = roadmap.band;
 
+  // One source of truth for whether the phase strip is drawn, used for the
+  // canvas height as well as the render. The height used to key off `bare`
+  // while the strip keyed off `strip ?? !bare`, so a caller passing
+  // strip={false} with labels on reserved 36pt for a strip it never drew —
+  // the dead space under the route card on Create.
+  const showStrip = sparkline ? false : strip ?? !bare;
+  const svgHeight = sparkline ? 44 : showStrip ? 160 : 124;
+
   const stripY = Y1 + 18;
   const stripLabelY = stripY + 18;
   const seg1w = Math.max(0, cur.stripB[0] - X0 - 2);
@@ -193,18 +259,20 @@ export default function JourneyChart({
   const seg3w = Math.max(0, X1 - cur.stripB[1] - 2);
 
   return (
-    <Svg width="100%" height={bare && !strip ? 124 : 160} viewBox={`0 0 320 ${bare && !strip ? 124 : 160}`}>
-      <Rect
-        x={X0}
-        y={cur.bandTop}
-        width={X1 - X0}
-        height={Math.max(0, cur.bandBottom - cur.bandTop)}
-        rx={8}
-        fill={`${color}1a`}
-      />
+    <Svg width="100%" height={svgHeight} viewBox={`0 0 320 ${svgHeight}`}>
+      {sparkline ? null : (
+        <Rect
+          x={X0}
+          y={cur.bandTop}
+          width={X1 - X0}
+          height={Math.max(0, cur.bandBottom - cur.bandTop)}
+          rx={8}
+          fill={`${color}1a`}
+        />
+      )}
       {/* Without ticks the space above the band reads as a gap rather than as
           scale, which is why the chart looked emptier than the mockup. */}
-      {bare
+      {bare && !sparkline
         ? [0, 1, 2, 3].map((i) => {
             const [lo, hi] = target.domain;
             const pct = hi - ((hi - lo) * i) / 3;
@@ -217,7 +285,7 @@ export default function JourneyChart({
           })
         : null}
 
-      {bare ? null : (
+      {bare || sparkline ? null : (
         <>
           <SvgText x={X1 + 2} y={cur.bandTop + 4} fontSize={9} fill="#5c5c62">
             {`${ceiling}%`}
@@ -227,11 +295,23 @@ export default function JourneyChart({
           </SvgText>
         </>
       )}
-      <Path d={d} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-      <Circle cx={X0} cy={cur.startY} r={8} fill={`${color}2e`} />
-      <Circle cx={X0} cy={cur.startY} r={4.5} fill={color} />
-      <Circle cx={X1} cy={cur.ys[N - 1]} r={3.5} fill="#131316" stroke="#8e8e93" strokeWidth={1.5} />
-      {bare ? null : (
+      <Path
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth={sparkline ? 1.8 : 2.5}
+        strokeOpacity={sparkline ? 0.55 : 1}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {sparkline ? null : (
+        <>
+          <Circle cx={X0} cy={cur.startY} r={8} fill={`${color}2e`} />
+          <Circle cx={X0} cy={cur.startY} r={4.5} fill={color} />
+          <Circle cx={X1} cy={cur.ys[N - 1]} r={3.5} fill="#131316" stroke="#8e8e93" strokeWidth={1.5} />
+        </>
+      )}
+      {bare || sparkline ? null : (
         <>
           <SvgText x={X0 + 14} y={Math.max(11, cur.startY - 9)} fontSize={11} fill={color}>
             {startBf != null ? `You \u00b7 ${Math.round(startBf)}%` : 'You'}
@@ -248,7 +328,7 @@ export default function JourneyChart({
         </>
       )}
 
-      {(strip ?? !bare) ? (
+      {showStrip ? (
         <>
       {seg1w > 0 ? <Rect x={X0} y={stripY} width={seg1w} height={6} rx={3} fill={color} /> : null}
       <Rect
@@ -282,15 +362,17 @@ export default function JourneyChart({
           {cur.stripLabels[1]}
         </SvgText>
       ) : null}
-      <SvgText
-        x={Math.min(X1 - 14, cur.stripB[1] + Math.max(16, (X1 - cur.stripB[1]) / 2))}
-        y={stripLabelY}
-        fontSize={10}
-        fill="#8e8e93"
-        textAnchor="middle"
-      >
-        {cur.stripLabels[2]}
-      </SvgText>
+      {cur.stripLabels[2] ? (
+        <SvgText
+          x={Math.min(X1 - 14, cur.stripB[1] + Math.max(16, (X1 - cur.stripB[1]) / 2))}
+          y={stripLabelY}
+          fontSize={10}
+          fill="#8e8e93"
+          textAnchor="middle"
+        >
+          {cur.stripLabels[2]}
+        </SvgText>
+      ) : null}
         </>
       ) : null}
     </Svg>

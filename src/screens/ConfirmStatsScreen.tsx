@@ -10,6 +10,8 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -30,10 +32,16 @@ import {
   continueNutritionFlow,
 } from '../utils/questionnaireRouting';
 import WeightEntrySheet from '../components/nutrition/WeightEntrySheet';
-import BodyFatField, {
+import {
   emptyBodyFatValue,
+  resolveBodyFat,
   type BodyFatFieldValue,
 } from '../components/BodyFatField';
+import RouteBodyFatField from '../components/route/RouteBodyFatField';
+import {
+  loadBodyFatReadings,
+  recordBodyFatReading,
+} from '../utils/bodyFatHistory';
 
 /**
  * ConfirmStatsScreen — the lightweight touchpoint for returning users
@@ -98,6 +106,48 @@ function validateHeight(raw: string): string | null {
   return null;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Past this, a number is old enough to distort a plan built from it. */
+const WEIGHT_STALE_DAYS = 14;
+const BODY_FAT_STALE_DAYS = 45;
+
+// The verb is a parameter because "Logged" and "Estimated" are the one thing
+// distinguishing these two rows. A single "Updated" for both throws that away.
+function ageLabel(days: number | null, verb: string): string | null {
+  if (days == null) return null;
+  if (days <= 0) return `${verb} today`;
+  if (days === 1) return `${verb} yesterday`;
+  if (days < 14) return `${verb} ${days} days ago`;
+  if (days < 60) return `${verb} ${Math.round(days / 7)} weeks ago`;
+  return `${verb} months ago`;
+}
+
+/** A real radial gradient, not an approximation of one. The first version
+ *  stacked eight translucent discs, which banded visibly: eight steps at 100px
+ *  spacing reads as rings, and the alphas accumulated into a flat tint over the
+ *  whole screen rather than light falling off from a point.
+ *
+ *  The stops match the mockup exactly: peak alpha at the centre, fully
+ *  transparent by 68% of the radius, so it has died out before it reaches the
+ *  stat rows. */
+function Glow({ color }: { color: string }) {
+  return (
+    <View style={styles.glowWrap} pointerEvents="none">
+      <Svg width="100%" height="100%">
+        <Defs>
+          <RadialGradient id="confirmStatsGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor={color} stopOpacity={0.13} />
+            <Stop offset="0.68" stopColor={color} stopOpacity={0} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#confirmStatsGlow)" />
+      </Svg>
+    </View>
+  );
+}
+
 type Nav = StackNavigationProp<RootStackParamList, 'ConfirmStats'>;
 type RouteProps = RouteProp<RootStackParamList, 'ConfirmStats'>;
 
@@ -119,6 +169,7 @@ export default function ConfirmStatsScreen() {
   const [currentWeightKg, setCurrentWeightKg] = useState<number | null>(null);
   const [weightDisplay, setWeightDisplay] = useState('');
   const [weightSheetVisible, setWeightSheetVisible] = useState(false);
+  const [bfSheetVisible, setBfSheetVisible] = useState(false);
   // The same three-mode field the intake uses. It used to be a plain number
   // box here, which meant the estimator was unreachable for anyone who
   // already had a profile — most users, most of the time.
@@ -136,6 +187,13 @@ export default function ConfirmStatsScreen() {
   const [sex, setSex] = useState<Sex | null>(null);
   const [ageInput, setAgeInput] = useState('');
   const [heightInput, setHeightInput] = useState('');
+
+  // How old each number is. The old screen asked "still accurate?" while
+  // showing values with no dates, which is a question the user had no way to
+  // answer. Now the screen answers it and only flags what has actually gone
+  // stale.
+  const [weightAgeDays, setWeightAgeDays] = useState<number | null>(null);
+  const [bodyFatAgeDays, setBodyFatAgeDays] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -160,6 +218,59 @@ export default function ConfirmStatsScreen() {
       if (profile?.ageYears != null) setAgeInput(String(profile.ageYears));
       if (profile?.heightCm != null) setHeightInput(String(profile.heightCm));
 
+      // Read straight from the key rather than through WorkoutStorage. An
+      // earlier version imported that module as a default export, which it may
+      // not be — the whole block then threw on its first line and the catch
+      // swallowed it, so both dates silently never appeared. Reading the key
+      // has no such dependency, and this only needs the newest timestamp, not
+      // the write queue and quarantine machinery the helper exists for.
+      let entries: any[] = [];
+      try {
+        const raw = await AsyncStorage.getItem('weight_tracking_history');
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) entries = parsed;
+      } catch {
+        // leave it unknown: a missing date costs a label, never a value
+      }
+
+      // Sorted rather than assumed newest-last: several screens append here and
+      // nothing guarantees the order.
+      const byDate = (arr: any[]) =>
+        arr.filter((e) => e?.date).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+
+      const latestWeight = byDate(entries);
+      if (latestWeight?.date) {
+        const days = Math.floor((Date.now() - new Date(latestWeight.date).getTime()) / DAY_MS);
+        if (Number.isFinite(days)) setWeightAgeDays(days);
+      }
+
+      try {
+        // Sorted here rather than trusting the stored order. recordBodyFatReading
+        // does sort before every write, so today this is belt and braces, but the
+        // weight lookup directly above already distrusts array order, and having
+        // the two halves of one block disagree is how the next writer gets it wrong.
+        const readings = [...(await loadBodyFatReadings())].sort((a, b) =>
+          a.dateISO.localeCompare(b.dateISO),
+        );
+        const latest = readings[readings.length - 1];
+        if (latest) {
+          const days = Math.floor((Date.now() - new Date(latest.dateISO).getTime()) / DAY_MS);
+          if (Number.isFinite(days)) setBodyFatAgeDays(days);
+        } else {
+          // Fall back to a reading logged alongside a weigh-in. The dedicated
+          // store only has data from screens routed through it, and four others
+          // still write the profile scalar with no date, so an empty store does
+          // not mean the user has never estimated.
+          const withBf = byDate(entries.filter((e: any) => e?.bodyFatPct != null));
+          if (withBf?.date) {
+            const days = Math.floor((Date.now() - new Date(withBf.date).getTime()) / DAY_MS);
+            if (Number.isFinite(days)) setBodyFatAgeDays(days);
+          }
+        }
+      } catch {
+        // leave it unknown
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -179,6 +290,12 @@ export default function ConfirmStatsScreen() {
         await updateGoalsProfileField('currentBodyFatPct', newBodyFatPct);
         if (newBodyFatPct != null) {
           await updateGoalsProfileField('bodyFatSource', bodyFat.source);
+          // bodyFatHistory.ts names this screen as one of four that write the
+          // bare profile scalar and leave no dated reading behind. Without this
+          // the age label above can only ever come from the weight-entry
+          // fallback, so a user who only ever estimates here sees no date, and
+          // the stale marking can never fire.
+          await recordBodyFatReading(newBodyFatPct, bodyFat.source, 'ConfirmStatsScreen');
         }
       }
 
@@ -213,7 +330,14 @@ export default function ConfirmStatsScreen() {
 
   const ageError = validateAge(ageInput);
   const heightError = validateHeight(heightInput);
+  const resolvedBodyFat = resolveBodyFat(bodyFat, sex ?? undefined, heightCm);
   const showTopUp = needSex || needAge || needHeight || needActivity;
+
+  // Stale is MARKED, never blocking. It is their body, and a number they have
+  // not updated is not the same as one the plan cannot be built without.
+  const weightStale = weightAgeDays != null && weightAgeDays >= WEIGHT_STALE_DAYS;
+  const bodyFatStale = bodyFatAgeDays != null && bodyFatAgeDays >= BODY_FAT_STALE_DAYS;
+  const anythingStale = weightStale || bodyFatStale;
   const sexForField = sex;
 
   // Missing fields must be filled to continue. They are not decoration: without
@@ -235,9 +359,10 @@ export default function ConfirmStatsScreen() {
 
   return (
     <View style={styles.container}>
+      <Glow color={themeColor} />
+      {/* No centred title. "Quick check" two lines above a 34pt headline was
+          two titles competing for the same job. */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <View style={{ width: 36 }} />
-        <Text style={styles.topBarTitle}>Quick check</Text>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={handleClose}
@@ -262,13 +387,16 @@ export default function ConfirmStatsScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          <Text style={styles.eyebrow}>BEFORE WE BUILD</Text>
           <Text style={styles.title}>
-            {showTopUp ? 'A couple of new details' : 'Still accurate?'}
+            {showTopUp ? 'A couple of gaps.' : anythingStale ? 'Worth a check.' : 'These still right?'}
           </Text>
           <Text style={styles.subtitle}>
             {showTopUp
-              ? 'Your plans now use these to work out realistic targets. One time only.'
-              : "Your targets are calculated from these. Update anything that's changed."}
+              ? 'The plan cannot be built without these. Height sets the plausibility check, and sex decides which body fat ranges apply to you.'
+              : anythingStale
+                ? 'Your plan is calculated from these, and one of them has not moved in a while.'
+                : 'Your plan is calculated from them. Change anything that has moved.'}
           </Text>
 
           {needSex ? (
@@ -385,36 +513,74 @@ export default function ConfirmStatsScreen() {
 
           {showTopUp ? <View style={styles.divider} /> : null}
 
+          {/* Plain list rows: no card surface, no border, no icon tile. Two
+              bordered cards for two values made the screen feel like a form to
+              be completed rather than a list to be glanced at, which is the
+              opposite of what a quick check is for. A hairline between them is
+              enough separation. */}
           <TouchableOpacity
-            style={styles.inputRow}
+            style={styles.statRow}
             onPress={() => setWeightSheetVisible(true)}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Current weight"
           >
-            <View style={styles.inputRowIcon}>
-              <Ionicons name="scale-outline" size={18} color="#a1a1aa" />
-            </View>
-            <View style={styles.inputRowContent}>
-              <Text style={styles.inputRowLabel}>Current weight</Text>
+            <View style={styles.statRowBody}>
+              <Text style={styles.statRowLabel}>Current weight</Text>
               {weightDisplay ? (
-                <Text style={[styles.inputRowValue, { color: themeColor }]}>{weightDisplay}</Text>
+                <Text style={styles.statRowValue}>{weightDisplay}</Text>
               ) : (
-                <Text style={styles.inputRowPlaceholder}>Tap to enter</Text>
+                <Text style={styles.statRowUnset}>Not set</Text>
               )}
+              {ageLabel(weightAgeDays, 'Logged') ? (
+                <Text style={[styles.statRowAge, weightStale && styles.statRowAgeStale]}>
+                  {ageLabel(weightAgeDays, 'Logged')}
+                </Text>
+              ) : null}
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#52525b" />
+            <Ionicons name="chevron-forward" size={14} color="#3f3f46" />
           </TouchableOpacity>
 
-          <Text style={styles.groupLabel}>
-            Body fat <Text style={styles.optionalTag}>optional</Text>
-          </Text>
-          <BodyFatField
-            value={bodyFat}
-            onChange={setBodyFat}
-            sex={sexForField ?? undefined}
-            heightCm={heightCm}
-            weightKg={currentWeightKg ?? undefined}
-            themeColor={themeColor}
-          />
+          {/* A row, matching weight, rather than an inline field with a method
+              picker above it. The three method buttons made "how do you want
+              to answer" the first decision on a screen whose whole point is a
+              glance and a tap, and the estimator already offers those paths
+              inside itself. */}
+          <TouchableOpacity
+            style={styles.statRow}
+            onPress={() => setBfSheetVisible(true)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Body fat"
+          >
+            <View style={styles.statRowBody}>
+              <Text style={styles.statRowLabel}>Body fat</Text>
+              {resolvedBodyFat != null ? (
+                <Text style={styles.statRowValue}>{Math.round(resolvedBodyFat)}%</Text>
+              ) : (
+                <Text style={styles.statRowUnset}>Not set</Text>
+              )}
+              {ageLabel(bodyFatAgeDays, 'Estimated') ? (
+                <Text style={[styles.statRowAge, bodyFatStale && styles.statRowAgeStale]}>
+                  {ageLabel(bodyFatAgeDays, 'Estimated')}
+                </Text>
+              ) : null}
+            </View>
+            <Ionicons name="chevron-forward" size={14} color="#3f3f46" />
+          </TouchableOpacity>
+          {/* Mounted collapsed: only its estimator sheet is wanted here, not
+              its scale, which would duplicate the row above. */}
+          <View style={styles.hiddenField} pointerEvents="box-none">
+            <RouteBodyFatField
+              value={bodyFat}
+              onChange={setBodyFat}
+              sex={sexForField ?? undefined}
+              heightCm={heightCm}
+              themeColor={themeColor}
+              estimatorOpen={bfSheetVisible}
+              onCloseEstimator={() => setBfSheetVisible(false)}
+            />
+          </View>
         </ScrollView>
 
         <View style={[styles.ctaBar, { paddingBottom: insets.bottom + 16 }]}>
@@ -446,6 +612,12 @@ export default function ConfirmStatsScreen() {
               </Text>
             )}
           </TouchableOpacity>
+
+          {/* The ghost "Nothing has changed" button used to sit here. It called
+              handleContinue, exactly as the button above does. Editing happens
+              in the rows, so proceeding after an edit and proceeding without
+              one are the same act, and offering two controls for it implied a
+              difference that did not exist. */}
         </View>
       </KeyboardAvoidingView>
 
@@ -480,9 +652,21 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 14,
+  },
+  // Every size below was previously the value drawn in a 310px mockup frame,
+  // copied unchanged onto a 393pt screen. That is 27% wider, which is why the
+  // built screen read as a quarter too small and floated in empty space.
+  glowWrap: {
+    position: 'absolute',
+    left: -190,
+    top: -210,
+    width: 760,
+    height: 760,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   topBarTitle: {
     fontSize: 15,
@@ -509,18 +693,38 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   title: {
-    fontSize: 26,
+    fontSize: 34,
     fontWeight: '700',
     color: '#ffffff',
-    lineHeight: 32,
-    marginBottom: 8,
+    lineHeight: 40,
+    letterSpacing: -1,
+    marginBottom: 10,
   },
   subtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.5)',
-    lineHeight: 20,
-    marginBottom: 28,
+    fontSize: 16,
+    color: '#71717a',
+    lineHeight: 23,
+    marginBottom: 34,
   },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 17,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#17171a',
+  },
+  statRowBody: { flex: 1 },
+  statRowLabel: { fontSize: 15, color: '#8e8e93' },
+  statRowValue: { fontSize: 19, fontWeight: '700', color: '#e4e4e7', marginTop: 4 },
+  // Amber, not grey. A field the plan cannot be built without was rendering in
+  // the faintest colour on the screen, which put the only blocking state below
+  // the merely stale one in visual priority.
+  statRowUnset: { fontSize: 19, fontWeight: '600', color: '#f0b429', marginTop: 4 },
+  statRowAge: { fontSize: 12.5, color: '#5b5b62', marginTop: 4 },
+  // Amber, not red: an old number is a gap to close, not an error.
+  statRowAgeStale: { color: '#f0b429' },
+
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -548,14 +752,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#a1a1aa',
     marginBottom: 4,
-  },
-  inputRowValue: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  inputRowPlaceholder: {
-    fontSize: 15,
-    color: '#52525b',
   },
   inlineInput: {
     fontSize: 15,
@@ -629,6 +825,11 @@ const styles = StyleSheet.create({
     color: '#52525b',
     fontWeight: '400',
   },
+  // Height zero, overflow hidden: the component renders a scale we do not want
+  // here, but its estimator modal is the one we do.
+  hiddenField: { height: 0, overflow: 'hidden' },
+  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: '#5b5b62', marginBottom: 10 },
+
   ctaBar: {
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -637,13 +838,13 @@ const styles = StyleSheet.create({
     borderTopColor: '#18181b',
   },
   ctaButton: {
-    height: 54,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ctaText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
   },
 });

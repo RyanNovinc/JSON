@@ -28,7 +28,15 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import Svg, { Path, Rect, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Path,
+  Rect,
+  Circle,
+  Defs,
+  RadialGradient,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,7 +47,10 @@ import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 import { getCreateImage } from '../assets/createImages';
 import { loadGoalsProfile } from '../utils/goalsProfileStorage';
 import { deriveRoadmap, type Roadmap } from '../utils/roadmap';
+import JourneyChart from '../components/route/JourneyChart';
+import { expandPhases, phasesAt, loadPhaseJourney } from '../utils/phaseJourney';
 import { startWorkoutFlow, startNutritionFlow } from '../utils/questionnaireRouting';
+import { isRouteComplete, firstUnansweredBeat } from '../utils/routeCompletion';
 import type { GoalsProfile } from '../utils/goalsProfile';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
@@ -69,13 +80,15 @@ export default function CreateChooserScreen() {
 
   const [profile, setProfile] = useState<GoalsProfile | null>(null);
   const [checked, setChecked] = useState(false);
+  const [completedPhases, setCompletedPhases] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      loadGoalsProfile().then((p) => {
+      Promise.all([loadGoalsProfile(), loadPhaseJourney()]).then(([p, journey]) => {
         if (cancelled) return;
         setProfile(p);
+        setCompletedPhases(journey.length);
         setChecked(true);
       });
       return () => {
@@ -85,19 +98,20 @@ export default function CreateChooserScreen() {
   );
 
   const roadmap = profile ? deriveRoadmap(profile, profile.routePreference ?? 'balanced') : null;
-  const hasRoute = !!roadmap;
+  const routeComplete = isRouteComplete(profile);
 
   const handleClose = () => navigation.goBack();
 
   const openRoute = () => {
-    if (hasRoute) navigation.navigate('Route', {});
+    if (routeComplete) navigation.navigate('RouteSummary');
+    else if (profile) navigation.navigate('Route', { startBeat: firstUnansweredBeat(profile) });
     else navigation.navigate('GoalsIntake', { nextFlow: 'workout' });
   };
 
   const handleSelect = async (option: CreateOption) => {
-    // Locked until there is a route. Tapping sends them to the thing that
+    // Locked until the route is finished. Tapping sends them to the thing that
     // unlocks it rather than doing nothing, so the card is never a dead end.
-    if (!hasRoute) {
+    if (!routeComplete) {
       openRoute();
       return;
     }
@@ -107,6 +121,28 @@ export default function CreateChooserScreen() {
 
   return (
     <View style={styles.container}>
+      {/* The glow every other screen in this flow has and this one never did —
+          RouteScreen and RouteSummaryScreen both carry it, so Create was the
+          odd one out on a flat black background.
+          
+          Same values as RouteSummaryScreen: 760px, peak alpha 0.13, transparent
+          by the edge, anchored off the top left corner. It follows themeColor
+          rather than being hardcoded cyan. */}
+      <View
+        style={[styles.glow, { width: GLOW, height: GLOW, left: -GLOW * 0.24, top: -GLOW * 0.22 }]}
+        pointerEvents="none"
+      >
+        <Svg width="100%" height="100%">
+          <Defs>
+            <RadialGradient id="createGlow" cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor={themeColor} stopOpacity={0.13} />
+              <Stop offset="1" stopColor={themeColor} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#createGlow)" />
+        </Svg>
+      </View>
+
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
           style={styles.closeButton}
@@ -120,94 +156,63 @@ export default function CreateChooserScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>What do you want{'\n'}to create?</Text>
-          <Text style={styles.subtitle}>
-            {hasRoute
-              ? 'Both plans are built from your route, so they pull the same way.'
-              : 'Your route comes first — both plans are built from it.'}
-          </Text>
+      {/* No ScrollView. The screen is a question and two answers, with the
+          route pinned to the base — everything fits, and a scrollable list of
+          two items invites a scroll that does nothing.
+
+          The photographic plan cards are gone. They were the loudest thing on
+          a screen whose whole job is one binary choice, and they pushed the
+          route below the fold. */}
+      <View style={styles.stage}>
+        <Text style={styles.title}>What are{'\n'}we making{'\n'}today?</Text>
+
+        <View style={styles.choices}>
+          {OPTIONS.map((option) => {
+            const locked = checked && !routeComplete;
+            return (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.choice}
+                onPress={() => handleSelect(option)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={option.title}
+                accessibilityState={{ disabled: locked }}
+              >
+                <View style={styles.choiceBody}>
+                  <Text style={[styles.choiceTitle, locked && styles.choiceTitleLocked]}>
+                    {option.id === 'workout' ? 'A workout plan' : 'A meal plan'}
+                  </Text>
+                  {locked ? (
+                    <Text style={styles.choiceHint}>Unlocks once your route is set</Text>
+                  ) : null}
+                </View>
+                <Ionicons
+                  name={locked ? 'lock-closed-outline' : 'chevron-forward'}
+                  size={locked ? 15 : 16}
+                  color="#3f3f46"
+                />
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* ── The route ──────────────────────────────────────────────────── */}
-        {checked ? (
-          <>
-            {hasRoute && roadmap && profile ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
+          {checked ? (
+            routeComplete && roadmap && profile ? (
               <RouteSummary
+                profile={profile}
                 roadmap={roadmap}
-                currentBodyFatPct={profile.currentBodyFatPct}
+                completedPhases={completedPhases}
                 themeColor={themeColor}
                 onPress={openRoute}
               />
             ) : (
               <RouteInvite themeColor={themeColor} onPress={openRoute} />
-            )}
-          </>
-        ) : null}
-
-        {/* ── The plans ──────────────────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>Your plans</Text>
-
-        {checked && !hasRoute ? (
-          <View style={styles.lockNote}>
-            <Ionicons name="lock-closed-outline" size={13} color="#71717a" />
-            <Text style={styles.lockNoteText}>Unlocks once your route is set</Text>
-          </View>
-        ) : null}
-
-        {OPTIONS.map((option) => {
-          const imageSource = getCreateImage(option.id);
-          const accent = option.id === 'nutrition' ? NUTRITION_GREEN.primary : themeColor;
-          const locked = checked && !hasRoute;
-          return (
-            <TouchableOpacity
-              key={option.id}
-              style={[styles.card, locked && styles.cardLocked]}
-              onPress={() => handleSelect(option)}
-              activeOpacity={0.9}
-              accessibilityRole="button"
-              accessibilityLabel={option.title}
-              accessibilityState={{ disabled: locked }}
-            >
-              <View style={styles.cardImageWrap}>
-                {imageSource ? (
-                  <Image source={imageSource} style={styles.cardImage} resizeMode="cover" />
-                ) : (
-                  <View style={[styles.cardImage, styles.cardImageFallback]} />
-                )}
-
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.85)']}
-                  style={styles.cardGradient}
-                  pointerEvents="none"
-                />
-
-                <View style={styles.cardOverlay}>
-                  <Text style={styles.cardEyebrow}>{option.eyebrow}</Text>
-                  <View style={styles.cardBottomRow}>
-                    <Text style={styles.cardTitle}>{option.title}</Text>
-                    <View
-                      style={[
-                        styles.cardArrowButton,
-                        locked
-                          ? styles.cardArrowLocked
-                          : { backgroundColor: accent, shadowColor: accent },
-                      ]}
-                    >
-                      <Ionicons
-                        name={locked ? 'lock-closed' : 'arrow-forward'}
-                        size={locked ? 17 : 20}
-                        color={locked ? '#8e8e93' : '#0a0a0b'}
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+            )
+          ) : null}
+        </View>
+      </View>
     </View>
   );
 }
@@ -216,8 +221,12 @@ export default function CreateChooserScreen() {
 
 function RouteInvite({ themeColor, onPress }: { themeColor: string; onPress: () => void }) {
   return (
+    // Still bordered, deliberately, where the filled state is not. With no
+    // route yet there is nothing to sit in the background — this is the one
+    // thing on the screen the user has to do, so it should look like a button
+    // rather than like scenery.
     <TouchableOpacity
-      style={[styles.summary, { borderColor: `${themeColor}59` }]}
+      style={[styles.invite, { borderColor: `${themeColor}59` }]}
       onPress={onPress}
       activeOpacity={0.9}
       accessibilityRole="button"
@@ -244,50 +253,78 @@ function RouteInvite({ themeColor, onPress }: { themeColor: string; onPress: () 
 }
 
 function RouteSummary({
+  profile,
   roadmap,
-  currentBodyFatPct,
+  completedPhases,
   themeColor,
   onPress,
 }: {
+  profile: GoalsProfile;
   roadmap: Roadmap;
-  currentBodyFatPct?: number;
+  completedPhases: number;
   themeColor: string;
   onPress: () => void;
 }) {
-  const current = roadmap.phases[0];
-  const last = roadmap.phases[roadmap.phases.length - 1];
-  const totalPhases = last.index;
+  /**
+   * The phase the user is STANDING IN. This card derived its TOTAL correctly
+   * and then hardcoded the POSITION to 1, so it read "Phase 1 of 10" to
+   * everyone — contradicting the route summary, the phase screen and the
+   * generation prompts the moment anyone finished a phase.
+   */
+  const legs = phasesAt(roadmap, completedPhases);
+  const current = legs.current ?? roadmap.phases[0];
 
-  const startLabel =
-    currentBodyFatPct != null ? `You · ${Math.round(currentBodyFatPct)}%` : 'You';
-  const endLabel = `Goal · ${last.exitBodyFatPct}%`;
+  // expandPhases, not `last.index`. The two agree only while a reveal exists:
+  // roadmap.phases holds DEFINITIONS with a repeats count, and the terminal
+  // reveal is conditional — omitted when the band floor already sits below the
+  // user's goal body fat. Without it, `last.index` is the collapsed block's
+  // index (3) where the route screen, which counts occurrences, says 9.
+  const totalPhases = expandPhases(roadmap).length;
+  const phaseNo = Math.min(completedPhases, totalPhases - 1) + 1;
 
+  // NO CONTAINER. The card read as a widget bolted to the bottom of the screen;
+  // this is meant to be part of the screen — the route is simply there under
+  // the question, the way a horizon sits under a skyline.
+  //
+  // What the card did usefully was announce "tappable". With it gone the
+  // chevron carries that alone, which is why it now sits inline with the phase
+  // name rather than floating in a corner.
   return (
     <TouchableOpacity
       style={styles.summary}
       onPress={onPress}
-      activeOpacity={0.9}
+      activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel="Review or change your route"
     >
       <View style={styles.summaryTop}>
-        <View style={styles.inviteHeadings}>
-          <Text style={[styles.summaryEyebrow, { color: themeColor }]}>YOUR ROUTE</Text>
-          <Text style={styles.summaryPhase}>
-            {PHASE_NAME[current.kind] ?? current.kind}
-            <Text style={styles.summaryPhaseCount}>  ·  Phase 1 of {totalPhases}</Text>
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color="#6b6b70" />
+        <Text style={[styles.summaryEyebrow, { color: themeColor }]}>YOUR ROUTE</Text>
+        <Text style={styles.summaryMeta}>
+          {PHASE_NAME[current.kind] ?? current.kind} · Phase {phaseNo} of {totalPhases}
+        </Text>
+        <Ionicons name="chevron-forward" size={15} color="#5b5b62" />
       </View>
 
+      {/* The REAL line. This card used to draw JourneyLine, whose path is a
+          hardcoded SVG string — the same squiggle for every user, every route
+          and every profile, with only the phase name and the two percentages
+          coming from the roadmap.
+          
+          It happened because JourneyLine also renders the dashed placeholder
+          for the no-route state, and the docstring says that shared geometry is
+          deliberate so setting a route reads as the card filling in. Sound
+          intent; the consequence was that the real state was built to match the
+          placeholder rather than the other way round.
+          
+          strip={false} keeps the phase-block bar off a card this small; the
+          route screen is where that belongs. */}
       <View style={styles.journey}>
-        <JourneyLine
-          color={themeColor}
-          startLabel={startLabel}
-          endLabel={endLabel}
-        />
+        <JourneyChart profile={profile} roadmap={roadmap} color={themeColor} sparkline />
       </View>
+
+      {/* Three numbers rather than a legend. The chart shows the SHAPE of the
+          plan; these say where the user is standing in it, which the line
+          cannot at this size. */}
     </TouchableOpacity>
   );
 }
@@ -295,9 +332,15 @@ function RouteSummary({
 /**
  * The journey as a single line: the operating band as a soft tint, the route
  * curving through it, a marker at YOUR end and the goal ringed at the other.
- * `ghost` renders the dashed grey placeholder for the no-route state — same
- * geometry, so setting the route reads as the card FILLING IN, not the screen
- * rearranging.
+ * GHOST ONLY as of 13 Aug 2026. The filled state now draws the user's actual
+ * phases through JourneyChart; this decorative path survives for the no-route
+ * placeholder, where there is no roadmap to draw and a suggestive shape is the
+ * honest thing to show.
+ *
+ * Do not reuse it for real data. The `ghost` prop is no longer optional in
+ * practice, and the "same geometry either way" property it was written for is
+ * gone deliberately — matching a placeholder was what kept the real card from
+ * ever showing the real plan.
  *
  * The marker sits at the start deliberately: the roadmap is re-derived fresh
  * from the current profile, so the user is always at the beginning of the
@@ -363,7 +406,11 @@ function JourneyLine({
   );
 }
 
+/** Wide enough that the falloff never shows an edge on any phone. */
+const GLOW = 760;
+
 const styles = StyleSheet.create({
+  glow: { position: 'absolute' },
   container: { flex: 1, backgroundColor: '#0a0a0b' },
   header: { paddingHorizontal: 20, paddingBottom: 4 },
   closeButton: {
@@ -376,15 +423,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  stage: { flex: 1, paddingHorizontal: 20 },
+  choices: { marginTop: 36 },
+  choice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 19,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#232327',
+  },
+  choiceBody: { flex: 1 },
+  choiceTitle: { fontSize: 22, fontWeight: '600', color: '#ffffff', letterSpacing: -0.3 },
+  choiceTitleLocked: { color: '#52525b' },
+  choiceHint: { fontSize: 13, color: '#5b5b62', marginTop: 4 },
+
+  // Pinned rather than flowed: the route is the base of the screen, and the
+  // space above it is deliberate rather than left over.
+  footer: { marginTop: 'auto' },
+
+
   titleBlock: { paddingTop: 24, paddingBottom: 26 },
   title: {
     color: '#ffffff',
-    fontSize: 36,
+    // Bigger, and pushed down: the question is now the whole top of the
+    // screen rather than a header above a list of cards. 40 rather than 74
+    // because the route block below has to fit without scrolling.
+    marginTop: 40,
+    fontSize: 40,
     fontWeight: '700',
-    letterSpacing: -0.6,
-    lineHeight: 40,
-    marginBottom: 10,
+    letterSpacing: -1.2,
+    lineHeight: 46,
+    marginBottom: 0,
   },
   subtitle: { color: '#a1a1aa', fontSize: 15, lineHeight: 22 },
 
@@ -416,7 +486,11 @@ const styles = StyleSheet.create({
   },
 
   // ── Route summary ─────────────────────────────────────────────────────────
-  summary: {
+  // No background, no border, no radius. The only padding is vertical, so the
+  // chart runs the full width of the screen's gutter like the choice rows above
+  // it rather than being inset inside a box.
+  summary: { paddingVertical: 4 },
+  invite: {
     backgroundColor: '#131316',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#27272a',
@@ -426,10 +500,11 @@ const styles = StyleSheet.create({
   },
   summaryTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
   },
-  summaryEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, marginBottom: 6 },
+  summaryMeta: { flex: 1, fontSize: 12.5, color: '#5b5b62', textAlign: 'right' },
+  summaryEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.8 },
   summaryPhase: {
     fontSize: 21,
     fontWeight: '700',
@@ -437,7 +512,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   summaryPhaseCount: { fontSize: 13, fontWeight: '400', color: '#8e8e93', letterSpacing: 0 },
-  journey: { marginTop: 12 },
+  journey: { marginTop: 8, marginHorizontal: -4 },
 
   // ── Lock note ─────────────────────────────────────────────────────────────
   lockNote: {

@@ -392,40 +392,51 @@ describe('computeCurrentLeanMass', () => {
   });
 });
 
-describe('phaseToVolumeTier', () => {
-  it('bulk → high volume tier (MAV→MRV)', () => {
-    const result = phaseToVolumeTier('bulk');
-    expect(result.tier).toBe('high');
-    expect(result.landmark).toBe('MAV→MRV');
+// These five tests used to assert a DIFFERENT tier per phase — bulk high at
+// MAV→MRV, cut low biased toward MEV, and so on. That mapping was deleted on
+// 17 Aug 2026 after two rounds of evidence review, and the tests below assert
+// the replacement: volume does not vary with the phase at all.
+//
+// Deliberately written as an INVARIANCE property rather than five assertions
+// of the same value. Five identical expectations can be satisfied one at a
+// time; a property comparing every phase against every other cannot be half
+// satisfied, and it fails loudly the moment anyone reintroduces a branch.
+describe('phaseToVolumeTier — volume does not vary with the phase', () => {
+  const ALL_PHASES = ['bulk', 'lean_bulk', 'recomp', 'maintain', 'cut'] as const;
+
+  it('returns an identical tier and landmark for every phase', () => {
+    const first = phaseToVolumeTier(ALL_PHASES[0]);
+    ALL_PHASES.forEach((phase) => {
+      const result = phaseToVolumeTier(phase);
+      expect(result.tier).toBe(first.tier);
+      expect(result.landmark).toBe(first.landmark);
+    });
   });
 
-  it('lean_bulk → high volume tier (MAV→MRV)', () => {
-    const result = phaseToVolumeTier('lean_bulk');
-    expect(result.tier).toBe('high');
-    expect(result.landmark).toBe('MAV→MRV');
-  });
-
-  it('recomp → moderate volume tier (MAV)', () => {
-    const result = phaseToVolumeTier('recomp');
-    expect(result.tier).toBe('moderate');
-    expect(result.landmark).toBe('MAV');
-  });
-
-  it('maintain → moderate volume tier (MEV→MAV)', () => {
-    const result = phaseToVolumeTier('maintain');
-    expect(result.tier).toBe('moderate');
-    expect(result.landmark).toBe('MEV→MAV');
-  });
-
-  it('cut → low volume tier (MEV→MAV, biased toward MEV)', () => {
+  // The specific value matters as well as the invariance. A future change that
+  // made every phase 'low' would satisfy the property above while quietly
+  // reinstating the cut reduction for everyone.
+  it('sits at moderate across the MEV–MAV window, never biased to an end', () => {
     const result = phaseToVolumeTier('cut');
-    expect(result.tier).toBe('low');
+    expect(result.tier).toBe('moderate');
     expect(result.landmark).toBe('MEV→MAV');
+  });
+
+  // The two deleted positions, pinned by name so a revert is unmissable.
+  it('never returns the low tier the cut used to get', () => {
+    ALL_PHASES.forEach((phase) => {
+      expect(phaseToVolumeTier(phase).tier).not.toBe('low');
+    });
+  });
+
+  it('never returns the high tier the bulk used to get', () => {
+    ALL_PHASES.forEach((phase) => {
+      expect(phaseToVolumeTier(phase).tier).not.toBe('high');
+    });
   });
 
   it('every phase returns a non-empty rationale string', () => {
-    const phases = ['bulk', 'lean_bulk', 'recomp', 'maintain', 'cut'] as const;
-    phases.forEach((phase) => {
+    ALL_PHASES.forEach((phase) => {
       expect(phaseToVolumeTier(phase).rationale.length).toBeGreaterThan(0);
     });
   });

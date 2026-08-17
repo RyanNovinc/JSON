@@ -31,7 +31,7 @@
 // an estimate label. On the one screen selling certainty, that tag is what
 // keeps it honest.
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,8 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  Alert,
+  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
@@ -49,17 +51,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import PhaseLine from '../components/route/PhaseLine';
 import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 import { getCreateImage } from '../assets/createImages';
 import { loadGoalsProfile } from '../utils/goalsProfileStorage';
 import { deriveRoadmap, type Roadmap } from '../utils/roadmap';
 import { startWorkoutFlow, startNutritionFlow } from '../utils/questionnaireRouting';
+import { sharePlanPdfFor } from '../utils/planPdf';
+import { loadPhaseJourney } from '../utils/phaseJourney';
+import { ROUTE_OPTIONS } from './RouteScreen';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
 import type { GoalsProfile } from '../utils/goalsProfile';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
 
-const BEATS = 6;
+// Four. The first phase card moved to the end of RouteScreen, and the
+// requirements now arrive complete rather than two lines then five: the drip
+// was a beat spent on suspense the list did not need.
+const BEATS = 4;
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 /** Where every beat's first line starts, as a share of screen height. Fixed so
@@ -68,6 +76,7 @@ const CONTENT_TOP = SCREEN_H * 0.2;
 
 const REQUIREMENTS: Array<[string, string]> = [
   ['Eat to your macros most days', 'Not perfectly. Most days.'],
+  ['Write the grocery list and prep the food', 'Every week, around whatever your week looks like.'],
   ['Enough hard sets per muscle, every week', 'Too few and nothing moves. Too many and you stall.'],
   ['Rest long enough between sets', 'Short rests cost you sets.'],
   ['Space your sessions to recover', 'Muscle grows between them, not during.'],
@@ -77,19 +86,13 @@ const REQUIREMENTS: Array<[string, string]> = [
 /** The same five, answered. Order matches REQUIREMENTS so the shape is already
  *  familiar by the time the ticks appear. */
 const HANDLED: Array<[string, string]> = [
-  ['Macros, meal timing and the shopping list', 'Set for this phase'],
+  ['Macros and meal timing', 'Set for this phase'],
+  ['Grocery list and meal prep', 'Written for your week'],
   ['Sets and reps per muscle, per week', 'Built into the block'],
   ['Rest timers', 'Running while you lift'],
   ['Your training split', 'Scheduled around your week'],
   ['Deloads', 'Already in the mesocycle'],
 ];
-
-const PHASE_LABEL: Record<string, string> = {
-  trim: 'Trim',
-  build: 'Build',
-  recomp: 'Recomp',
-  reveal: 'The reveal',
-};
 
 export default function RouteRevealScreen() {
   const navigation = useNavigation<NavProp>();
@@ -116,9 +119,6 @@ export default function RouteRevealScreen() {
   const roadmap: Roadmap | null = profile
     ? deriveRoadmap(profile, profile.routePreference ?? 'balanced')
     : null;
-  const first = roadmap?.phases[0];
-  const phaseName = first ? PHASE_LABEL[first.kind] ?? first.kind : 'Phase 1';
-  const months = first?.estMonths;
 
   const advance = () => {
     if (beat >= BEATS - 1) return;
@@ -132,37 +132,162 @@ export default function RouteRevealScreen() {
     });
   };
 
+  // One driver per beat, interpolated with a per row offset. Cheaper than an
+  // Animated.Value per line, and it keeps everything on the native driver
+  // because only opacity and translate are touched.
+  const stagger = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    stagger.setValue(0);
+    Animated.timing(stagger, {
+      toValue: 1,
+      duration: 900,
+      useNativeDriver: true,
+    }).start();
+  }, [beat, stagger]);
+
+  /** Fades and lifts item `i` in, starting after `i` steps of the driver. */
+  const stepIn = (i: number) => {
+    const start = Math.min(0.72, i * 0.11);
+    const end = Math.min(1, start + 0.28);
+    return {
+      opacity: stagger.interpolate({ inputRange: [start, end], outputRange: [0, 1], extrapolate: 'clamp' }),
+      transform: [
+        {
+          translateY: stagger.interpolate({
+            inputRange: [start, end],
+            outputRange: [12, 0],
+            extrapolate: 'clamp',
+          }),
+        },
+      ],
+    };
+  };
+
+  const { globalUnit } = useWeightUnit();
+  const [exporting, setExporting] = useState(false);
+
+  /**
+   * The first moment there is anything to export: the plan is locked in, so
+   * the file describes something real.
+   *
+   * Deliberately NOT offered during the questions. There is nothing to put in
+   * it until lock-in, and interrupting a ten-beat run to hand someone a
+   * document about a plan they have not finished making is the wrong trade.
+   */
+  const exportPdf = async () => {
+    if (!profile || exporting) return;
+    setExporting(true);
+    try {
+      const journey = await loadPhaseJourney();
+      const routeName =
+        ROUTE_OPTIONS.find((o) => o.id === (profile.routePreference ?? 'balanced'))?.name ??
+        'Balanced';
+      await sharePlanPdfFor(profile, journey.length, routeName, globalUnit === 'lbs');
+    } catch {
+      Alert.alert('Could not create the file', 'Try again in a moment.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const leave = () => navigation.popToTop();
   const isChooser = beat === BEATS - 1;
+
+  // The chooser gets its OWN opacity rather than sharing `fade`. `fade` is
+  // driven with useNativeDriver, which means its JavaScript side value stops
+  // updating; when the chooser mounts it reads that stale value, which is 0
+  // because fade was zeroed just before the beat changed, and it never sees the
+  // animation that already ran on the now unmounted view. Result: a fully
+  // transparent screen.
+  const chooserFade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isChooser) return;
+    chooserFade.setValue(0);
+    Animated.timing(chooserFade, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [isChooser, chooserFade]);
 
   return (
     <View style={styles.container}>
       <Glow color={themeColor} />
 
       {isChooser ? (
-        <Animated.View style={[styles.chooser, { opacity: fade, paddingTop: insets.top + 24 }]}>
-          <Text style={styles.chooserTitle}>Where do you{'\n'}want to start?</Text>
-          <Text style={styles.chooserLede}>
-            Both get built from the same route. Order is up to you.
-          </Text>
+        <Animated.View style={[styles.chooser, { opacity: chooserFade, paddingTop: insets.top + 24 }]}>
+          {/* SAME SHAPE AS THE CREATE SCREEN, deliberately. Both answer one
+              question — workout or food — and two designs for one job is how
+              they drift apart and how you end up maintaining both.
 
-          <PlanCard
-            id="workout"
-            eyebrow="TRAINING"
-            title="Start with training"
-            accent={themeColor}
-            onPress={() => startWorkoutFlow(navigation)}
-          />
-          <PlanCard
-            id="nutrition"
-            eyebrow="NUTRITION"
-            title="Start with food"
-            accent={NUTRITION_GREEN.primary}
-            onPress={() => startNutritionFlow(navigation)}
-          />
+              What the reveal adds, and Create does not: a recommendation. A
+              returning user opening Create knows what they want; someone who
+              has just answered ten questions does not. */}
+          <Text style={styles.chooserTitle}>Your plan is{'\n'}locked in.</Text>
+
+          <View style={styles.choices}>
+            <TouchableOpacity
+              style={styles.choice}
+              onPress={() => startWorkoutFlow(navigation)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Start with a workout plan, recommended"
+            >
+              <View style={styles.choiceBody}>
+                <View style={styles.choiceTitleRow}>
+                  <Text style={styles.choiceTitle}>A workout plan</Text>
+                  <View style={[styles.tag, { borderColor: `${themeColor}4d` }]}>
+                    <Text style={[styles.tagText, { color: themeColor }]}>START HERE</Text>
+                  </View>
+                </View>
+                {/* The reason is that it is SHORTER, not that the phase calls
+                    for it. A phase-based line would be wrong the moment a Trim
+                    user is still recommended the workout plan, and the whole
+                    point of recommending the same thing every time is that the
+                    justification has to hold every time. */}
+                <Text style={styles.choiceHint}>Fewer questions. The meal plan is easy to add after.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#3f3f46" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.choice}
+              onPress={() => startNutritionFlow(navigation)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Start with a meal plan"
+            >
+              <View style={styles.choiceBody}>
+                <Text style={styles.choiceTitle}>A meal plan</Text>
+                <Text style={styles.choiceHint}>Or start here instead</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#3f3f46" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Bordered, not a filled button and not a third row. Loud enough to
+              find, quiet enough that downloading a file never looks equivalent
+              to building a training plan. */}
+          <TouchableOpacity
+            style={styles.pdf}
+            onPress={exportPdf}
+            disabled={exporting}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Save my route as a PDF"
+          >
+            {exporting ? (
+              <ActivityIndicator color="#71717a" size="small" />
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={15} color={themeColor} />
+                <Text style={[styles.pdfText, { color: themeColor }]}>Save my route as a PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.exit, { marginBottom: insets.bottom + 12 }]}
+            style={[styles.exit, { marginTop: 'auto', marginBottom: insets.bottom + 12 }]}
             onPress={leave}
             activeOpacity={0.75}
             accessibilityRole="button"
@@ -180,91 +305,53 @@ export default function RouteRevealScreen() {
           >
             {beat === 0 ? (
               <>
-                <Text style={styles.eyebrow}>
-                  PHASE 1 OF {roadmap ? roadmap.phases.length : '\u2014'}
-                </Text>
-                {/* No full stop. At this size it read as a brand slide rather
-                    than a plan. */}
-                <Text style={styles.huge}>{phaseName}</Text>
-
-                {/* What actually changes in this phase, which is the question
-                    the card is answering. */}
-                {roadmap ? (
-                  <View style={styles.fromTo}>
-                    <Text style={styles.fromToNum}>
-                      {Math.round(profile?.currentBodyFatPct ?? roadmap.band.ceiling + 2)}
-                    </Text>
-                    <Text style={styles.fromToArrow}>{'\u2192'}</Text>
-                    <Text style={[styles.fromToNum, { color: themeColor }]}>
-                      {Math.round(roadmap.phases[0].exitBodyFatPct)}
-                    </Text>
-                    <Text style={styles.fromToUnit}>% body fat</Text>
-                  </View>
-                ) : null}
-
-                {months ? (
-                  <View style={styles.durRow}>
-                    <Text style={styles.durValue}>
-                      {months[0]} to {months[1]} months
-                    </Text>
-                    <Text style={styles.durTag}>ESTIMATE</Text>
-                  </View>
-                ) : null}
-
-                {/* The plan they just locked in, with this phase lit. The wow
-                    on this screen should come from seeing their own line, not
-                    from bigger type. */}
-                {roadmap && profile ? (
-                  <View style={styles.phaseLine}>
-                    <PhaseLine
-                      profile={profile}
-                      roadmap={roadmap}
-                      phaseIndex={0}
-                      color={themeColor}
-                    />
-                  </View>
-                ) : null}
-              </>
-            ) : null}
-
-            {beat === 1 || beat === 2 ? (
-              <>
                 <Text style={styles.lead}>To get this phase right,{'\n'}you&rsquo;d need to:</Text>
                 {REQUIREMENTS.map(([label, sub], i) => (
-                  <View
-                    key={label}
-                    style={[styles.row, i >= (beat === 1 ? 2 : 5) && styles.rowHidden]}
-                  >
+                  <Animated.View key={label} style={[styles.row, stepIn(i)]}>
                     <View style={styles.bullet} />
                     <View style={styles.rowBody}>
                       <Text style={styles.rowLabel}>{label}</Text>
                       <Text style={styles.rowSub}>{sub}</Text>
                     </View>
-                  </View>
+                  </Animated.View>
                 ))}
+                <Animated.View style={stepIn(REQUIREMENTS.length)}>
+                  <Text style={styles.andMore}>And more.</Text>
+                </Animated.View>
               </>
             ) : null}
 
-            {beat === 3 ? (
-              <Text style={styles.turn}>
-                That&rsquo;s a lot to hold{'\n'}in your head.{'\n'}
-                <Text style={styles.turnSoft}>You won&rsquo;t have to.</Text>
-              </Text>
+            {beat === 1 ? (
+              <>
+                <Text style={styles.turn}>
+                  That&rsquo;s a lot to hold{'\n'}in your head.
+                </Text>
+                {/* Held back deliberately: the relief has to arrive after the
+                    problem has landed, or the turn is not a turn. */}
+                <Animated.View style={stepIn(4)}>
+                  <Text style={[styles.turn, styles.turnSoft]}>You won&rsquo;t have to.</Text>
+                </Animated.View>
+              </>
             ) : null}
 
-            {beat === 4 ? (
+            {beat === 2 ? (
               <>
                 <Text style={styles.lead}>All of it is decided{'\n'}for you.</Text>
-                {HANDLED.map(([label, sub]) => (
-                  <View key={label} style={styles.row}>
+                {HANDLED.map(([label, sub], i) => (
+                  <Animated.View key={label} style={[styles.row, stepIn(i)]}>
                     <Ionicons name="checkmark" size={15} color={themeColor} style={styles.tick} />
                     <View style={styles.rowBody}>
                       <Text style={[styles.rowLabel, styles.rowLabelDone]}>{label}</Text>
                       <Text style={styles.rowSub}>{sub}</Text>
                     </View>
-                  </View>
+                  </Animated.View>
                 ))}
-                <Text style={styles.closer}>You just show up and follow it.</Text>
+                <Animated.View style={stepIn(HANDLED.length)}>
+                  <Text style={styles.andMore}>And more.</Text>
+                </Animated.View>
+                <Animated.View style={stepIn(HANDLED.length + 1)}>
+                  <Text style={styles.closer}>You just show up and follow it.</Text>
+                </Animated.View>
               </>
             ) : null}
           </Animated.View>
@@ -275,11 +362,15 @@ export default function RouteRevealScreen() {
         </Pressable>
       )}
 
-      <View style={[styles.beatDots, { bottom: insets.bottom + 16 }]} pointerEvents="none">
-        {Array.from({ length: BEATS }).map((_, i) => (
-          <View key={i} style={[styles.beatDot, i === beat && styles.beatDotOn]} />
-        ))}
-      </View>
+      {/* Not on the chooser: there is nothing left to progress through, and the
+          dots were overlapping the exit button. */}
+      {isChooser ? null : (
+        <View style={[styles.beatDots, { bottom: insets.bottom + 16 }]} pointerEvents="none">
+          {Array.from({ length: BEATS }).map((_, i) => (
+            <View key={i} style={[styles.beatDot, i === beat && styles.beatDotOn]} />
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -364,37 +455,17 @@ const styles = StyleSheet.create({
   tapArea: { flex: 1 },
   beat: { flex: 1, paddingHorizontal: 30 },
 
-  eyebrow: { fontSize: 10.5, fontWeight: '700', letterSpacing: 1.8, color: '#5b5b62', marginBottom: 14 },
-  huge: { fontSize: 40, fontWeight: '700', letterSpacing: -1.2, color: '#ffffff', marginTop: 6, marginBottom: 0 },
-  durRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  durValue: { fontSize: 21, fontWeight: '700', color: '#ffffff', letterSpacing: -0.4 },
-  fromTo: { flexDirection: 'row', alignItems: 'baseline', gap: 9, marginTop: 18 },
-  fromToNum: { fontSize: 44, fontWeight: '800', color: '#ffffff', letterSpacing: -2 },
-  fromToArrow: { fontSize: 20, color: '#3f3f46' },
-  fromToUnit: { fontSize: 15, fontWeight: '600', color: '#5b5b62' },
-  phaseLine: { marginTop: 28, marginHorizontal: -4 },
-  durTag: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.1,
-    color: '#5b5b62',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    overflow: 'hidden',
-  },
-
   lead: { fontSize: 22, fontWeight: '700', color: '#ffffff', letterSpacing: -0.5, lineHeight: 30, marginBottom: 24 },
   row: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  rowHidden: { opacity: 0 },
   bullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#3f3f46', marginTop: 8 },
   tick: { marginTop: 2, width: 16 },
   rowBody: { flex: 1 },
   rowLabel: { fontSize: 15, lineHeight: 21, color: '#a1a1aa' },
   rowLabelDone: { color: '#e4e4e7' },
   rowSub: { fontSize: 12, lineHeight: 17, color: '#5b5b62', marginTop: 2 },
+  // Sits where a row would, indented to the same text column, so it reads as
+  // the list trailing off rather than as a new sentence.
+  andMore: { fontSize: 12.5, color: '#4b4b52', marginLeft: 18, marginTop: 2 },
   closer: { fontSize: 15, lineHeight: 22, fontWeight: '500', color: '#6b6b70', marginTop: 20 },
 
   turn: { fontSize: 34, fontWeight: '700', color: '#ffffff', letterSpacing: -1.2, lineHeight: 42 },
@@ -406,7 +477,50 @@ const styles = StyleSheet.create({
   beatDotOn: { width: 12, backgroundColor: '#4b4b52' },
 
   chooser: { flex: 1, paddingHorizontal: 20 },
-  chooserTitle: { fontSize: 27, fontWeight: '700', color: '#ffffff', letterSpacing: -0.6, lineHeight: 33, marginBottom: 6 },
+  chooserTitle: {
+    marginTop: 40,
+    fontSize: 38,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: -1.1,
+    lineHeight: 44,
+  },
+
+  // Mirrors CreateChooserScreen's choice rows exactly. If one moves, move both.
+  choices: { marginTop: 30 },
+  choice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 19,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#232327',
+  },
+  choiceBody: { flex: 1 },
+  choiceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  choiceTitle: { fontSize: 22, fontWeight: '600', color: '#ffffff', letterSpacing: -0.3 },
+  choiceHint: { fontSize: 13, color: '#5b5b62', marginTop: 4 },
+  tag: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  tagText: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2 },
+
+  pdf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#1f1f23',
+    marginTop: 22,
+  },
+  pdfText: { fontSize: 13.5, fontWeight: '600' },
+
   chooserLede: { fontSize: 13.5, lineHeight: 21, color: '#71717a', marginBottom: 20 },
 
   card: { borderRadius: 20, overflow: 'hidden', marginBottom: 14, backgroundColor: '#18181b' },

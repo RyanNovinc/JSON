@@ -650,26 +650,6 @@ function previousOneRMKgBySet(
 }
 
 /**
- * The reps a weight works out to against a reference 1RM: the largest rep count
- * whose estimated 1RM does not exceed the reference. A downward search rather than
- * an inverted formula so a custom calculate1RM keeps working; 30 is the ceiling the
- * Epley default is defined over. A weight above the reference floors at "1" — the
- * honest reading of loading past last session's best. Empty string = no answer, so
- * the caller can fall through to the target-reps ghost.
- */
-function repsForWeightAgainstOneRM(
-  weightKg: number,
-  oneRMKg: number,
-  calculate1RM: (w: number, r: number) => number,
-): string {
-  if (!(weightKg > 0) || !(oneRMKg > 0)) return '';
-  for (let r = 30; r >= 1; r--) {
-    if (calculate1RM(weightKg, r) <= oneRMKg * 1.0001) return String(r);
-  }
-  return '1';
-}
-
-/**
  * The load that lines up a target rep count with a reference 1RM, in kg. Uses
  * calculate1RM(1, reps) as the rep multiplier, which is exact for any estimator
  * linear in weight (Epley, Brzycki, and every common formula are). 0 = no answer.
@@ -1125,20 +1105,44 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     }
   }, [exercises, resolveExerciseImagePair, themeColor]);
 
-  // ── Load previous-session data for every exercise (+ alternatives) ──
-  // Used both by the PREV column (most recent session) and by PR detection
-  // (best estimated 1RM across all history).
-  const [previousByExercise, setPreviousByExercise] = useState<Record<string, PreviousSets>>({});
+  // ── Load history for every exercise (+ alternatives) ──────────────
+  // Raw storage rows only. Everything that needs "last session" derives it below,
+  // from this snapshot, so there is exactly one place where the current session is
+  // excluded and one definition of what a session is.
   const [historyByExercise, setHistoryByExercise] = useState<Record<string, WorkoutHistory[]>>({});
+
+  /**
+   * Stable dependency for the loader below.
+   *
+   * `exercises` is a prop, and a parent that rebuilds the array each render hands over a
+   * new identity holding the same exercises. Keyed on the array, the loader re-read all of
+   * storage on every parent render — including the renders caused by logging a set, which
+   * is how today's own sets ended up in the "previous session" reference mid workout.
+   * Keyed on the names, it runs when the exercise list actually changes and not otherwise.
+   */
+  const exercisesRef = useRef(exercises);
+  exercisesRef.current = exercises;
+
+  const historyKey = useMemo(
+    () =>
+      exercises
+        .map((ex) =>
+          [
+            ex.exercise || ex.name || '',
+            ...((ex.alternatives || []).filter((a) => a && typeof a === 'string').map(String)),
+          ].join('>'),
+        )
+        .join('|'),
+    [exercises],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const loadHistory = async () => {
-      const prevMap: Record<string, PreviousSets> = {};
       const histMap: Record<string, WorkoutHistory[]> = {};
 
-      for (const ex of exercises) {
+      for (const ex of exercisesRef.current) {
         const names = [
           ex.exercise || ex.name || '',
           ...((ex.alternatives || []).filter((a) => a && typeof a === 'string').map(String)),
@@ -1147,21 +1151,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
         for (const name of names) {
           if (!name || histMap[name]) continue; // skip blanks / already-loaded
           try {
-            const hist = await WorkoutStorage.getExerciseHistory(name);
-            histMap[name] = hist;
-
-            // Most recent prior session → set-by-set reference
-            const sorted = [...hist].sort(
-              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-            );
-            const latestEntry = sorted[0];
-            if (latestEntry) {
-              const setsMap: PreviousSets = {};
-              latestEntry.sets.forEach((s) => {
-                setsMap[s.setNumber] = { weight: s.weight, reps: s.reps, unit: s.unit };
-              });
-              prevMap[name] = setsMap;
-            }
+            histMap[name] = await WorkoutStorage.getExerciseHistory(name);
           } catch (error) {
             // Non-fatal — just no reference for this exercise
           }
@@ -1169,7 +1159,6 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       }
 
       if (!cancelled) {
-        setPreviousByExercise(prevMap);
         setHistoryByExercise(histMap);
 
         // One line per exercise, once per screen mount. This is the snapshot the personal
@@ -1198,7 +1187,64 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [exercises]);
+  }, [historyKey]);
+
+  /**
+   * The PREV reference: the most recent session STRICTLY BEFORE this one, merged.
+   *
+   * Two things went wrong with reading it straight off the newest storage row.
+   *
+   * Today counted as history. `addWorkoutEntry` appends with no date check and
+   * `getExerciseHistory` filters by exercise only, so the moment a set was logged the
+   * newest row was today's. PREV then showed what the user had just typed, and the
+   * suggested weight was measured against the set it was supposed to be suggesting.
+   * Every row is now filtered against the session start, the same boundary the personal
+   * best check already uses, so a re-read mid workout cannot change the answer.
+   *
+   * One row is not a session. Nothing merges rows by date, so a session can be spread
+   * over several. Taking the newest row alone left most set numbers missing from the map,
+   * and a missing set number is a 0 anchor, which renders the suggested weight as blank.
+   * All rows sharing the most recent prior date are merged into one map; later rows win a
+   * duplicate set number, so a corrected re-log of set 2 beats the original.
+   */
+  const previousByExercise = useMemo(() => {
+    const sessionStart = workoutStartTime
+      ? workoutStartTime.getTime()
+      : new Date().setHours(0, 0, 0, 0);
+
+    const map: Record<string, PreviousSets> = {};
+
+    Object.entries(historyByExercise).forEach(([name, entries]) => {
+      const prior = entries.filter((entry) => {
+        const t = new Date(entry.date).getTime();
+        return Number.isFinite(t) && t < sessionStart;
+      });
+      if (prior.length === 0) return;
+
+      // Day-level grouping, not timestamp: a session's rows are written minutes apart.
+      const latestDay = prior.reduce(
+        (acc, entry) => {
+          const day = String(entry.date).slice(0, 10);
+          return day > acc ? day : acc;
+        },
+        String(prior[0].date).slice(0, 10),
+      );
+
+      const setsMap: PreviousSets = {};
+      prior
+        .filter((entry) => String(entry.date).slice(0, 10) === latestDay)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .forEach((entry) => {
+          entry.sets.forEach((s) => {
+            setsMap[s.setNumber] = { weight: s.weight, reps: s.reps, unit: s.unit };
+          });
+        });
+
+      if (Object.keys(setsMap).length > 0) map[name] = setsMap;
+    });
+
+    return map;
+  }, [historyByExercise, workoutStartTime]);
 
   // ── Timer context ──────────────────────────────────────────────────
   const { timer, stopTimer, showModal: showTimerModal } = useTimer();
@@ -1269,7 +1315,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
 
   // ── Modal state ────────────────────────────────────────────────────
   const [showFinishModal, setShowFinishModal] = useState(false);
-  // Explainer for the suggested weight/reps ghosts, opened from the info dot in
+  // Explainer for the suggested weight ghost, opened from the info dot in
   // the sets header. Keyboard dismissed first for the same reason as the 1RM modal.
   const [showSuggestionInfo, setShowSuggestionInfo] = useState(false);
   const handleShowSuggestionInfo = useCallback(() => {
@@ -1465,11 +1511,55 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     return weeklyReps ? parseTargetReps(String(weeklyReps), currentSets.length) : [];
   }, [effectiveCurrentExercise, currentWeek, currentSets.length]);
 
+  /**
+   * The suggested load for each set of the FOCUSED exercise, as a display string.
+   *
+   * Deliberately the same arithmetic as the KG ghost in SetRow, including the loose
+   * parseInt on the target: whatever is autofilled on completion has to be the exact
+   * number the user was looking at when they tapped. If these two ever diverge the app
+   * logs something the user was never shown.
+   */
+  const currentSuggestedWeights = useMemo(() => {
+    const previousSets = currentResolved
+      ? previousByExercise[currentResolved.name] || EMPTY_PREVIOUS
+      : EMPTY_PREVIOUS;
+    const anchors = previousOneRMKgBySet(
+      previousSets,
+      currentSets.length,
+      globalUnit,
+      calculate1RM,
+    );
+
+    return currentSets.map((_, i) => {
+      const target = currentTargetReps[i];
+      const targetRepsInt = target ? parseInt(target, 10) : NaN;
+      if (!Number.isFinite(targetRepsInt) || targetRepsInt <= 0 || !(anchors[i] > 0)) return '';
+      return formatSuggestedWeight(
+        weightForRepsAgainstOneRM(targetRepsInt, anchors[i], calculate1RM),
+        globalUnit,
+      );
+    });
+  }, [
+    currentResolved,
+    previousByExercise,
+    currentSets,
+    currentTargetReps,
+    globalUnit,
+    calculate1RM,
+  ]);
+
   // A set completed with blank reps is marked done but silently skips history,
   // the rest timer and the superset transition (the adapter gates history on
   // `reps`). The user saw the prescription as a placeholder and assumed it was
-  // logged, so commit it for them — but only when it is unambiguous.
-  const [pendingCompletion, setPendingCompletion] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
+  // logged, so commit it for them — but only when it is unambiguous. The same
+  // reasoning covers a blank weight: the suggested load was sitting in the field
+  // looking like a value, so a tap on the circle logs it.
+  const [pendingCompletion, setPendingCompletion] = useState<{
+    exerciseIndex: number;
+    setIndex: number;
+    awaitingReps: boolean;
+    awaitingWeight: boolean;
+  } | null>(null);
 
   // Refs so completeSet can be identity-stable for the memoised cards while always
   // reading the latest committed data. Reading refs at call time gives the same
@@ -1481,32 +1571,53 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   currentIndexRef.current = currentIndex;
   const currentTargetRepsRef = useRef(currentTargetReps);
   currentTargetRepsRef.current = currentTargetReps;
+  const currentSuggestedWeightsRef = useRef(currentSuggestedWeights);
+  currentSuggestedWeightsRef.current = currentSuggestedWeights;
 
   const completeSet = useCallback((exerciseIndex: number, setIndex: number) => {
     const set = allSetsDataRef.current[exerciseIndex]?.[setIndex];
 
-    // Un-completing, no set, or reps the user actually typed: never autofill.
-    if (!set || set.completed || set.reps?.trim()) {
+    // Un-completing or no set: nothing to fill.
+    if (!set || set.completed) {
       latest.current.onSetComplete(exerciseIndex, setIndex);
       return;
     }
 
-    // Only the focused exercise has a target array in scope.
-    const target =
-      exerciseIndex === currentIndexRef.current
-        ? currentTargetRepsRef.current[setIndex]?.trim()
-        : undefined;
+    // Only the focused exercise has its target reps and suggested loads in scope.
+    // Both arrays are indexed by set, so a swipe mid-tap can't cross them over.
+    const focused = exerciseIndex === currentIndexRef.current;
 
+    // Reps: a value the user typed always wins.
     // Defensive: a user-imported program can prescribe a range ("8-12"). We will
     // not guess which end the user hit — leave reps blank rather than invent one.
-    if (!target || !/^\d+$/.test(target) || parseInt(target, 10) <= 0) {
+    let awaitingReps = false;
+    if (focused && !set.reps?.trim()) {
+      const target = currentTargetRepsRef.current[setIndex]?.trim();
+      if (target && /^\d+$/.test(target) && parseInt(target, 10) > 0) {
+        latest.current.onSetUpdate(exerciseIndex, setIndex, 'reps', target);
+        awaitingReps = true;
+      }
+    }
+
+    // Weight: same rule, one field over. '' means there was no ghost to log —
+    // no prior anchor, or bodyweight work with nothing to suggest — and a blank
+    // weight is a legitimate log, so completion goes ahead untouched.
+    let awaitingWeight = false;
+    if (focused && !set.weight?.trim()) {
+      const suggested = currentSuggestedWeightsRef.current[setIndex];
+      if (suggested) {
+        latest.current.onSetUpdate(exerciseIndex, setIndex, 'weight', suggested);
+        awaitingWeight = true;
+      }
+    }
+
+    if (!awaitingReps && !awaitingWeight) {
       latest.current.onSetComplete(exerciseIndex, setIndex);
       return;
     }
 
-    // Write the reps, then defer completion — see the effect below for why.
-    latest.current.onSetUpdate(exerciseIndex, setIndex, 'reps', target);
-    setPendingCompletion({ exerciseIndex, setIndex });
+    // Wrote something, so defer completion — see the effect below for why.
+    setPendingCompletion({ exerciseIndex, setIndex, awaitingReps, awaitingWeight });
   }, []);
 
   // The adapter's handleSetComplete reads `allSetsData` from its render closure
@@ -1517,14 +1628,17 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   // closing over the state that already contains the reps.
   useEffect(() => {
     if (!pendingCompletion) return;
-    const { exerciseIndex, setIndex } = pendingCompletion;
+    const { exerciseIndex, setIndex, awaitingReps, awaitingWeight } = pendingCompletion;
     const set = allSetsData[exerciseIndex]?.[setIndex];
 
     if (!set || set.completed) {
       setPendingCompletion(null);
       return;
     }
-    if (!set.reps) return; // autofill not visible yet — wait for the next render
+    // Only wait on the fields this completion actually wrote. Waiting on reps when
+    // the weight was the autofilled one would hang forever on a prescribed range.
+    if (awaitingReps && !set.reps) return; // autofill not visible yet — next render
+    if (awaitingWeight && !set.weight) return;
 
     setPendingCompletion(null);
     latest.current.onSetComplete(exerciseIndex, setIndex);
@@ -1817,8 +1931,20 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       if (bestSessionKg <= 0 || !bestSet) return;
 
       // Best estimated 1RM in history — normalize each set to kg using its stored unit.
+      // Rows from THIS session are excluded, the same boundary priorBestsByExercise uses.
+      // Without that, a mid-workout history re-read put today's sets in the comparison and
+      // the session was measured against itself, so bestSessionKg > bestHistKg could never
+      // be true and the finish summary silently stopped reporting PRs.
+      const prSessionStart = workoutStartTime
+        ? workoutStartTime.getTime()
+        : new Date().setHours(0, 0, 0, 0);
       let bestHistKg = 0;
-      (historyByExercise[name] || []).forEach((h) =>
+      (historyByExercise[name] || [])
+        .filter((h) => {
+          const t = new Date(h.date).getTime();
+          return Number.isFinite(t) && t < prSessionStart;
+        })
+        .forEach((h) =>
         h.sets.forEach((s) => {
           const w = parseFloat(s.weight);
           const r = parseInt(s.reps, 10);
@@ -1851,7 +1977,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       reps: best.reps,
       estimatedOneRM: best.estimatedOneRM,
     };
-  }, [exercises, allSetsData, historyByExercise, calculate1RM, globalUnit]);
+  }, [exercises, allSetsData, historyByExercise, workoutStartTime, calculate1RM, globalUnit]);
 
   // ── Personal-best detection ──────────────────────────────────────
   // Same arithmetic as prInfo above, which computes the session's single best PR for the
@@ -2711,7 +2837,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
           </Text>
           <Text style={styles.suggestionInfoBody}>
             It holds you at the strength you already have, it doesn't add weight for
-            you. Feeling stronger? Type a heavier weight and the faint reps adjust.
+            you. Feeling stronger? Type in a heavier weight.
           </Text>
           <TouchableOpacity
             style={[
@@ -3675,14 +3801,11 @@ function SetRow({
 }: SetRowProps) {
   const completed = set.completed;
 
-  // Recommended reps for the typed weight, measured against the matching set's
-  // estimated 1RM from last session. Empty until a weight is typed or when there
-  // is no previous set to measure against.
-  const typedWeight = parseFloat(set.weight);
-  const suggestedReps =
-    Number.isFinite(typedWeight) && typedWeight > 0 && prevOneRMKg > 0
-      ? repsForWeightAgainstOneRM(toKg(typedWeight, globalUnit), prevOneRMKg, calculate1RM)
-      : '';
+  // The REPS ghost is the week's prescription and nothing else. It used to recalculate
+  // against the typed weight, which meant the prescribed number vanished the moment the
+  // user started typing — and a weight that was light against the anchor returned the
+  // search ceiling, so the cell read "30". The reps for the week are decided by the
+  // program; the 1RM arithmetic exists to suggest a WEIGHT, not to renegotiate them.
 
   // Suggested load for this set: this week's prescribed reps against the matching
   // set's estimated 1RM from last session, shown in the on-screen unit, rounded to
@@ -3812,7 +3935,7 @@ function SetRow({
             // sides normalised to kg). With no weight yet, this week's prescription
             // shows — what to hit, not what was hit last time. Last session's reps
             // are still one column to the left, under PREV.
-            placeholder={suggestedReps || targetReps || previous?.reps || ''}
+            placeholder={targetReps || previous?.reps || ''}
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
           />

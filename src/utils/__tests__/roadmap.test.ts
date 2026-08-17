@@ -24,6 +24,10 @@ import {
   leanAtNormalisedFfmi,
   splitGap,
   deriveRoadmap,
+  simulateLoss,
+  monthsToCut,
+  monthsToLoseWeight,
+  monthsToRecomp,
 } from '../roadmap';
 
 const REAL: GoalsProfile = {
@@ -215,14 +219,25 @@ describe('bandFor', () => {
 // two, the model has drifted away from the evidence and the number on the
 // user's screen is no longer defensible.
 
-/** A profile carrying `built` kg of lean mass above the untrained baseline. */
-function profileWithBuilt(builtKg: number, heightCm = 185): GoalsProfile {
+/**
+ * A profile carrying `built` kg of lean mass above the untrained baseline.
+ *
+ * trainingState defaults to 'new' so the curve-reproduction tests measure
+ * the RAW curve — pass a position-matched state when probing deeper
+ * positions, or the state cap and the conflict widening fire inside tests
+ * that exist to measure the curve itself.
+ */
+function profileWithBuilt(
+  builtKg: number,
+  heightCm = 185,
+  trainingState: GoalsProfile['trainingState'] = 'new',
+): GoalsProfile {
   const lean = leanAtNormalisedFfmi(19, heightCm) + builtKg;
   const bodyFatPct = 15;
   return {
     currentWeightKg: lean / (1 - bodyFatPct / 100),
     currentBodyFatPct: bodyFatPct,
-    trainingState: 'consistent',
+    trainingState,
     sex: 'male',
     heightCm,
   };
@@ -266,7 +281,7 @@ describe('the curve reproduces the published year-by-year magnitudes', () => {
   it('year two is half of year one', () => {
     const L = lifetimeHeadroomKg(185, 'male');
     const y1 = leanGainKgPerYear(profileWithBuilt(0))![0];
-    const y2 = leanGainKgPerYear(profileWithBuilt(L * 0.5))![0];
+    const y2 = leanGainKgPerYear(profileWithBuilt(L * 0.5, 185, 'consistent'))![0];
     // Asserted as a RATIO. Both figures are rounded to one decimal, and
     // comparing them directly puts the difference on the tolerance boundary —
     // it would fail on rounding rather than on the model being wrong.
@@ -276,7 +291,7 @@ describe('the curve reproduces the published year-by-year magnitudes', () => {
   it('year four falls in the published 1-2 kg advanced band', () => {
     const L = lifetimeHeadroomKg(185, 'male');
     const builtByYear3 = L * (1 - Math.pow(0.5, 3));
-    const mid = midpoint(leanGainKgPerYear(profileWithBuilt(builtByYear3))!);
+    const mid = midpoint(leanGainKgPerYear(profileWithBuilt(builtByYear3, 185, 'advanced'))!);
     expect(mid).toBeGreaterThanOrEqual(1);
     expect(mid).toBeLessThanOrEqual(2);
   });
@@ -316,10 +331,17 @@ describe('muscleBuiltKg', () => {
 });
 
 describe('yearsToBuild', () => {
-  it('pins the real profile at roughly 2 to 4 years of building', () => {
+  // EXPECTED MOVEMENT under the trainingState cap (13 Aug): the REAL profile
+  // reports 'consistent' with built ≈ 0, so its rate is capped at 0.28 × L ≈
+  // 5.7 kg/yr against a curve rate of 10.3 — the mid build time moves from
+  // ~2.4 to ~3.2 years, range ≈ [2.4, 4.9]. The pre-cap number promised a
+  // 10 kg novice year that "still adding weight most weeks" does not support.
+  it('pins the real profile at roughly 2.5 to 5 years of building', () => {
     const [lo, hi] = yearsToBuild(16.8, REAL)!;
-    expect(lo).toBeGreaterThan(1.5);
-    expect(hi).toBeLessThan(4.5);
+    expect(lo).toBeGreaterThan(2);
+    expect(lo).toBeLessThan(3);
+    expect(hi).toBeGreaterThan(4);
+    expect(hi).toBeLessThan(5.5);
   });
 
   it('takes longer for someone who has already used most of their headroom', () => {
@@ -365,6 +387,177 @@ describe('splitGap', () => {
 
   it('ignores a peak lighter than current weight', () => {
     expect(splitGap({ ...REAL, peakWeightKg: 70 }, 16.8).regainKg).toBe(0);
+  });
+});
+
+// ── The partition loop ─────────────────────────────────────────────────────
+//
+// First duration assertions in this file. Every bug found on 12 Aug lived in
+// the gap where no test asserted a duration; these close it for the loss side.
+
+describe('the partition loop', () => {
+  // Ryan's real starting composition: 77.3 kg at 20.4%.
+  const LEAN = 61.5;
+  const FAT = 15.8;
+
+  // Garthe 2011's slow group GAINED lean mass while losing weight at 0.7%/wk.
+  // At the slow bound the loss-side deficit sits under the 500 kcal/day
+  // ceiling for typical bodyweights (~425 kcal/day here), so the simulation
+  // must reproduce that direction rather than assert it. This is the one
+  // independent cross-check the loop has — if it fails, the coupling between
+  // leanFractionOfLoss, the deficit and leanGainFactor has drifted.
+  it('reproduces the Garthe slow-group direction: lean rises during a slow cut', () => {
+    const r = simulateLoss({
+      leanKg: LEAN,
+      fatKg: FAT,
+      targetBfPct: 15,
+      rateFraction: 0.005,
+      weeklyGainKg: 0.15,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.leanKg).toBeGreaterThan(LEAN);
+  });
+
+  it('loses lean during a fast cut, where the deficit clears the ceiling', () => {
+    const r = simulateLoss({
+      leanKg: LEAN,
+      fatKg: FAT,
+      targetBfPct: 15,
+      rateFraction: 0.01,
+      weeklyGainKg: 0.15,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.leanKg).toBeLessThan(LEAN);
+  });
+
+  // 60 kg of lean cannot weigh 55 kg at any body fat. The 13 Aug version
+  // simulated through negative fat and reported the weeks it took to fail.
+  it('returns null for a goal weight below what the lean mass can weigh', () => {
+    expect(monthsToLoseWeight(60, 30, 10, 55)).toBeNull();
+  });
+
+  // The safety rail is a rail, not a result. Before this test the loop
+  // returned { weeks: 1040 } here and the caller rounded it into a 239-month
+  // phase card.
+  it('returns null rather than an estimate when the rail is hit', () => {
+    const r = simulateLoss({
+      leanKg: LEAN,
+      fatKg: FAT,
+      targetBfPct: 10,
+      rateFraction: 0.00001,
+      weeklyGainKg: 0,
+    });
+    expect(r).toBeNull();
+  });
+
+  // "No phase needed" and "cannot compute" are different answers.
+  it('reports zero weeks, not null, when the targets are already met', () => {
+    const r = simulateLoss({
+      leanKg: LEAN,
+      fatKg: 7, // 10.2% body fat, already under the 15% target
+      targetBfPct: 15,
+      rateFraction: 0.005,
+      weeklyGainKg: 0,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.weeks).toBe(0);
+  });
+
+  // The balanced-band trim on the real profile: fast bound near 1.8 months,
+  // slow near 3–3.5. Bounds are deliberately loose — this pins the magnitude
+  // and the ordering, not the decimal.
+  it('times the balanced band trim at roughly two to four months', () => {
+    const r = monthsToCut(LEAN, 18, 12, REAL);
+    expect(r).not.toBeNull();
+    const [lo, hi] = r!;
+    expect(lo).toBeGreaterThan(1);
+    expect(lo).toBeLessThan(3);
+    expect(hi).toBeGreaterThan(lo);
+    expect(hi).toBeLessThan(5);
+  });
+
+  it('derives a positive ascending range for a recomp', () => {
+    const r = monthsToRecomp(REAL, 77.3, 20.4, 18);
+    expect(r).not.toBeNull();
+    expect(r![0]).toBeGreaterThan(0);
+    expect(r![1]).toBeGreaterThan(r![0]);
+  });
+});
+
+// ── The trainingState cap ──────────────────────────────────────────────────
+//
+// min(curve rate, state cap): the curve bounds what the frame has left, the
+// state bounds demonstrated progress, and state can only ever SLOW a rate.
+
+describe('the trainingState cap', () => {
+  const L = lifetimeHeadroomKg(185, 'male');
+
+  // The common path, not an edge case: FFMI_UNTRAINED is a population
+  // median, so built clamps to zero for roughly half of untrained men and
+  // the curve hands them the full novice rate whatever they answered. The
+  // cap turns "half of users get the novice rate regardless of state" into
+  // "users get at most their state's pace".
+  it('caps a consistent reporter with no banked muscle at 0.28 × L', () => {
+    const r = leanGainKgPerYear(profileWithBuilt(0, 185, 'consistent'))!;
+    expect(midpoint(r)).toBeCloseTo(0.28 * L, 1);
+  });
+
+  it('caps an advanced reporter with no banked muscle at 0.10 × L', () => {
+    const r = leanGainKgPerYear(profileWithBuilt(0, 185, 'advanced'))!;
+    expect(midpoint(r)).toBeCloseTo(0.1 * L, 1);
+  });
+
+  // Position-matched users pass UNDER their own cap — the cap only bites
+  // when state and FFMI position disagree.
+  it('leaves a position-matched advanced lifter untouched', () => {
+    const builtByYear3 = L * (1 - Math.pow(0.5, 3));
+    const capped = midpoint(leanGainKgPerYear(profileWithBuilt(builtByYear3, 185, 'advanced'))!);
+    const raw = midpoint(leanGainKgPerYear(profileWithBuilt(builtByYear3, 185, 'new'))!);
+    expect(capped).toBeCloseTo(raw, 0);
+  });
+
+  // Two estimators disagreeing by 2×+ means the model knows less, and the
+  // interval must say so: ±35% → ±50% on a two-tier conflict.
+  it('widens the range on a two-tier state/position conflict', () => {
+    const conflicted = leanGainKgPerYear(profileWithBuilt(0, 185, 'advanced'))!;
+    const adjacent = leanGainKgPerYear(profileWithBuilt(0, 185, 'consistent'))!;
+    expect(conflicted[1] / conflicted[0]).toBeGreaterThan(adjacent[1] / adjacent[0]);
+  });
+
+  // The muscular novice, the other two-tier conflict: the rate stays
+  // headroom-bounded — state never RAISES a rate — and the interval widens
+  // instead, with his true outcome likely toward the fast edge.
+  it('widens for a muscular novice without raising the rate', () => {
+    const muscular = leanGainKgPerYear(profileWithBuilt(L * 0.9, 185, 'new'))!;
+    const matched = leanGainKgPerYear(profileWithBuilt(L * 0.9, 185, 'advanced'))!;
+    expect(midpoint(muscular)).toBeCloseTo(midpoint(matched), 0);
+    expect(muscular[1] / muscular[0]).toBeGreaterThan(matched[1] / matched[0]);
+  });
+
+  // The regain exemption tripwire. Same body, returning-with-peak must beat
+  // consistent: both cap the NOVEL portion at the same 0.28 × L, so any
+  // difference is the muscle-memory credit surviving the cap. If the state
+  // cap ever leaks into the regain rate, this is the assertion that trips.
+  it('keeps the regain credit outside the cap: returning with a peak beats consistent', () => {
+    const consistentP: GoalsProfile = {
+      currentWeightKg: 85,
+      currentBodyFatPct: 20,
+      goalWeightKg: 90,
+      goalBodyFatPct: 13,
+      sex: 'male',
+      heightCm: 185,
+      trainingState: 'consistent',
+    };
+    const returningP: GoalsProfile = {
+      ...consistentP,
+      trainingState: 'returning',
+      peakWeightKg: 88,
+      peakLeanness: 'average',
+    };
+    const consistent = deriveRoadmap(consistentP)!.estYears;
+    const returning = deriveRoadmap(returningP)!.estYears;
+    expect(returning[0]).toBeLessThan(consistent[0]);
+    expect(returning[1]).toBeLessThan(consistent[1]);
   });
 });
 

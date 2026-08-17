@@ -104,7 +104,11 @@ export default function LeanGauge({
       onChange(last.current, true);
       return;
     }
-    const raw = lo + t * (hi - lo);
+    // t is a fraction of the whole view, but the plot only spans X0 to X1
+    // inside the viewBox. Mapping t straight onto the value range meant the pin
+    // landed right of the finger by the width of the left inset.
+    const plotT = ((t * W - X0) / (X1 - X0));
+    const raw = lo + Math.min(1, Math.max(0, plotT)) * (hi - lo);
     setLive(Math.min(hi, Math.max(lo, raw)));
     const next = Math.min(hi, Math.max(lo, Math.round(raw)));
     if (next !== last.current) {

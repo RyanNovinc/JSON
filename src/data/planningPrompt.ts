@@ -5,6 +5,7 @@ import { loadGoalsProfile } from '../utils/goalsProfileStorage';
 import { derivePhase, phaseToVolumeTier, deriveExperienceTier } from '../utils/goalsProfile';
 import type { GoalsProfile, DerivedPhase, VolumeTierInfo } from '../utils/goalsProfile';
 import { deriveRoadmap } from '../utils/roadmap';
+import { expandPhases, phasesAt, loadPhaseJourney } from '../utils/phaseJourney';
 import type { Roadmap } from '../utils/roadmap';
 
 export interface ProgramContext {
@@ -923,7 +924,10 @@ export function buildTrainingPhaseContext(
   volumeTierInfo: VolumeTierInfo,
   userVolumePref?: string,
   roadmap?: Roadmap | null,
-  profile?: GoalsProfile
+  profile?: GoalsProfile,
+  /** Confirmed phase transitions. Defaults to 0 so every existing caller
+   *  behaves exactly as before rather than silently changing meaning. */
+  completedPhases = 0
 ): string {
   const phasePref = TIER_TO_PREF[volumeTierInfo.tier];
   const prefLabel = VOLUME_TIER_LABELS[phasePref];
@@ -950,36 +954,49 @@ export function buildTrainingPhaseContext(
   }
   lines.push('');
 
-  // Volume guidance per phase
+  // ── VOLUME AND RIR, STATED ONCE, OUTSIDE THE PHASE SWITCH ────────────────
+  //
+  // These used to sit inside each branch. After the 17 Aug evidence review
+  // removed every phase-conditioned adjustment, all five branches said a
+  // version of the same thing — and five near-identical statements invite the
+  // model to look for a distinction between them that does not exist. One
+  // statement cannot be read as implying a difference.
+  //
+  // It also puts the claim where it can be revised once. Removing the cut
+  // reduction previously meant editing five separate places that each phrased
+  // it slightly differently, and the bulk cases were missed on the first pass
+  // precisely because they were spread out.
+  lines.push(
+    '**Volume:** Does not change with the phase. Prescribe what this lifter can recover from and stick to, and hold it whether they are in a deficit, at maintenance, or in a surplus. Do NOT bias toward MEV in a cut or toward MRV in a bulk. No trial has shown that reducing volume in a deficit protects muscle — the recovery rationale for reducing it has been measured directly and was not supported — and the evidence for raising volume in a surplus comes from studies averaging far fewer weekly sets than this program prescribes.',
+  );
+  lines.push(
+    '**RIR:** Standard defaults in every phase. Do not add RIR for a deficit: no trial has manipulated proximity to failure under energy restriction, and self-reported RIR carries one to two reps of error in trained lifters, so the adjustment would be smaller than the noise it is expressed in. Reduced recovery shows up on its own as fewer reps at the same target RIR, so the progression adapts without a modifier.',
+  );
+
+  // ── WHAT THE PHASE ACTUALLY CHANGES ─────────────────────────────────────
+  //
+  // Goal framing and cardio. Both genuinely differ, and cardio differs most:
+  // it is the one training-adjacent variable the phase moves, because in a
+  // surplus it spends the surplus the user is deliberately eating.
   switch (phase) {
     case 'cut':
-      lines.push('**Volume:** Target the MEV (minimum effective volume) end of the prescribed tier. Avoid pushing into MRV — recovery is compromised in a deficit.');
-      lines.push('**RIR:** Add +1 RIR relative to your defaults (i.e., stop 1 rep further from failure than usual) to limit CNS fatigue and protect recovery.');
-      lines.push('**Goal:** Muscle retention. Maintain strength and movement quality; do not chase hypertrophy volume under a calorie deficit.');
+      lines.push('**Goal:** Muscle retention. Maintain strength and movement quality. Protein intake and the size of the deficit do the retention work; training volume is a weak lever here.');
       lines.push('**Cardio:** Optional 2–3 sessions/week of low-intensity steady-state (LISS, 20–30 min). Cardio is a lever to hit the target rate, not a mandate — use the least needed to keep fat loss on track. Avoid high-intensity cardio on the same day as lower-body sessions.');
       break;
     case 'recomp':
-      lines.push('**Volume:** Target the mid-MAV range within the prescribed tier. Consistent stimulus without excess fatigue is the priority.');
-      lines.push('**RIR:** Standard defaults. No modification needed.');
       lines.push('**Goal:** Body recomposition. Simultaneous muscle retention (or modest gain) and fat loss. Prioritise compound movements and protein delivery.');
       lines.push('**Cardio:** Optional low-intensity cardio to fine-tune energy balance — a daily step target is often enough. Add structured LISS only if fat loss stalls.');
       break;
     case 'lean_bulk':
-      lines.push('**Volume:** Target the MAV-to-MRV range within the prescribed tier. A small surplus supports hypertrophy; capitalise on it with progressive volume.');
-      lines.push('**RIR:** Standard defaults, or 1 RIR fewer on isolation work when recovery allows.');
       lines.push('**Goal:** Hypertrophy. Lean surplus supports muscle gain; apply progressive overload across the mesocycle.');
       lines.push('**Cardio:** Minimal — 1 optional LISS session/week maximum. Additional cardio will eat into the small surplus and blunt adaptation.');
       break;
     case 'bulk':
-      lines.push('**Volume:** Bias toward MRV within the prescribed tier. A surplus supports recovery from higher volumes — use it.');
-      lines.push('**RIR:** Standard defaults, or 1 RIR fewer on accessories and isolation work when recovery is strong.');
       lines.push('**Goal:** Hypertrophy, maximise stimulus. The surplus is there to fuel adaptation — apply meaningful overload each block.');
       lines.push('**Cardio:** None prescribed. Any cardio should be incidental (walking, sport). Deliberate cardio sessions compete with the surplus and recovery budget.');
       break;
     case 'maintain':
     default:
-      lines.push('**Volume:** Target the MEV end of the prescribed tier. Minimum effective dose to maintain muscle mass without unnecessary fatigue.');
-      lines.push('**RIR:** Standard defaults.');
       lines.push('**Goal:** Maintenance stimulus. Preserve strength and muscle; avoid accumulating fatigue that would disrupt other life priorities.');
       lines.push('**Cardio:** Optional 1–2 sessions/week per user preference. Does not affect the maintenance stimulus target.');
       break;
@@ -990,7 +1007,7 @@ export function buildTrainingPhaseContext(
 
   if (userOverrode) {
     lines.push('');
-    lines.push(`> **Note:** The user has explicitly selected the ${VOLUME_TIER_LABELS[userVolumePref as VolumeTier] ?? userVolumePref} volume tier, which differs from the phase recommendation (${prefLabel}). Honour the user's selection but apply the phase-specific RIR and goal guidance above.`);
+    lines.push(`> **Note:** The user has explicitly selected the ${VOLUME_TIER_LABELS[userVolumePref as VolumeTier] ?? userVolumePref} volume tier, which differs from the default (${prefLabel}). Honour the user's selection. The goal and cardio guidance above still applies; volume and RIR do not change with the phase.`);
   }
 
   // ── Route section (9 Aug 2026) ────────────────────────────────────────────
@@ -1010,28 +1027,39 @@ export function buildTrainingPhaseContext(
     // consequence the transition note tells the user about. Matches the
     // per-phase guidance this block emits when that phase is current.
     const NEXT_PHASE_SHIFT: Record<string, string> = {
-      trim: 'volume shifts toward the MEV end and RIR rises by +1 to protect muscle in the deficit',
-      reveal: 'volume shifts toward the MEV end and RIR rises by +1 to protect muscle in the deficit',
-      build: 'volume shifts toward the MAV-high end with standard RIR to capitalise on the surplus',
-      recomp: 'volume holds at mid-MAV with standard RIR',
+      trim: 'training does not change — the deficit does the work, and volume and RIR both hold',
+      reveal: 'training does not change — the deficit does the work, and volume and RIR both hold',
+      build: 'training does not change — the surplus does the work, and volume and RIR both hold',
+      recomp: 'training does not change — volume and RIR both hold',
     };
-    const current = roadmap.phases[0];
-    const next = roadmap.phases[1];
-    const last = roadmap.phases[roadmap.phases.length - 1];
-    const totalPhases = last.index;
+    /**
+     * The phase the user is STANDING IN, not roadmap.phases[0]. See the note
+     * in phaseJourney.expandPhases: phases[0] is the opener, a definition
+     * rather than a position, so this told the AI "phase 1 of 10" to everyone
+     * regardless of how far along they were.
+     */
+    const all = expandPhases(roadmap);
+    const legs = phasesAt(roadmap, completedPhases);
+    const current = legs.current ?? roadmap.phases[0];
+    const next = legs.next;
+    const totalPhases = all.length;
+    const phaseNo = Math.min(completedPhases, totalPhases - 1) + 1;
 
     lines.push('');
     lines.push('**Route (the multi-phase journey this program serves):**');
 
-    if (totalPhases === 1) {
+    // `!next` covers the LAST phase of a multi-phase journey as well as a
+    // single-phase one: both have nothing after them, and the copy below reads
+    // correctly for either.
+    if (totalPhases === 1 || !next) {
       lines.push(
-        `- This program serves the CURRENT phase only: phase 1 of 1 — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches the ~${current.exitBodyFatPct}% goal (estimated ${current.estMonths[0]}–${current.estMonths[1]} months).`,
-        '- The muscle is already built — this cut lands the goal; no later phases follow.',
+        `- This program serves the CURRENT phase only: phase ${phaseNo} of ${totalPhases} — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches the ~${current.exitBodyFatPct}% goal (estimated ${current.estMonths[0]}–${current.estMonths[1]} months).`,
+        '- This is the last phase of the journey; no later phases follow.',
         '- Phases end on a body-fat NUMBER, never a date. Body-fat readings carry several points of error, so thresholds apply to the trend.',
       );
     } else {
       lines.push(
-        `- This program serves the CURRENT phase only: phase 1 of ${totalPhases} — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches ~${current.exitBodyFatPct}% (estimated ${current.estMonths[0]}–${current.estMonths[1]} months; individual variation is wide — treat every duration as a range and never promise a date).`,
+        `- This program serves the CURRENT phase only: phase ${phaseNo} of ${totalPhases} — ${KIND_LABELS[current.kind]}, which ends when the body-fat TREND reaches ~${current.exitBodyFatPct}% (estimated ${current.estMonths[0]}–${current.estMonths[1]} months; individual variation is wide — treat every duration as a range and never promise a date).`,
         `- Next phase: ${KIND_LABELS[next.kind]} to ~${next.exitBodyFatPct}% — ${NEXT_PHASE_SHIFT[next.kind]}.`,
         '- Phases end on a body-fat NUMBER, never a date. Body-fat readings carry several points of error, so thresholds apply to the trend.',
         `- **Program length vs phase length:** the chosen program duration may outlast the current phase. Do NOT bake later phases into specific weeks and do NOT re-derive or reorder the sequence. Periodise normally for the CURRENT phase, and add one short "When the phase changes" note to the program overview: when the body-fat trend reaches ~${current.exitBodyFatPct}%, the training emphasis above no longer applies — regenerating the program then is recommended, and the app's targets will already reflect the new phase.`,
@@ -1047,7 +1075,16 @@ export function buildTrainingPhaseContext(
 export function assemblePlanningPromptWithProfile(
   data: QuestionnaireData,
   profile: GoalsProfile,
-  mesocycleContext?: ProgramContext
+  mesocycleContext?: ProgramContext,
+  /**
+   * Confirmed phase transitions, from loadPhaseJourney().length.
+   *
+   * Optional and defaulting to 0 because this function is SYNCHRONOUS and the
+   * journey lives in AsyncStorage — a caller that cannot await simply gets
+   * today's behaviour. Any caller that can should pass it, or the AI is told
+   * about phase 1 forever.
+   */
+  completedPhases = 0
 ): string {
   const phase = derivePhase(profile);
   const volumeTierInfo = phaseToVolumeTier(phase);
@@ -1072,7 +1109,14 @@ export function assemblePlanningPromptWithProfile(
     trainingExperience: deriveExperienceTier(profile.trainingState),
   };
 
-  const phaseCtx = buildTrainingPhaseContext(phase, volumeTierInfo, data.volumePreference, roadmap, profile);
+  const phaseCtx = buildTrainingPhaseContext(
+    phase,
+    volumeTierInfo,
+    data.volumePreference,
+    roadmap,
+    profile,
+    completedPhases,
+  );
   return assemblePlanningPrompt(resolvedData, mesocycleContext, phaseCtx);
 }
 
@@ -1085,7 +1129,16 @@ export async function assemblePlanningPromptAsync(
 ): Promise<string> {
   const profile = await loadGoalsProfile();
   if (profile) {
-    return assemblePlanningPromptWithProfile(data, profile, mesocycleContext);
+    // The journey count is loaded HERE rather than pushed down, because this
+    // is the only entry point on the real generation path that can await —
+    // assemblePlanningPromptWithProfile is synchronous by design and the
+    // journey lives in AsyncStorage.
+    //
+    // Without it the route block describes roadmap.phases[0], the opener, so
+    // a user four phases in was handed a program written for a phase they
+    // finished months ago.
+    const journey = await loadPhaseJourney();
+    return assemblePlanningPromptWithProfile(data, profile, mesocycleContext, journey.length);
   }
   return assemblePlanningPrompt(data, mesocycleContext);
 }

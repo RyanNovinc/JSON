@@ -62,8 +62,25 @@ import { OnboardingAnalytics } from '../services/onboardingAnalytics';
 //   modal for ~300ms.
 // ============================================================================
 
-const KEY_COMPLETED = '@onboarding/completedAt';
-const KEY_INTENT = '@onboarding/intent';
+/**
+ * The fork is no longer the onboarding. Route is.
+ *
+ * This component keeps its job as the GATE: it owns the AsyncStorage check,
+ * the legacy-key migration and the opaque cover that stops the home screen
+ * flashing during the async read. All that changed is the destination — where
+ * a fresh install used to raise the fork's own UI, it now navigates into the
+ * Route intake, which asks the goal questions and ends on a roadmap.
+ *
+ * The fork's UI below is left intact and unreachable rather than deleted.
+ * Flip this to true and the old behaviour returns exactly as it was, which is
+ * worth one dead constant while the new onboarding is still being measured.
+ */
+const FORK_ENABLED = false;
+
+/** Where a fresh install lands when the fork is off. */
+const ONBOARDING_ROUTE = 'Route';
+
+const KEY_COMPLETED = '@onboarding/completedAt';const KEY_INTENT = '@onboarding/intent';
 const LEGACY_KEY = 'onboarding_completed';
 
 type Intent = 'meals' | 'plan' | 'workout' | 'skipped';
@@ -176,8 +193,14 @@ export default function IntentForkModal() {
     };
     triggerOnboardingShow = () => {
       OnboardingAnalytics.started(false);
-      OnboardingAnalytics.stepViewed('intent_fork', 1);
-      setVisible(true);
+      OnboardingAnalytics.stepViewed(FORK_ENABLED ? 'intent_fork' : 'route_intake', 1);
+      if (FORK_ENABLED) {
+        setVisible(true);
+        return;
+      }
+      // In-session re-entry (the profile reset, the contract's back button).
+      // The cover is already gone here, so this is a plain navigation.
+      navigate(ONBOARDING_ROUTE);
     };
     return () => {
       triggerOnboardingRecheck = null;
@@ -232,7 +255,18 @@ export default function IntentForkModal() {
         // Workouts/home screen behind the half-faded modal for ~300ms — that was
         // the flash. The setTimeout is only a safety net if onShow never fires.
         OnboardingAnalytics.started(true);
-        OnboardingAnalytics.stepViewed('intent_fork', 1);
+        OnboardingAnalytics.stepViewed(FORK_ENABLED ? 'intent_fork' : 'route_intake', 1);
+
+        if (!FORK_ENABLED) {
+          // Navigate FIRST, while the cover is still fully opaque, for the same
+          // reason the fork routed before dismissing: the destination mounts
+          // behind the cover and is revealed already drawn, rather than the
+          // home screen showing through for a frame.
+          navigate(ONBOARDING_ROUTE);
+          fadeOutCover();
+          return;
+        }
+
         setVisible(true);
         if (isInitialCheck) {
           coverTimerRef.current = setTimeout(() => {

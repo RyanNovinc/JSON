@@ -261,43 +261,77 @@ export function deriveExperienceTier(trainingState: TrainingState): DerivedExper
 }
 
 /**
- * Maps a derived phase to its recommended volume tier against the
- * MEV / MAV / MRV landmarks from volume-landmarks.md.
+ * TRAINING VOLUME IS PHASE-INVARIANT. This function returns the same answer
+ * for every phase, deliberately, and the parameter survives only so callers
+ * do not all have to change at once.
  *
- * - bulk / lean_bulk → MAV→MRV  (surplus maximises recovery; drive adaptation)
- * - recomp          → MAV       (balance stimulus and recovery at maintenance)
- * - maintain        → MEV→MAV   (maintenance stimulus; keep flexibility)
- * - cut             → MEV→MAV   (recovery compromised; bias toward MEV)
+ * Rewritten 17 Aug 2026 after two rounds of evidence review took the old
+ * mapping apart. Each of its four positions failed for a different reason.
+ *
+ * ── CUT no longer reduces ────────────────────────────────────────────────
+ *
+ * Roth et al. 2023 (Scand J Med Sci Sports, doi 10.1111/sms.14237) randomised
+ * 38 resistance-trained males to five sets per exercise versus three — roughly
+ * 20 vs 12 weekly quadriceps sets — for six weeks in a deficit. No group ×
+ * time interaction. Crucially the authors measured the RATIONALE as well as
+ * the outcome: contractility, stiffness, sleep and mood were unaffected
+ * irrespective of volume, so "recovery is compromised in a deficit" was tested
+ * directly and not supported.
+ *
+ * Read honestly, that trial is weaker than it first appears — whole-body lean
+ * mass fell in BOTH arms, and both groups increased load throughout, so the
+ * manipulated variable may have been swamped by an unmanipulated one. It
+ * establishes that reducing does not help, not that dose is irrelevant. That
+ * is enough to stop prescribing a reduction, which is all this needed.
+ *
+ * The direction of error settles it: under-stimulating during the phase whose
+ * job is retaining tissue costs muscle that is slow to regain, while
+ * over-stimulating costs fatigue and adherence, which recover.
+ *
+ * ── BULK no longer increases ─────────────────────────────────────────────
+ *
+ * This one survived a round longer than it should have. Pelland et al. 2026
+ * (Sports Med 56(2):481-505) does show hypertrophy rising with volume — but
+ * the mean weekly fractional set volume across its included studies is
+ * 8.14 ± 6.23, which the authors themselves call relatively low. Programs here
+ * target 12-20. Using a slope fitted where the data actually sit to justify
+ * moving a user from 15 sets to 17 extrapolates into the region the same model
+ * shows as a functional plateau, where the predicted gain is near zero and its
+ * interval comfortably contains it.
+ *
+ * "A surplus improves recovery capacity" has no dose-response study
+ * conditioning on energy balance either. Combining the two was stapling an
+ * extrapolated slope to an unmeasured moderator.
+ *
+ * ── RECOMP collapsed into MAINTAIN ───────────────────────────────────────
+ *
+ * A recomp sits at maintenance calories by definition, so recovery is not
+ * compromised relative to maintenance, and no training-side variable has been
+ * shown to differ. The old split had recomp at MAV and maintain at MEV→MAV — a
+ * distinction with nothing behind it.
+ *
+ * ── WHAT THE LANDMARKS ARE STILL FOR ─────────────────────────────────────
+ *
+ * Distribution, not individualisation. "Chest tolerates more direct work than
+ * triceps" and "front delts get enough from pressing" are ordinal claims that
+ * follow from muscle size and indirect loading, and they do not need MRV to be
+ * a measured ceiling — which it is not. What does not survive is treating a
+ * range endpoint as a threshold; those endpoints are conventions.
+ *
+ * ── KNOWN LOOSE END ──────────────────────────────────────────────────────
+ *
+ * The tier this returns still becomes the volume preference for users who did
+ * not choose one, via TIER_TO_PREF in planningPrompt. That default is now
+ * phase-independent, which is correct, but it should properly be keyed off
+ * EXPERIENCE rather than routed through a phase function that no longer
+ * branches. Until that moves, this function is the last place a phase touches
+ * volume at all — and it now touches it identically in every case.
  */
-export function phaseToVolumeTier(phase: DerivedPhase): VolumeTierInfo {
-  switch (phase) {
-    case 'bulk':
-    case 'lean_bulk':
-      return {
-        tier: 'high',
-        landmark: 'MAV→MRV',
-        rationale:
-          'Recovery is maximized in a calorie surplus; bias toward higher volume to drive adaptation.',
-      };
-    case 'recomp':
-      return {
-        tier: 'moderate',
-        landmark: 'MAV',
-        rationale: 'Balance training stimulus and recovery at maintenance calories.',
-      };
-    case 'maintain':
-      return {
-        tier: 'moderate',
-        landmark: 'MEV→MAV',
-        rationale:
-          'A maintenance stimulus is sufficient; work anywhere in the MEV–MAV window.',
-      };
-    case 'cut':
-      return {
-        tier: 'low',
-        landmark: 'MEV→MAV',
-        rationale:
-          'Recovery is compromised in a deficit; goal shifts from growth to muscle retention — bias toward MEV.',
-      };
-  }
+export function phaseToVolumeTier(_phase: DerivedPhase): VolumeTierInfo {
+  return {
+    tier: 'moderate',
+    landmark: 'MEV→MAV',
+    rationale:
+      'Volume does not change with the phase. Set it once at what the lifter can recover from and stick to, and hold it through cuts and builds alike — no trial has shown that reducing volume in a deficit protects muscle, and the case for raising it in a surplus rests on extrapolating past where the data sit.',
+  };
 }

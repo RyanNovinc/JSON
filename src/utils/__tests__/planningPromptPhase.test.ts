@@ -29,71 +29,96 @@ describe('buildTrainingPhaseContext — section heading', () => {
   });
 });
 
-describe('buildTrainingPhaseContext — cut', () => {
-  const ctx = buildTrainingPhaseContext('cut', { tier: 'low', landmark: 'MEV', rationale: 'Deficit recovery' });
+// ── WHAT THE PHASE DOES NOT CHANGE ───────────────────────────────────────
+//
+// Volume and RIR were lifted out of the phase switch on 17 Aug 2026 and are
+// now stated once, identically, for every phase.
+//
+// THE OLD TESTS HERE WERE WORSE THAN FAILING. Three of them kept PASSING
+// against the new copy for the wrong reason: "biases toward MRV" matched the
+// string "do NOT bias toward MRV", and both MEV checks matched "do NOT bias
+// toward MEV in a cut". A test that passes because its assertion appears
+// inside a negation is false confidence, so they are replaced rather than
+// adjusted.
+describe('buildTrainingPhaseContext — volume and RIR are phase-invariant', () => {
+  const ALL_PHASES = ['cut', 'recomp', 'lean_bulk', 'bulk', 'maintain'] as const;
+  const tier = { tier: 'moderate' as const, landmark: 'MEV→MAV', rationale: 'r' };
 
-  it('mentions MEV and deficit in volume line', () => {
-    expect(ctx).toMatch(/MEV/i);
+  const volumeLine = (ctx: string) =>
+    ctx.split('\n').find((l) => l.startsWith('**Volume:**')) ?? '';
+  const rirLine = (ctx: string) =>
+    ctx.split('\n').find((l) => l.startsWith('**RIR:**')) ?? '';
+
+  it('emits exactly ONE volume line and ONE RIR line per phase', () => {
+    ALL_PHASES.forEach((phase) => {
+      const ctx = buildTrainingPhaseContext(phase, tier);
+      expect(ctx.split('**Volume:**').length - 1).toBe(1);
+      expect(ctx.split('**RIR:**').length - 1).toBe(1);
+    });
   });
 
-  it('includes +1 RIR instruction', () => {
-    expect(ctx).toMatch(/\+1 RIR/);
+  it('gives every phase the SAME volume line', () => {
+    const first = volumeLine(buildTrainingPhaseContext(ALL_PHASES[0], tier));
+    expect(first.length).toBeGreaterThan(0);
+    ALL_PHASES.forEach((phase) => {
+      expect(volumeLine(buildTrainingPhaseContext(phase, tier))).toBe(first);
+    });
   });
 
-  it('names muscle retention as the goal', () => {
-    expect(ctx).toMatch(/muscle retention/i);
+  it('gives every phase the SAME RIR line', () => {
+    const first = rirLine(buildTrainingPhaseContext(ALL_PHASES[0], tier));
+    expect(first.length).toBeGreaterThan(0);
+    ALL_PHASES.forEach((phase) => {
+      expect(rirLine(buildTrainingPhaseContext(phase, tier))).toBe(first);
+    });
+  });
+
+  // The deleted instructions, pinned by name. Asserted on the RIR line rather
+  // than the whole block so a future mention elsewhere cannot mask a revert.
+  it('never tells the lifter to add RIR for a deficit', () => {
+    ALL_PHASES.forEach((phase) => {
+      expect(rirLine(buildTrainingPhaseContext(phase, tier))).not.toMatch(/\+1 RIR/);
+    });
+  });
+
+  it('never instructs a bias toward MEV or MRV', () => {
+    ALL_PHASES.forEach((phase) => {
+      const line = volumeLine(buildTrainingPhaseContext(phase, tier));
+      // Only a NEGATED mention is allowed, which is what the copy now carries.
+      expect(line).not.toMatch(/(?<!NOT )bias toward (MEV|MRV)/i);
+    });
   });
 });
 
-describe('buildTrainingPhaseContext — recomp', () => {
-  const ctx = buildTrainingPhaseContext('recomp', { tier: 'moderate', landmark: 'MAV', rationale: 'BF elevated' });
+// ── WHAT THE PHASE DOES CHANGE ───────────────────────────────────────────
+//
+// Goal framing and cardio. Cardio is the one training-adjacent variable a
+// phase genuinely moves, because in a surplus it spends the surplus the user
+// is deliberately eating.
+describe('buildTrainingPhaseContext — goal and cardio still vary', () => {
+  const tier = { tier: 'moderate' as const, landmark: 'MEV→MAV', rationale: 'r' };
 
-  it('mentions mid-MAV', () => {
-    expect(ctx).toMatch(/mid-MAV/i);
+  it('names muscle retention on a cut', () => {
+    expect(buildTrainingPhaseContext('cut', tier)).toMatch(/muscle retention/i);
   });
 
-  it('names recomposition as the goal', () => {
-    expect(ctx).toMatch(/recomposition/i);
+  it('names recomposition on a recomp', () => {
+    expect(buildTrainingPhaseContext('recomp', tier)).toMatch(/recomposition/i);
   });
 
-  it('says RIR is standard (no modification)', () => {
-    expect(ctx).toMatch(/standard/i);
-  });
-});
-
-describe('buildTrainingPhaseContext — lean_bulk', () => {
-  const ctx = buildTrainingPhaseContext('lean_bulk', { tier: 'moderate', landmark: 'MAV', rationale: 'Lean gainz' });
-
-  it('mentions MAV-to-MRV range', () => {
-    expect(ctx).toMatch(/MAV.{0,5}MRV/i);
+  it('names hypertrophy on both building phases', () => {
+    expect(buildTrainingPhaseContext('lean_bulk', tier)).toMatch(/hypertrophy/i);
+    expect(buildTrainingPhaseContext('bulk', tier)).toMatch(/hypertrophy/i);
   });
 
-  it('names hypertrophy as the goal', () => {
-    expect(ctx).toMatch(/hypertrophy/i);
-  });
-});
-
-describe('buildTrainingPhaseContext — bulk', () => {
-  const ctx = buildTrainingPhaseContext('bulk', { tier: 'high', landmark: 'MRV', rationale: 'Big surplus' });
-
-  it('biases toward MRV', () => {
-    expect(ctx).toMatch(/MRV/i);
+  it('names maintenance stimulus on maintain', () => {
+    expect(buildTrainingPhaseContext('maintain', tier)).toMatch(/maintenance stimulus/i);
   });
 
-  it('names maximise stimulus as part of the goal', () => {
-    expect(ctx).toMatch(/maximis/i);
-  });
-});
-
-describe('buildTrainingPhaseContext — maintain', () => {
-  const ctx = buildTrainingPhaseContext('maintain', { tier: 'low', landmark: 'MEV', rationale: 'Maintenance' });
-
-  it('mentions MEV (minimum effective volume)', () => {
-    expect(ctx).toMatch(/MEV/i);
-  });
-
-  it('names maintenance stimulus as the goal', () => {
-    expect(ctx).toMatch(/maintenance stimulus/i);
+  // The property that matters: a cut prescribes cardio and a bulk does not.
+  it('prescribes cardio on a cut and none on a bulk', () => {
+    expect(buildTrainingPhaseContext('cut', tier)).toMatch(/2–3 sessions\/week/i);
+    expect(buildTrainingPhaseContext('bulk', tier)).toMatch(/none prescribed/i);
   });
 });
 
