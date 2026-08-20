@@ -1003,6 +1003,14 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   ]).current;
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
 
+  // The panel is PERMANENTLY mounted and hidden purely by its native-driver
+  // opacity. Unmounting it (conditionally rendering on open state) hits a known
+  // RN native-driver bug: detaching the animated node from a dying view restores
+  // the JS-side prop values first, painting the menu at full opacity for one
+  // frame — the "flash after close". With no unmount there is no commit after
+  // the fade completes, so no frame exists for the restore to paint.
+  // See facebook/react-native#26978 (fixed one path) and #38510 (re-render
+  // restores persist); oblador/react-native-animatable#148 for the symptom.
   useEffect(() => {
     if (headerMenuOpen) {
       menuRowAnims.forEach((a) => a.setValue(0));
@@ -2592,50 +2600,51 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       </Animated.ScrollView>
 
       {/* ── HEADER DROPDOWN MENU (overlays, stays fixed) ───────────── */}
+      {/* Backdrop mounts/unmounts freely (it has no animated props); the panel is
+          never unmounted — see the comment on the menu-animation effect. */}
       {headerMenuOpen && (
         <Pressable
           style={styles.menuBackdrop}
           onPress={() => setHeaderMenuOpen(false)}
         />
       )}
-      {headerMenuOpen && (
-        <Animated.View
-          style={[
-            styles.headerMenu,
-            {
-              opacity: menuAnim,
+      <Animated.View
+        pointerEvents={headerMenuOpen ? 'auto' : 'none'}
+        style={[
+          styles.headerMenu,
+          {
+            opacity: menuAnim,
+            transform: [
+              { scale: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
+              { translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) },
+            ],
+          },
+        ]}
+      >
+        {headerMenuItems.map((item, i) => (
+          <Animated.View
+            key={item.label}
+            style={{
+              opacity: menuRowAnims[i],
               transform: [
-                { scale: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
-                { translateY: menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) },
+                { translateY: menuRowAnims[i].interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) },
               ],
-            },
-          ]}
-        >
-          {headerMenuItems.map((item, i) => (
-            <Animated.View
-              key={item.label}
-              style={{
-                opacity: menuRowAnims[i],
-                transform: [
-                  { translateY: menuRowAnims[i].interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) },
-                ],
+            }}
+          >
+            <TouchableOpacity
+              style={[styles.headerMenuRow, i < headerMenuItems.length - 1 && styles.headerMenuRowBorder]}
+              onPress={() => {
+                setHeaderMenuOpen(false);
+                item.onPress();
               }}
+              activeOpacity={0.7}
             >
-              <TouchableOpacity
-                style={[styles.headerMenuRow, i < headerMenuItems.length - 1 && styles.headerMenuRowBorder]}
-                onPress={() => {
-                  setHeaderMenuOpen(false);
-                  item.onPress();
-                }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name={item.icon} size={20} color={themeColor} style={styles.headerMenuIcon} />
-                <Text style={styles.headerMenuLabel}>{item.label}</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
-        </Animated.View>
-      )}
+              <Ionicons name={item.icon} size={20} color={themeColor} style={styles.headerMenuIcon} />
+              <Text style={styles.headerMenuLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        ))}
+      </Animated.View>
 
       {/* ── BOTTOM BAR ─────────────────────────────────────────── */}
       {!accessoryVisible && (
