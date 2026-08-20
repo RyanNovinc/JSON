@@ -7,6 +7,8 @@ import {
 } from './nutritionQuestionnaireStorage';
 import { hasGoalsProfile, loadGoalsProfile } from './goalsProfileStorage';
 import { derivePhase } from './goalsProfile';
+import { leanGainKgPerYear } from './roadmap';
+import { resolveCutRatePct } from './lossRate';
 
 // The phase -> synthetic N1/N2 mapping now lives in its own leaf module so
 // nutritionQuestionnaireStorage can use it for goal recovery without an
@@ -28,13 +30,49 @@ import type { GoalsProfile } from './goalsProfile';
  * not just the meal side for BMR. Seeding them into the nutrition draft keeps
  * every existing reader working unchanged.
  */
+/**
+ * The synthetic goal and rate for this profile's phase.
+ *
+ * Extracted because BOTH entry points below need it and they were byte
+ * identical — which is how the gain-rate fix would have landed in one and not
+ * the other.
+ *
+ * The lean-gain rate is passed across so a synthetic BULK rate follows what
+ * this lifter can actually build. Without it the fallback constant applies,
+ * and a fixed percentage of bodyweight prescribes gain the body cannot put on
+ * as muscle: 0.5%/wk on a 75 kg intermediate is 375 g a week against a
+ * ~110 g/week lean ceiling, so most of it is fat the roadmap then schedules a
+ * trim to remove.
+ */
+function syntheticSeedFor(profile: GoalsProfile) {
+  const phase = derivePhase(profile);
+  const rate = leanGainKgPerYear(profile);
+
+  // THE CUT RATE IS RESOLVED HERE, EVERY TIME, and that is the whole point of
+  // storing a preference rather than a number. Someone who chose 'faster' at
+  // 25% body fat and is now cutting again at 14% has a much smaller fat store,
+  // and Alpert's limit scales with fat mass — so the rate they picked may be
+  // one their body can no longer supply. Resolving on entry gives them the
+  // fastest rate STILL AVAILABLE instead of the one they chose once.
+  return deriveSyntheticNutritionAnswers(phase, {
+    leanGainKgPerWeek: rate ? (rate[0] + rate[1]) / 2 / 52 : undefined,
+    currentWeightKg: profile.currentWeightKg,
+    cutRatePct: resolveCutRatePct(profile, phase, profile.cutPace ?? 'steady') ?? undefined,
+  });
+}
+
 function profileNutritionFields(profile: GoalsProfile): Record<string, any> {
   const out: Record<string, any> = {};
   if (profile.sex) out.gender = profile.sex;
-  if (profile.ageYears != null) out.age = profile.ageYears;
+  // age deliberately NOT seeded, same reason as activityLevel: it is asked as
+  // its own step (N3Age) now, and seeding would silently skip the question for
+  // anyone with an older profile.
   if (profile.heightCm != null) out.height = profile.heightCm;
   if (profile.currentWeightKg) out.weight = profile.currentWeightKg;
-  if (profile.activityLevel) out.activityLevel = profile.activityLevel;
+  // activityLevel deliberately NOT seeded. It is now asked as its own step
+  // (N4Activity), and seeding it here would mean a user with an older profile
+  // silently skipped the question — which is the duplication this move was
+  // meant to remove, just inverted.
   return out;
 }
 
@@ -86,7 +124,7 @@ export async function continueNutritionFlow(
   const profile = await loadGoalsProfile();
 
   const seed: Record<string, any> = profile
-    ? { ...deriveSyntheticNutritionAnswers(derivePhase(profile)), ...profileNutritionFields(profile) }
+    ? { ...syntheticSeedFor(profile), ...profileNutritionFields(profile) }
     : {};
 
   // Never overwrite an answer the user gave themselves.
@@ -99,10 +137,13 @@ export async function continueNutritionFlow(
   // of 12, so the offset drops by 4 and every downstream screen keeps its own
   // hardcoded numbers untouched.
   const baseOffset = (extraParams as any).flowStepOffset ?? 0;
-  navigation.navigate('N5DietType', {
+  // N4Activity is now the first screen. Its literals assume it is the 4th of
+  // 12, so the offset drops by 3 rather than 4 and every downstream screen
+  // keeps its own hardcoded numbers untouched.
+  navigation.navigate('N3Age', {
     answersSoFar: merged ?? {},
     ...extraParams,
-    flowStepOffset: baseOffset - 4,
+    flowStepOffset: baseOffset - 2,
   });
 }
 
@@ -131,13 +172,13 @@ export async function restartNutritionFlow(navigation: any): Promise<void> {
 
   const profile = await loadGoalsProfile();
   const seed = profile
-    ? { ...deriveSyntheticNutritionAnswers(derivePhase(profile)), ...profileNutritionFields(profile) }
+    ? { ...syntheticSeedFor(profile), ...profileNutritionFields(profile) }
     : {};
   const merged = Object.keys(seed).length ? await mergeNutritionAnswers(seed) : {};
 
-  navigation.navigate('N5DietType', {
+  navigation.navigate('N3Age', {
     answersSoFar: merged ?? {},
-    flowStepOffset: -4,
+    flowStepOffset: -2,
   });
 }
 

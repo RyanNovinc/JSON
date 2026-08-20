@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,16 @@ import {
   Alert,
   Image,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { TouchableOpacity as GHTouchable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  useFocusEffect,
+  RouteProp,
+} from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { MealPlan } from '../utils/storage';
@@ -23,9 +29,11 @@ import { startNutritionFlow } from '../utils/questionnaireRouting';
  * MealPlanPreviewScreen — opens when a user taps a saved meal plan in SavedNutrition.
  *
  * Revamped layout (v2) — photo-forward, fewer taps:
- *   - Hero mosaic: up to 4 unique meal photos as a full-bleed grid at the top,
- *     with a flat scrim holding the overline ("SAVED MEAL PLAN · N DAYS") and
- *     the plan title. Replaces the old pill + centered title + filmstrip.
+ *   - Hero mosaic: up to 4 meal photos as a full-bleed grid at the top, with
+ *     a flat scrim holding the overline ("SAVED MEAL PLAN · N DAYS") and the
+ *     plan title. When the plan has more unique photos than tiles, the tiles
+ *     cross-fade through the full set one at a time (focus-scoped interval),
+ *     so every photo in the plan eventually gets shown.
  *   - Floating back button pinned over the hero (stays put while scrolling).
  *   - Borderless 3-stat strip: kcal/day · protein/day · meals/day. The day
  *     count lives in the overline now, freeing the third stat slot.
@@ -283,6 +291,64 @@ function MealPhoto({
   );
 }
 
+/**
+ * A hero tile that cross-fades to a new photo whenever its `meal` prop
+ * changes. The tile itself is stable (keyed by position, not by meal), which
+ * is what makes the fade possible.
+ *
+ * Two PERMANENT layers, and only the top one's opacity ever animates:
+ *   - new photo while the top layer is hidden  → load it into the top layer,
+ *     fade the top IN;
+ *   - new photo while the top layer is showing → load it into the BOTTOM
+ *     layer (safely covered by the opaque top), fade the top OUT.
+ * Nothing unmounts and no visible layer ever swaps its Image source — an
+ * earlier version committed the new source at the end of the fade, and the
+ * one-frame Image re-render showed the OLD photo as a flash.
+ */
+function CyclingHeroTile({ meal }: { meal: PreviewMeal }) {
+  const [layerA, setLayerA] = useState(meal); // bottom, static opacity
+  const [layerB, setLayerB] = useState<PreviewMeal | null>(null); // top, fades
+  const topShown = useRef(false); // is layer B the one currently visible?
+  const shownKey = useRef(meal.key);
+  const fade = useRef(new Animated.Value(0)).current; // layer B's opacity
+
+  useEffect(() => {
+    if (meal.key === shownKey.current) return;
+    shownKey.current = meal.key;
+    if (topShown.current) {
+      setLayerA(meal);
+      topShown.current = false;
+      Animated.timing(fade, {
+        toValue: 0,
+        duration: 650,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      setLayerB(meal);
+      topShown.current = true;
+      Animated.timing(fade, {
+        toValue: 1,
+        duration: 650,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [meal, fade]);
+
+  return (
+    <View style={styles.heroTile}>
+      <MealPhoto meal={layerA} style={styles.heroTileImg} iconSize={26} />
+      {layerB && (
+        <Animated.View
+          style={[styles.heroTileImg, { opacity: fade }]}
+          pointerEvents="none"
+        >
+          <MealPhoto meal={layerB} style={styles.heroTileImg} iconSize={26} />
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
 export default function MealPlanPreviewScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'MealPlanPreview'>>();
@@ -325,8 +391,9 @@ export default function MealPlanPreviewScreen() {
 
   const dayCount = days.length || plan.duration || 0;
 
-  // Hero mosaic: unique meal photos from across the whole plan (max 4).
-  const heroMeals = useMemo(() => {
+  // Hero mosaic pool: EVERY unique meal photo across the whole plan. The grid
+  // still shows at most 4 at once; the rest rotate in (see the cycle effect).
+  const heroPool = useMemo(() => {
     const out: PreviewMeal[] = [];
     const seen = new Set<string>();
     for (const day of days) {
@@ -336,11 +403,57 @@ export default function MealPlanPreviewScreen() {
         if (seen.has(k)) continue;
         seen.add(k);
         out.push(meal);
-        if (out.length >= 4) return out;
       }
     }
     return out;
   }, [days]);
+
+  const tileCount = Math.min(4, heroPool.length);
+
+  // Which pool index each tile is currently showing.
+  const [tileIdx, setTileIdx] = useState<number[]>(() =>
+    Array.from({ length: Math.min(4, heroPool.length) }, (_, i) => i)
+  );
+  // Round-robin cursors: which tile swaps next, and which photo comes in next.
+  const nextTileRef = useRef(0);
+  const nextPhotoRef = useRef(tileCount);
+
+  // Cycle one tile at a time so the user eventually sees every photo in the
+  // plan. Focus-scoped: stops while the screen is covered or left, resumes on
+  // return. No-op when every photo already fits in the grid.
+  //
+  // The first swap fires on a short timeout rather than waiting out a full
+  // interval — the cycling should visibly start soon after the screen appears.
+  useFocusEffect(
+    useCallback(() => {
+      if (heroPool.length <= tileCount) return;
+      const swap = () =>
+        setTileIdx((prev) => {
+          const next = [...prev];
+          const tile = nextTileRef.current % tileCount;
+          nextTileRef.current = tile + 1;
+          // Next photo not already on screen (pool > tiles, so one exists).
+          let idx = nextPhotoRef.current % heroPool.length;
+          while (next.includes(idx)) idx = (idx + 1) % heroPool.length;
+          nextPhotoRef.current = idx + 1;
+          next[tile] = idx;
+          return next;
+        });
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+      const timeoutId = setTimeout(() => {
+        swap();
+        intervalId = setInterval(swap, 3200);
+      }, 1000);
+      return () => {
+        clearTimeout(timeoutId);
+        if (intervalId) clearInterval(intervalId);
+      };
+    }, [heroPool, tileCount])
+  );
+
+  const heroMeals = tileIdx
+    .map((i) => heroPool[i])
+    .filter(Boolean) as PreviewMeal[];
 
   // Gate: only show the hero when there are real days AND real photos —
   // otherwise we'd render a broken-looking mosaic of fallback icons.
@@ -439,22 +552,22 @@ export default function MealPlanPreviewScreen() {
   };
 
   // Adaptive mosaic for 1–4 photos. gap:2 keeps the photo-grid feel.
+  // Tiles are keyed by POSITION, not meal — the tile has to survive its photo
+  // changing for CyclingHeroTile's cross-fade to run.
   const renderMosaic = () => {
     const p = heroMeals;
-    const tile = (meal: PreviewMeal) => (
-      <View key={meal.key} style={styles.heroTile}>
-        <MealPhoto meal={meal} style={styles.heroTileImg} iconSize={26} />
-      </View>
+    const tile = (meal: PreviewMeal, pos: number) => (
+      <CyclingHeroTile key={`tile-${pos}`} meal={meal} />
     );
     if (p.length === 1) {
-      return <View style={styles.heroGrid}>{tile(p[0])}</View>;
+      return <View style={styles.heroGrid}>{tile(p[0], 0)}</View>;
     }
     if (p.length === 2) {
       return (
         <View style={styles.heroGrid}>
           <View style={styles.heroRow}>
-            {tile(p[0])}
-            {tile(p[1])}
+            {tile(p[0], 0)}
+            {tile(p[1], 1)}
           </View>
         </View>
       );
@@ -462,10 +575,10 @@ export default function MealPlanPreviewScreen() {
     if (p.length === 3) {
       return (
         <View style={styles.heroGrid}>
-          <View style={styles.heroRow}>{tile(p[0])}</View>
+          <View style={styles.heroRow}>{tile(p[0], 0)}</View>
           <View style={styles.heroRow}>
-            {tile(p[1])}
-            {tile(p[2])}
+            {tile(p[1], 1)}
+            {tile(p[2], 2)}
           </View>
         </View>
       );
@@ -473,12 +586,12 @@ export default function MealPlanPreviewScreen() {
     return (
       <View style={styles.heroGrid}>
         <View style={styles.heroRow}>
-          {tile(p[0])}
-          {tile(p[1])}
+          {tile(p[0], 0)}
+          {tile(p[1], 1)}
         </View>
         <View style={styles.heroRow}>
-          {tile(p[2])}
-          {tile(p[3])}
+          {tile(p[2], 2)}
+          {tile(p[3], 3)}
         </View>
       </View>
     );

@@ -454,6 +454,13 @@ export const NUTRITION_STORAGE_KEYS = {
   CURRENT_MEAL_PLAN: '@nutrition_current_plan',
   MEAL_HISTORY: '@nutrition_meal_history',
   FAVORITE_MEALS: '@nutrition_favorites',
+  /**
+   * DEAD KEY, kept on purpose. Nothing writes it and nothing reads it since
+   * 19 Aug 2026 — see NutritionState above. The constant survives so the key
+   * stays documented rather than becoming an unexplained orphan on the devices
+   * of anyone who installed before then; `clearAllData` sweeps it by
+   * enumeration. Do not add a new writer.
+   */
   WEIGHT_ENTRIES: '@nutrition_weight_entries',
   MEAL_RATINGS: '@nutrition_meal_ratings',
   COMPLETED_MEALS: '@nutrition_completed_meals',
@@ -471,7 +478,12 @@ export interface NutritionState {
   currentMealPlan: MealPlan | null;
   favoriteMeals: FavoriteMeal[];
   mealHistory: MealHistory[];
-  weightEntries: WeightEntry[];
+  // weightEntries REMOVED 19 Aug 2026. It backed `@nutrition_weight_entries`,
+  // a third weight store that no screen wrote to and no component read — it was
+  // parsed into memory on every launch and ignored. The real series is
+  // `weight_tracking_history`, written through recordWeightEntry in
+  // utils/weightHistory.ts, which is what the charts and phase-transition
+  // detection read.
   completedMeals: Record<string, boolean>; // key format: "date:mealId"
   isLoading: boolean;
   hasCompletedQuestionnaire: boolean;

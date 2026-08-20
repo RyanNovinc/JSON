@@ -21,13 +21,24 @@
 // compares to the expanded journey rather than to a hardcoded body-fat figure,
 // so a change to the roadmap's durations or bands moves the fixtures and the
 // expectations together. The suite already survived durations shifting 44% by
-// asserting shape rather than decimals; this keeps that.
+// asserting shape rather than decimals; this keeps that. It is also why this
+// file needed so little changing on 18 Aug when the roadmap went from ten
+// phases to three.
+//
+// TWO THINGS DID CHANGE THAT DAY, and both are called out where they occur:
+//   - Detection reads a WEIGHT trend, not a body-fat trend, because consumer
+//     body-fat readings cannot resolve the change a phase targets. Readings
+//     here are kilograms and thresholds are exitWeightKg.
+//   - deriveRoadmap no longer collapses repeated cycles, so the collapsed
+//     definitions and the expanded journey are now the SAME length. The test
+//     that asserted collapsed < expanded is inverted below rather than deleted,
+//     because the relationship still needs pinning — it just reversed.
 
 import type { GoalsProfile } from '../goalsProfile';
 import { derivePhase, phaseToVolumeTier } from '../goalsProfile';
 import { deriveRoadmap } from '../roadmap';
 import { expandPhases, phasesAt } from '../phaseJourney';
-import { evaluateTransition, type BodyFatReading } from '../phaseTransition';
+import { evaluateTransition, type WeightReading } from '../phaseTransition';
 import { buildTrainingPhaseContext } from '../../data/planningPrompt';
 
 /** Ryan's real profile — a multi-phase roadmap opening on a recomp. */
@@ -58,12 +69,14 @@ const SINGLE: GoalsProfile = {
 
 const roadmapFor = (p: GoalsProfile) => deriveRoadmap(p, p.routePreference ?? 'balanced')!;
 
-/** Three readings inside the trend window, all at the same value. */
-function readingsAt(bodyFatPct: number, now = Date.now()): BodyFatReading[] {
+/** Three readings inside the trend window, all at the same weight. The 14-day
+ *  spread clears TREND_MIN_SPAN_DAYS; three flat readings make the weighted
+ *  trend exactly the value passed, whatever the weighting. */
+function readingsAt(weightKg: number, now = Date.now()): WeightReading[] {
   const DAY = 86_400_000;
   return [0, 7, 14].map((d) => ({
     dateISO: new Date(now - d * DAY).toISOString(),
-    bodyFatPct,
+    weightKg,
   }));
 }
 
@@ -96,12 +109,20 @@ describe('phasesAt agrees with expandPhases at every position', () => {
     expect(phasesAt(roadmap, all.length - 1).next).toBeUndefined();
   });
 
-  // roadmap.phases is SHORTER than the journey — that difference is the whole
-  // reason phases[0] was never a position. If these ever match, the collapsing
-  // has gone and every "read phases[0]" bug becomes invisible again.
-  it('the collapsed definitions are fewer than the expanded journey', () => {
+  // INVERTED 18 Aug 2026. This used to assert the collapsed definitions were
+  // FEWER than the expanded journey, because the middle blocks carried a
+  // repeats count. deriveRoadmap no longer collapses — every phase is emitted
+  // once with repeats 1 — so they now match, and expandPhases is a pass-through
+  // for the common case.
+  //
+  // Still worth pinning: expandPhases must honour repeats if one ever returns,
+  // and it must never DROP a phase. It silently dropped the build from every
+  // two-phase roadmap for exactly as long as it assumed a fixed four-slot
+  // shape, which is what this now catches.
+  it('the expanded journey accounts for every phase and its repeats', () => {
     const roadmap = roadmapFor(MULTI);
-    expect(roadmap.phases.length).toBeLessThan(expandPhases(roadmap).length);
+    const expected = roadmap.phases.reduce((n, p) => n + Math.max(1, p.repeats ?? 1), 0);
+    expect(expandPhases(roadmap)).toHaveLength(expected);
   });
 });
 
@@ -110,22 +131,24 @@ describe('evaluateTransition reads the position, not the opener', () => {
     const roadmap = roadmapFor(MULTI);
     const first = expandPhases(roadmap)[0];
 
-    const check = evaluateTransition(MULTI, readingsAt(18), undefined, Date.now(), 0)!;
-    expect(check.thresholdPct).toBe(first.exitBodyFatPct);
+    const check = evaluateTransition(MULTI, readingsAt(80), undefined, Date.now(), 0)!;
+    expect(check.thresholdKg).toBe(first.exitWeightKg);
+    expect(check.thresholdBodyFatPct).toBe(first.exitBodyFatPct);
     expect(check.currentKind).toBe(first.kind);
   });
 
   // THE HEADLINE REGRESSION. Before the fix this returned the opener's
   // threshold no matter what was passed, so a user who had finished two phases
   // was measured against a line they crossed long ago and could never advance.
-  it('tests the THIRD phase threshold at two completed', () => {
+  it('tests the LAST phase threshold at that many completed', () => {
     const roadmap = roadmapFor(MULTI);
     const all = expandPhases(roadmap);
-    const third = all[2];
+    const last = all.length - 1;
+    const target = all[last];
 
-    const check = evaluateTransition(MULTI, readingsAt(18), undefined, Date.now(), 2)!;
-    expect(check.thresholdPct).toBe(third.exitBodyFatPct);
-    expect(check.currentKind).toBe(third.kind);
+    const check = evaluateTransition(MULTI, readingsAt(80), undefined, Date.now(), last)!;
+    expect(check.thresholdKg).toBe(target.exitWeightKg);
+    expect(check.currentKind).toBe(target.kind);
 
     // The KIND must differ from the opener, or this test proves nothing.
     //
@@ -141,62 +164,70 @@ describe('evaluateTransition reads the position, not the opener', () => {
     const roadmap = roadmapFor(MULTI);
     const all = expandPhases(roadmap);
 
-    const check = evaluateTransition(MULTI, readingsAt(18), undefined, Date.now(), 2)!;
-    expect(check.nextKind).toBe(all[3].kind);
-    expect(check.nextExitBodyFatPct).toBe(all[3].exitBodyFatPct);
+    // At position 1 the next phase is all[2], whatever the journey's length —
+    // asserted relatively so this survives the roadmap reshaping again.
+    const check = evaluateTransition(MULTI, readingsAt(80), undefined, Date.now(), 1)!;
+    expect(check.nextKind).toBe(all[2].kind);
+    expect(check.nextExitBodyFatPct).toBe(all[2].exitBodyFatPct);
   });
 
-  // Direction is kind-dependent: a build ends when the trend RISES to its
-  // exit, everything else when it FALLS to it. Asserted at a position past the
-  // opener so a future simplification of exitCrossed fails here.
-  it('crosses a build phase upward and a trim phase downward', () => {
+  // Direction is kind-dependent: a build ends when the trend RISES to its exit
+  // weight, everything else when it FALLS to it. Asserted at positions PAST the
+  // opener so a future simplification of exitReached fails here.
+  //
+  // Uses the build and the terminal reveal rather than build-and-trim: on this
+  // fixture the only trim IS the opener, and the point of the test is that
+  // direction is read from the phase at the position rather than from phases[0].
+  it('reaches a build upward and a reveal downward', () => {
     const roadmap = roadmapFor(MULTI);
     const all = expandPhases(roadmap);
 
     const buildIdx = all.findIndex((p) => p.kind === 'build');
-    const trimIdx = all.findIndex((p, i) => i > 0 && p.kind === 'trim');
+    const downIdx = all.findIndex((p, i) => i > 0 && (p.kind === 'reveal' || p.kind === 'trim'));
     expect(buildIdx).toBeGreaterThan(-1);
-    expect(trimIdx).toBeGreaterThan(-1);
+    expect(downIdx).toBeGreaterThan(-1);
 
     const build = all[buildIdx];
-    const trim = all[trimIdx];
+    const down = all[downIdx];
+    expect(build.exitWeightKg).toBeDefined();
+    expect(down.exitWeightKg).toBeDefined();
 
-    // At the build's exit, arriving from below: crossed.
+    // At the build's target weight, arriving from below: reached.
     expect(
-      evaluateTransition(MULTI, readingsAt(build.exitBodyFatPct), undefined, Date.now(), buildIdx)!
+      evaluateTransition(MULTI, readingsAt(build.exitWeightKg!), undefined, Date.now(), buildIdx)!
         .crossed,
     ).toBe(true);
-    // Well under it: not yet.
+    // Three kilos under it: not yet.
     expect(
       evaluateTransition(
         MULTI,
-        readingsAt(build.exitBodyFatPct - 3),
+        readingsAt(build.exitWeightKg! - 3),
         undefined,
         Date.now(),
         buildIdx,
       )!.crossed,
     ).toBe(false);
 
-    // The trim runs the other way.
+    // The downward phase runs the other way.
     expect(
-      evaluateTransition(MULTI, readingsAt(trim.exitBodyFatPct), undefined, Date.now(), trimIdx)!
+      evaluateTransition(MULTI, readingsAt(down.exitWeightKg!), undefined, Date.now(), downIdx)!
         .crossed,
     ).toBe(true);
     expect(
       evaluateTransition(
         MULTI,
-        readingsAt(trim.exitBodyFatPct + 3),
+        readingsAt(down.exitWeightKg! + 3),
         undefined,
         Date.now(),
-        trimIdx,
+        downIdx,
       )!.crossed,
     ).toBe(false);
   });
 
   it('never treats too few readings as a crossing', () => {
-    const one = readingsAt(10).slice(0, 1);
-    const check = evaluateTransition(MULTI, one, undefined, Date.now(), 2)!;
-    expect(check.trendPct).toBeNull();
+    const one = readingsAt(80).slice(0, 1);
+    const check = evaluateTransition(MULTI, one, undefined, Date.now(), 1)!;
+    expect(check.trendKg).toBeNull();
     expect(check.crossed).toBe(false);
   });
 
@@ -204,7 +235,7 @@ describe('evaluateTransition reads the position, not the opener', () => {
   it('handles a count past the end of the journey without throwing', () => {
     const roadmap = roadmapFor(MULTI);
     const beyond = expandPhases(roadmap).length + 5;
-    expect(() => evaluateTransition(MULTI, readingsAt(14), undefined, Date.now(), beyond)).not.toThrow();
+    expect(() => evaluateTransition(MULTI, readingsAt(80), undefined, Date.now(), beyond)).not.toThrow();
   });
 });
 
@@ -225,11 +256,15 @@ describe('the workout prompt describes the phase the user is on', () => {
     expect(ctxAt(MULTI, 0)).toContain('phase 1 of');
   });
 
-  // Before the fix this said "phase 1 of 10" to everyone, so the AI wrote a
-  // program for a phase the user had finished months earlier.
-  it('says phase 4 at three completed', () => {
-    const ctx = ctxAt(MULTI, 3);
-    expect(ctx).toContain('phase 4 of');
+  // Before the fix this said "phase 1 of N" to everyone, so the AI wrote a
+  // program for a phase the user had finished months earlier. Indexed off the
+  // journey's real length now — the fixture used to expand to ten phases and
+  // expands to three since deriveRoadmap stopped churning cycles.
+  it('names a later phase at that many completed', () => {
+    const last = expandPhases(roadmapFor(MULTI)).length - 1;
+    expect(last).toBeGreaterThan(0);
+    const ctx = ctxAt(MULTI, last);
+    expect(ctx).toContain(`phase ${last + 1} of`);
     expect(ctx).not.toContain('phase 1 of');
   });
 
@@ -241,8 +276,9 @@ describe('the workout prompt describes the phase the user is on', () => {
       trim: 'Trim',
       reveal: 'Final cut',
     };
-    const ctx = ctxAt(MULTI, 3);
-    expect(ctx).toContain(LABEL[all[3].kind]);
+    const last = all.length - 1;
+    const ctx = ctxAt(MULTI, last);
+    expect(ctx).toContain(LABEL[all[last].kind]);
   });
 
   // `last.index` and the occurrence count agree only while a terminal reveal

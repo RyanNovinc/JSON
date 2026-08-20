@@ -806,26 +806,109 @@ export class WorkoutStorage {
   }
 
   // Utility methods
-  static async clearAllData(): Promise<void> {
+
+  /**
+   * Keys that SURVIVE a full reset, and why each one has to.
+   *
+   * Everything not on this list is deleted. That is deliberately the wrong way
+   * round from how the old reset worked — see clearAllData below — because a
+   * denylist can only remove keys somebody remembered to add to it, and this
+   * app builds key names at runtime (`completed_<block>_week<n>`,
+   * `meal_completions_<date>`, `@mealprep_done_<planId>`, every RobustStorage
+   * `_backup1`/`_emergency_<ts>` shadow) which no list can enumerate.
+   *
+   * Adding to this list means deciding that something is NOT the user's data.
+   * The bar is high, and each entry says why.
+   */
+  private static readonly RESET_PRESERVED_KEYS: readonly string[] = [
+    // The only stable per-install identity in the app. Deleting it makes one
+    // device look like a brand new install and detaches its history. It is
+    // also the only candidate for a RevenueCat appUserID if purchases are
+    // re-enabled, at which point deleting it would strand an entitlement.
+    '@jsonfit_analytics_anon_id',
+
+    // "This person already rated us." Write-once, and its own source comments
+    // say never to clear it. Deleting re-arms the review prompt for somebody
+    // who already went to the store, which is the one nag that must not repeat.
+    'ratingEngaged',
+    'lastReviewPrompt',
+    'reviewPromptVersion',
+
+    // Migration bookkeeping. runMigrations() is blocking on launch; wiping
+    // these makes it re-run every migration on the next start. Harmless
+    // against empty data, but pointless, and it turns a reset into a slow
+    // launch. Kept so the app comes back up the way it went down.
+    'schema_version',
+    'identity_table_version',
+
+    // "Already gave an email" / "already said no." Deleting re-solicits
+    // someone who has answered — the same class of nag as ratingEngaged.
+    '@jsonfit_cookbook_capture_subscribed',
+    '@jsonfit_cookbook_capture_dismissed',
+
+    // Display preferences, not data. Coming back from a reset in the wrong
+    // units or the wrong theme reads as a bug rather than a fresh start, and
+    // neither tells anybody anything about the user. The confirmation copy in
+    // ProfileScreen should say "settings you chose stay" rather than promising
+    // settings are deleted.
+    'globalWeightUnit',
+    'theme_preference',
+  ];
+
+  /**
+   * Deletes everything except RESET_PRESERVED_KEYS.
+   *
+   * ── WHY THIS WAS REWRITTEN, 19 Aug 2026 ──────────────────────────────────
+   *
+   * The old version named 14 keys. An audit counted well over a hundred in
+   * use across ~25 owners, so the reset left behind the weight series, the
+   * goals profile, the roadmap, every check-in, all custom meals, every
+   * nutrition plan, and every dynamically-named completion key — while the
+   * button promised "This deletes ALL your workouts, meal plans, weight
+   * history, and settings. This CANNOT be undone."
+   *
+   * THE RESURRECTION BUG, which is worse than the leak. Several keys are
+   * written through RobustStorage, which fans one logical write out to
+   * `<key>_backup1`, `<key>_backup2`, `<key>_meta` and timestamped emergency
+   * copies. A raw multiRemove of the primary key alone leaves those shadows
+   * intact with no tombstone, so the next read RESTORES the data the user just
+   * asked to destroy. removeMyRoutine already guards against exactly this;
+   * the reset did not.
+   *
+   * AND THE QUARANTINE. `weight_tracking_history_quarantine` retains raw bytes
+   * of a corrupted weight series "for support". It is squarely inside what the
+   * copy promises to delete, and it survived every reset path. Enumeration
+   * catches it.
+   *
+   * Enumerating and filtering is the only approach that can be right, because
+   * the key names are not all knowable in advance. The trade is that a new key
+   * is deleted by default — which is the safe direction for a button whose
+   * whole job is deleting.
+   *
+   * Returns what it did rather than void, so the caller can tell the user the
+   * truth instead of an unconditional "All app data has been deleted."
+   */
+  static async clearAllData(): Promise<{
+    ok: boolean;
+    removed: number;
+    kept: number;
+  }> {
     try {
-      await AsyncStorage.multiRemove([
-        STORAGE_KEYS.ROUTINES,
-        STORAGE_KEYS.MY_ROUTINES,
-        STORAGE_KEYS.MEAL_PLANS,
-        STORAGE_KEYS.HISTORY,
-        STORAGE_KEYS.CURRENT_WORKOUT,
-        STORAGE_KEYS.FEEDBACK,
-        STORAGE_KEYS.EXERCISE_PREFERENCES,
-        STORAGE_KEYS.ONBOARDING_COMPLETED,
-        STORAGE_KEYS.THEME_PREFERENCE,
-        STORAGE_KEYS.NUTRITION_QUESTIONNAIRE,
-        STORAGE_KEYS.NUTRITION_COMPLETION_STATUS,
-        STORAGE_KEYS.BUDGET_COOKING_QUESTIONNAIRE,
-        STORAGE_KEYS.FRIDGE_PANTRY_QUESTIONNAIRE,
-        STORAGE_KEYS.AWAITING_IMPORT,
-      ]);
+      const all = await AsyncStorage.getAllKeys();
+      const keep = new Set<string>(WorkoutStorage.RESET_PRESERVED_KEYS);
+      const doomed = all.filter((k) => !keep.has(k));
+
+      // Chunked: multiRemove is one bridge call and this can be hundreds of
+      // keys after a long install, backups and emergency copies included.
+      const CHUNK = 100;
+      for (let i = 0; i < doomed.length; i += CHUNK) {
+        await AsyncStorage.multiRemove(doomed.slice(i, i + CHUNK));
+      }
+
+      return { ok: true, removed: doomed.length, kept: all.length - doomed.length };
     } catch (error) {
       console.error('Failed to clear all data:', error);
+      return { ok: false, removed: 0, kept: 0 };
     }
   }
 

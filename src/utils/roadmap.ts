@@ -21,9 +21,16 @@
 // particular have no trial evidence, and a precise-looking number would
 // misrepresent that.
 
-import type { GoalsProfile, Sex, RoutePreference, DerivedPhase } from './goalsProfile';
-import { derivePhase } from './goalsProfile';
-import { bandFor } from './operatingBands';
+import type {
+  GoalsProfile,
+  Sex,
+  RoutePreference,
+  DerivedPhase,
+  PhaseOrder,
+} from './goalsProfile';
+import { derivePhase, isRevealOnly, defaultPhaseOrder } from './goalsProfile';
+import { FAT_PER_LEAN_KG } from './syntheticNutritionAnswers';
+import { bandFor, leanStopFor } from './operatingBands';
 
 // ---------------------------------------------------------------------------
 // Body composition arithmetic (definitional — no citation needed)
@@ -1061,6 +1068,58 @@ export interface RoadmapPhase {
   index: number;
   /** Body fat this phase ends at — phases end on a NUMBER, never a date. */
   exitBodyFatPct: number;
+  /**
+   * Scale weight the user should be at when this phase ends, kg.
+   *
+   * ADDED 18 Aug 2026 because exitBodyFatPct IS NOT MEASURABLE AT HOME. An
+   * independent measurement review put consumer foot-to-foot BIA body fat at
+   * ±4-8 percentage points against DXA, worst exactly where change detection
+   * matters, and moving with hydration, last meal and recent exercise. Even
+   * DXA's least significant change is 1.0-1.5 kg of fat consecutive-day. A
+   * phase moving someone 18% to 15% is ~2.4 kg of fat: at the edge of DXA and
+   * entirely below a smart scale's noise floor.
+   *
+   * Day-to-day bodyweight noise is about 0.53% of bodyweight by contrast
+   * (Vasey 2023), so a smoothed weight trend CAN resolve what these phases
+   * target. phaseTransition detects on this, not on the body fat.
+   *
+   * Computed from the lean mass the model carries at that point, so it already
+   * accounts for the muscle a build adds. Undefined only on the degraded path
+   * where body fat is unknown and no composition can be tracked at all.
+   */
+  exitWeightKg?: number;
+  /**
+   * The rate this phase is PRESCRIBED at, as a percentage of bodyweight per
+   * week. Negative for a cut, positive for a build.
+   *
+   * ADDED 18 Aug 2026 because a weight target on its own is dangerous advice.
+   * "Get to 76.7 kg" can be satisfied by crash dieting there in six weeks, and
+   * half of what comes off that way is the muscle the plan exists to protect.
+   * Garthe 2011 is the whole reason the rate band is 0.5-1%/week: her slow group
+   * GAINED lean while losing fat, her fast group merely held it.
+   *
+   * So the weight is where the plan LANDS, and this is how it has to get there.
+   * phaseTransition compares the measured trend slope against this, and a user
+   * who arrives far too fast is reported separately from one who arrives.
+   */
+  targetRatePctPerWeek?: number;
+  /**
+   * True when this phase is too short for its own outcome to be measured — see
+   * MIN_DETECTABLE_PHASE_MONTHS.
+   *
+   * These are NOT miscalculations and must not be restructured away. A build of
+   * eleven days means the user needs almost no muscle, which is a true fact
+   * about their goal and worth telling them. What is wrong is only the pretence
+   * that FINISHING it can be detected: it is over before a scale can say
+   * whether it worked. So the phase stands and phaseTransition declines to
+   * detect it, exactly as it declines on a recomp — time-box it and let the
+   * user confirm.
+   *
+   * Measured across the full sweep: 27.8% of builds, 3.9% of reveals and 1.4%
+   * of trims. Builds dominate because a small lean gap produces a genuinely
+   * tiny build.
+   */
+  belowDetectionThreshold?: boolean;
   /** Estimated duration in months, [lo, hi]. Always a range. */
   estMonths: [number, number];
   /** How many times this phase repeats (build/trim cycles collapse). */
@@ -1084,7 +1143,301 @@ export interface Roadmap {
 }
 
 /** [B] Duration of the terminal cut to the goal body fat, months. */
+/**
+ * [B] Shortest phase whose outcome a home scale can resolve, in months.
+ *
+ * Three weeks. DERIVED, not measured: with day-to-day bodyweight noise around
+ * 0.53% (Vasey 2023) the standard error of a fitted slope over N daily weights
+ * is σ√(12/(N(N²−1))), which needs about 15 days to separate a 0.5%/week trend
+ * from zero — and that assumes independent residuals, which daily weights are
+ * not. Inflating for autocorrelation and the ~0.35% within-week rhythm lands at
+ * 3-4 weeks. No primary study gives an "N days to detect X" figure; this is
+ * arithmetic on top of the noise estimate, and it is a floor on NONSENSE rather
+ * than a claim of statistical adequacy.
+ */
+export const MIN_DETECTABLE_PHASE_MONTHS = 0.75;
+
+/**
+ * [B] THE NARROWEST OPERATING RANGE THE APP WILL PLAN, in percentage points.
+ *
+ * Was MIN_RAIL_DROP_PCT = 1.5, a silent behaviour: a range narrower than this
+ * made the ceiling rail stand down, so the user asked for a tight range and got
+ * a long drift with no explanation. It is now a LIMIT the range control
+ * enforces, and the rail keeps the same test as a backstop.
+ *
+ * RAISED TO 2 ON MEASUREMENT, not on argument. Same lifter, floor 13, widening
+ * the range, counting phases too short to read on a bathroom scale:
+ *
+ *   width 0.5  ->  10 cuts, 20 phases, 10 unmeasurable
+ *   width 1    ->   6 cuts, 11 phases,  5 unmeasurable
+ *   width 1.5  ->   4 cuts,  7 phases,  3 unmeasurable
+ *   width 2    ->   4 cuts,  7 phases,  1 unmeasurable
+ *   width 2.5  ->   3 cuts,  5 phases,  0 unmeasurable
+ *
+ * At 2 the only phase under MIN_DETECTABLE_PHASE_MONTHS is the terminal cut,
+ * which is short at every width and not caused by the range. Below 2 the range
+ * itself starts manufacturing phases nobody can verify.
+ *
+ * THE PRINCIPLE UNDERNEATH, worth keeping: the bottom of the range is a promise
+ * the user made and it holds everywhere, including mid-build. The top was never
+ * a promise, only a rail, so where it cannot do useful work it stands down and
+ * the terminal cut takes the fat.
+ */
+export const MIN_RANGE_WIDTH_PCT = 2;
+
+/**
+ * [B] How wide the suggested range is, in percentage points. A CONVENTION and
+ * must never be presented as a finding: it matches the width of the app's own
+ * lean band, and it is the tightest width that produced no range-driven
+ * unmeasurable phases in the table above. No trial has compared band widths in
+ * trained lifters — ICECAP found intermittent and continuous restriction
+ * identical on everything but appetite.
+ */
+export const SUGGESTED_RANGE_WIDTH_PCT = 3;
+
+/**
+ * [B] Lean mass left to gain, in kg, below which the ceiling rail stops
+ * bothering to interrupt a build.
+ *
+ * NOT A PREFERENCE — a correctness guard. When a build ends exactly on the
+ * ceiling, the solved step leaves a rounding crumb of lean behind, `left` sits
+ * a hair above zero, and the rail dutifully inserts a trim and a rebuild for
+ * it. Measured cost: the plan then finishes at the BOTTOM of the range instead
+ * of the goal, because the terminal cut only fires on an overshoot — a user
+ * asking for 18% ended at 14.1%. One thousand profiles in the sweep.
+ *
+ * Half a kilo of lean is months of building at the capped rate, so anything
+ * under it cannot support a phase either way.
+ */
+export const TRIM_REMAINDER_MIN_KG = 0.5;
+
 const REVEAL_MONTHS: [number, number] = [3, 5];
+
+/**
+ * Does the cut-first / build-first choice actually mean anything for this user?
+ *
+ * Derives both and compares the phase sequence, rather than re-deriving the
+ * "is there fat to shed before building" test in the UI where it would drift.
+ * False in the two cases where the answer is forced: already leaner than the
+ * goal (nothing to cut) and no lean gap (a single cut, isRevealOnly). Callers
+ * should hide the picker when this is false rather than offer two buttons that
+ * do the same thing.
+ */
+export function phaseOrderMatters(profile: GoalsProfile, route?: RoutePreference): boolean {
+  const a = deriveRoadmap({ ...profile, preBuildBf: undefined, phaseOrder: 'cut_first' }, route);
+  const b = deriveRoadmap({ ...profile, preBuildBf: undefined, phaseOrder: 'build_first' }, route);
+  if (!a || !b) return false;
+  const sig = (r: Roadmap) => r.phases.map((ph) => `${ph.kind}:${ph.exitBodyFatPct}`).join('|');
+  return sig(a) !== sig(b);
+}
+
+/**
+ * THE OPERATING RANGE: the body fat range a user cycles within while building,
+ * and the SINGLE DEFINITION of its bounds, its defaults and its one hard rule.
+ *
+ * Exported for the same reason phaseOrderMatters was: the screen and the plan
+ * must not be able to disagree. The control renders nothing when this returns
+ * null, clamps to what it returns, and reads `suggestedTop` for its suggestion.
+ *
+ * ── THE TWO ENDS ARE NOT SYMMETRICAL ────────────────────────────────────────
+ *
+ * BOTTOM has a hard stop, `leanStop`, because the lean end has measured
+ * consequences (see leanStopFor). It also cannot exceed current body fat: a
+ * bottom above where the user is standing means no opening cut at all, which is
+ * the build-first plan and is reached by putting the bottom at the top of its
+ * travel rather than by a separate picker.
+ *
+ * TOP has NO upper clamp, deliberately. Above the point the build tops out, a
+ * ceiling never fires and the plan is identical to having none — so the honest
+ * behaviour is to accept the number and let the screen say it never comes into
+ * play, rather than refusing a value the user asked for. An earlier version
+ * clamped it to the natural peak and that was the wrong call.
+ *
+ * The ONE hard rule is width: MIN_RANGE_WIDTH_PCT, measured rather than
+ * argued.
+ *
+ * ── DEFAULTS PRESERVE THE OLD PLAN ──────────────────────────────────────────
+ *
+ * `bottom` defaults to the depth at which the fat the build adds lands the user
+ * exactly on their goal, floored by the lean stop — the figure deriveRoadmap
+ * computed inline before any of this existed — or to current body fat for a
+ * profile carrying phaseOrder 'build_first'. `top` defaults to the suggestion.
+ * So an untouched profile plans as it did, and phaseOrder survives only as the
+ * seed for that default; nothing writes it any more.
+ *
+ * Returns null where there is no range to set: no measured body fat, no goal,
+ * or nothing to build (isRevealOnly, or a non-positive lean gap).
+ */
+export interface OperatingRange {
+  /** Leanest the bottom may go. Sex-based, see leanStopFor. */
+  leanStop: number;
+  /** Highest the bottom may go: current body fat, i.e. no opening cut. */
+  topStop: number;
+  /** Narrowest permitted top minus bottom. */
+  minWidth: number;
+  /** Resolved bottom, stored value clamped, else the default. */
+  bottom: number;
+  /** Resolved top, stored value floored by the width rule, else the suggestion. */
+  top: number;
+  /**
+   * THE SUGGESTED RANGE, BOTH ENDS. `suggestedBottom` is the depth the plan
+   * would pick on its own — where the fat the build adds lands the user on
+   * their goal — and `suggestedTop` is that plus SUGGESTED_RANGE_WIDTH_PCT.
+   *
+   * The top used to be derived from the user's CURRENT bottom, which made the
+   * suggestion follow them around: a user who had nudged the bottom to 15.5 was
+   * offered "the suggested 15.5 to 18.5", anchored to a number they had picked
+   * arbitrarily. A recommendation that inherits half of what it is recommending
+   * against is not a recommendation.
+   */
+  suggestedBottom: number;
+  suggestedTop: number;
+}
+
+/**
+ * The bottom of the range, resolved for ANY profile that has a build ahead of
+ * it — including the ones with no range to choose.
+ *
+ * SEPARATE FROM operatingRangeFor ON PURPOSE. The range screen is skipped for a
+ * user whose goal body fat is above where they stand, but deriveRoadmap still
+ * needs a depth for that user, and the sweep proved what happens without one:
+ * falling back to the band floor made mid-build trims 2 points deeper than the
+ * plan they had before, on 17k profiles.
+ */
+function resolveBottom(
+  profile: GoalsProfile,
+  route: RoutePreference,
+): { bottom: number; defaultBottom: number; leanStop: number; topStop: number } | null {
+  const { currentWeightKg, currentBodyFatPct, goalWeightKg, goalBodyFatPct, sex } = profile;
+  if (currentBodyFatPct == null || !goalWeightKg || goalBodyFatPct == null) return null;
+  if (isRevealOnly(profile)) return null;
+
+  const leanNow = round1(leanMassKg(currentWeightKg, currentBodyFatPct));
+  const gapKg = round1(round1(leanMassKg(goalWeightKg, goalBodyFatPct)) - leanNow);
+  if (!(gapKg > 0)) return null;
+
+  const leanStop = leanStopFor(sex);
+  const topStop = round1(currentBodyFatPct);
+
+  // The same two lines deriveRoadmap sizes a build's fat cost from, so the
+  // default bottom cannot disagree with the plan it is the default for.
+  const phase1 = derivePhase({ ...profile, routePreference: route });
+  const fatPerLean = phase1 === 'bulk' ? FAT_PER_LEAN_KG.bulk : FAT_PER_LEAN_KG.lean_bulk;
+
+  const goalFat = goalWeightKg * (goalBodyFatPct / 100);
+  const preBuildFat = Math.max(0, goalFat - gapKg * fatPerLean);
+  const computed = Math.max(leanStop, round1((preBuildFat / (leanNow + preBuildFat)) * 100));
+  // THE BOTTOM NO LONGER ENCODES THE ORDER, 20 Aug 2026. It used to park at
+  // current body fat for a stored 'build_first', which was the only way to say
+  // "no opening cut" while one field did both jobs. It cannot survive the range
+  // screen: a user who sets 13 to 16 and then chooses to build first must keep
+  // 13 as the depth their mid-build trims return to, not have it dragged up to
+  // 20. phaseOrder is a real input again and owns the opening cut alone.
+  const defaultBottom = Math.min(computed, topStop);
+
+  // UPPER BOUND IS max(leanStop, topStop), NOT topStop. Someone already leaner
+  // than the stop — 10% against a stop of 12 — would otherwise have the bottom
+  // clamped DOWN to 10, and every mid-build trim would then take them to 10 for
+  // years because the bottom is also the trim target. The stop has to win in
+  // that direction: they are welcome to be leaner than it today, but the plan
+  // will not keep putting them there. Caught by the sweep, 2,604 profiles.
+  const bottom = Math.min(
+    Math.max(round1(profile.preBuildBf ?? defaultBottom), leanStop),
+    Math.max(leanStop, topStop),
+  );
+  return {
+    bottom,
+    // Pre-clamped against the same bounds as `bottom`, so the suggestion is
+    // always a value the control could actually be set to.
+    defaultBottom: Math.min(
+      Math.max(round1(defaultBottom), leanStop),
+      Math.max(leanStop, topStop),
+    ),
+    leanStop,
+    topStop,
+  };
+}
+
+export function operatingRangeFor(
+  profile: GoalsProfile,
+  route: RoutePreference = 'balanced',
+): OperatingRange | null {
+  const base = resolveBottom(profile, route);
+  if (!base) return null;
+
+  // NOTHING TO SHED MEANS NO RANGE TO CHOOSE. A user at or under their goal body
+  // fat is asking to get FATTER, and cycling them is wrong rather than merely
+  // unnecessary: with a suggested top three points above today, the rail fires
+  // and trims them back to today's leanness on the way to a goal they set
+  // HIGHER than that, and the plan then ends below the goal because the
+  // terminal cut never triggers. One build, no range. Same rule that hides the
+  // order picker for "already leaner than goal".
+  const { currentBodyFatPct, goalBodyFatPct } = profile;
+  if (currentBodyFatPct == null || goalBodyFatPct == null) return null;
+  if (currentBodyFatPct <= goalBodyFatPct) return null;
+
+  // THE TOP CAN NEVER SIT BELOW THE GOAL BODY FAT, and this is a hard rule
+  // rather than a default. A ceiling under the finish line is incoherent: the
+  // rail fires before the build reaches the goal, trims back to the bottom, and
+  // the plan ends BELOW the goal with no terminal cut because the reveal only
+  // triggers on an overshoot. Measured at 1,436 profiles, all of them a
+  // suggested top of bottom+3 landing under a goal the user set higher.
+  const floorForTop = Math.max(
+    round1(base.bottom + MIN_RANGE_WIDTH_PCT),
+    round1(goalBodyFatPct),
+  );
+  const suggestedBottom = base.defaultBottom;
+  const suggestedTop = Math.max(
+    round1(suggestedBottom + SUGGESTED_RANGE_WIDTH_PCT),
+    round1(suggestedBottom + MIN_RANGE_WIDTH_PCT),
+    round1(goalBodyFatPct),
+  );
+
+  // THE DEFAULT TOP IS THE OLD BAND CEILING, NOT THE SUGGESTION, and the
+  // difference matters. `suggestedTop` is what the range screen offers and the
+  // user accepts; this is what a profile that has never answered gets. Making
+  // the suggestion the default would silently re-plan a quarter of existing
+  // profiles onto a tighter band nobody asked for, which is the same fault the
+  // route preference had. Measured across 39,672 profiles: default = suggestion
+  // moves 26.1% of plans and 1.34 -> 1.37 average cuts; default = band ceiling
+  // moves only what the floor change moves.
+  // THE WIDTH AND GOAL RULES APPLY TO A CHOSEN TOP, NOT TO THE FALLBACK.
+  // Raising the fallback to satisfy them switches the rail ON for users who
+  // never asked for a range — 9,928 lean and balanced profiles that previously
+  // drifted with one cut and would suddenly cycle. The old code let a fallback
+  // too close to the bottom stand down instead, and planBuild's own
+  // MIN_RANGE_WIDTH_PCT test still does exactly that, so the fallback is passed
+  // through raw and the rail decides.
+  const top =
+    profile.ceilingBf != null
+      ? Math.max(round1(profile.ceilingBf), floorForTop)
+      : bandFor(route, profile.sex).ceiling;
+  return {
+    leanStop: base.leanStop,
+    topStop: base.topStop,
+    minWidth: MIN_RANGE_WIDTH_PCT,
+    bottom: base.bottom,
+    top,
+    suggestedBottom,
+    suggestedTop,
+  };
+}
+
+/**
+ * The bottom of the range, in the shape the current RouteScreen dial reads.
+ *
+ * KEPT AS A WRAPPER so the shipped screen keeps compiling and behaving while
+ * the range control is built. It has one consumer and should go with it.
+ */
+export function preBuildBfRange(
+  profile: GoalsProfile,
+  route: RoutePreference = 'balanced',
+): { lo: number; hi: number; defaultBf: number } | null {
+  const r = resolveBottom(profile, route);
+  if (!r) return null;
+  if (r.topStop - r.leanStop < 0.5) return null;
+  return { lo: r.leanStop, hi: r.topStop, defaultBf: r.bottom };
+}
 
 /**
  * Builds the full phase sequence from a profile.
@@ -1119,10 +1472,23 @@ export function deriveRoadmap(
   if (!goalWeightKg || goalBodyFatPct == null) return null;
 
   const leanTargetKg = round1(leanMassKg(goalWeightKg, goalBodyFatPct));
-  // `cycles` is deliberately NOT destructured from bandFor any more: the band
-  // still sets where trims start and stop, but how MANY of them there are is
-  // derived from the gap further down.
-  const { floor, ceiling } = bandFor(route, sex);
+  // ── THE BAND IS THE USER'S NOW, 20 Aug 2026 ──────────────────────────────
+  //
+  // Both edges came from `bandFor(route, sex)` until today, which meant the
+  // route preference decided whether someone was held inside a range or left to
+  // drift — and the route picker was removed from the UI on 17 Aug, so that was
+  // a field nobody could set. operatingRangeFor resolves both edges from the
+  // profile, falling back to the same defaults, so an untouched profile is
+  // unchanged.
+  //
+  // bandFor SURVIVES as the fallback for the degraded paths this function still
+  // has to serve: no measured body fat, no lean gap, or reveal-only, where
+  // there is no range to set and operatingRangeFor correctly returns null.
+  const bands = bandFor(route, sex);
+  const range = operatingRangeFor(profile, route);
+  const base = resolveBottom(profile, route);
+  const floor = base ? base.bottom : bands.floor;
+  const ceiling = range ? range.top : bands.ceiling;
 
   const leanNowKg =
     currentBodyFatPct != null ? round1(leanMassKg(currentWeightKg, currentBodyFatPct)) : undefined;
@@ -1136,12 +1502,14 @@ export function deriveRoadmap(
   // body-fat is above goal, the correct phase is a CUT, not a bulk — the user
   // already has the muscle and needs to reveal it." Nothing to build means
   // nothing to split, walk down the curve, or cycle for.
-  if (
-    gapKg != null &&
-    gapKg <= 0 &&
-    currentBodyFatPct != null &&
-    currentBodyFatPct > goalBodyFatPct
-  ) {
+  //
+  // The TEST now lives in goalsProfile as `isRevealOnly`, shared with
+  // derivePhase rule 0. This branch returns before the derivePhase call
+  // further down, so while the condition was written out here the two
+  // functions could — and did — answer differently for the same profile: any
+  // goal weight at or under leanNow / (1 - goalBF) produced a "reveal" card
+  // beside a "recomp" plan. One definition, two callers, no drift.
+  if (isRevealOnly(profile)) {
     // The branch's premise is "the muscle is already built, just reveal it",
     // and its duration used to be monthsToCut, which holds lean mass constant.
     // That contradicts the goal WEIGHT whenever the lean surplus is part of
@@ -1184,6 +1552,15 @@ export function deriveRoadmap(
           kind: 'reveal',
           index: 1,
           exitBodyFatPct: goalBodyFatPct,
+          // Lean is held through a reveal by definition — the whole premise of
+          // this branch is that the muscle is already there — so the weight it
+          // ends at is that lean mass at the goal body fat. Where the goal
+          // weight is lower still (mustShedLean above), the goal weight wins,
+          // because that is what the user asked to see on the scale.
+          exitWeightKg:
+            leanNowKg != null
+              ? round1(Math.min(leanNowKg / (1 - goalBodyFatPct / 100), goalWeightKg))
+              : round1(goalWeightKg),
           estMonths: revealOnly,
           repeats: 1,
         },
@@ -1196,206 +1573,333 @@ export function deriveRoadmap(
   const { regainKg, novelKg } =
     gapKg != null ? splitGap(profile, gapKg) : { regainKg: 0, novelKg: 0 };
 
-  // ── Phase 1: derivePhase's answer, mapped ────────────────────────────────
-  // The route being PREVIEWED is passed through the profile, overriding any
-  // stored routePreference — so scrubbing between routes on the route screen
-  // previews each candidate route's own opener, not the stored one's.
+  // ── The build's fat cost comes from the SURPLUS, not the band ────────────
   //
-  // 'maintain' maps to build: it can only reach here with goal fields set
-  // and a residual lean gap (a meaningful direction or leanness signal would
-  // have derived something else), and a gap is closed by building.
+  // This is the correction of 17 Aug 2026. Every build used to run floor ->
+  // ceiling, which meant the BAND decided how much fat a build added. Measured
+  // on a 90 kg male at 25% aiming for 90 kg at 14%, that implied 2.65 kg of fat
+  // per kg of lean on the balanced route (1.94 lean, 1.05 roomy) against the
+  // 0.2 the nutrition side actually prescribes — so the roadmap was drawing a
+  // plan the macros would never produce. The user ate a lean-bulk surplus,
+  // never reached the ceiling, and the four scheduled trims never fired.
+  //
+  // FAT_PER_LEAN_KG is now imported rather than re-typed, so the two modules
+  // cannot drift. syntheticNutritionAnswers is a runtime leaf (types only from
+  // goalsProfile), which is what makes importing it here safe under Metro.
+  //
+  // What this does NOT claim: that one long build beats several short ones. No
+  // trial has compared them. The claim is only that the fat a build adds should
+  // come from what the user is told to eat.
   const phase1 = derivePhase({ ...profile, routePreference: route });
-  const OPENERS: Record<DerivedPhase, { kind: RoadmapPhaseKind; exit: number }> = {
-    recomp: { kind: 'recomp', exit: ceiling },
-    cut: { kind: 'trim', exit: floor },
-    lean_bulk: { kind: 'build', exit: ceiling },
-    bulk: { kind: 'build', exit: ceiling },
-    maintain: { kind: 'build', exit: ceiling },
-  };
-  const opener = OPENERS[phase1];
+  const fatPerLean =
+    phase1 === 'bulk' ? FAT_PER_LEAN_KG.bulk : FAT_PER_LEAN_KG.lean_bulk;
+
+  const bfOf = (lean: number, fat: number) => (fat / (lean + fat)) * 100;
+  const fatAt = (lean: number, bfPct: number) =>
+    (lean * (bfPct / 100)) / (1 - bfPct / 100);
 
   /**
-   * A phase has to have somewhere to go. Three corrections, all of the same
-   * shape: derivePhase picks the opener from training state, direction and
-   * body fat, and never consults the band, so the exit it implies can sit on
-   * the wrong side of where the user actually is.
+   * Adds `leanToGain` while the surplus adds fat alongside it, inserting a trim
+   * whenever body fat would cross the ceiling.
    *
-   *   build at or above the ceiling  → no room to gain; trim to the floor
-   *   recomp inside the band         → exit is the FLOOR, not the ceiling,
-   *                                    or it reads as ending fatter
-   *   recomp with the floor at or
-   *   above the user                 → no room to lose; they are already lean,
-   *                                    so build instead
+   * The rail almost never fires on a lean bulk: at 0.2 the tissue being added
+   * is ~17% fat, so body fat asymptotes toward 16.7% and an 18% ceiling is
+   * unreachable from below. It exists for the roomy route (0.5, asymptote 33%)
+   * and for anyone starting near the ceiling — the cycling behaviour survives
+   * exactly where it is genuinely needed and disappears where it was invented.
    *
-   * The last one is reachable from rule 4: a user at 11% wanting 7% gets a
-   * recomp, and with the floor at 12 that phase would run 11 → 12 on a
-   * duration that was never computed, because monthsToRecomp returns null on a
-   * negative swing and the [4, 7] fallback takes over.
+   * `trimTo` IS THE USER'S DIAL, not the band floor (20 Aug 2026). A mid-build
+   * trim is still a cut, and sending someone who said "never below 16%" down to
+   * a 12% floor because the ceiling happened to be crossed would break the one
+   * promise the screen makes. The floor survives as the dial's lower bound, so
+   * it still binds — it just binds in one place instead of two.
    */
-  const resolvedOpener = ((): { kind: RoadmapPhaseKind; exit: number } => {
-    let kind = opener.kind;
-    let exit = opener.exit;
-    if (currentBodyFatPct == null) return { kind, exit };
-
-    if (kind === 'build' && currentBodyFatPct >= ceiling) {
-      kind = 'trim';
-      exit = floor;
-    } else if (kind === 'recomp' && currentBodyFatPct <= ceiling) {
-      exit = floor;
-    }
-    if (kind === 'recomp' && currentBodyFatPct <= exit) {
-      kind = 'build';
-      exit = ceiling;
-    }
-    // A trim for someone already leaner than the floor would run upward. Their
-    // goal body fat is the only exit below them that means anything; if that is
-    // not below them either, there is nothing to cut and they should build.
-    if (kind === 'trim' && currentBodyFatPct <= exit) {
-      exit = Math.min(exit, goalBodyFatPct);
-      if (currentBodyFatPct <= exit) {
-        kind = 'build';
-        exit = ceiling;
+  function planBuild(lean0: number, fat0: number, leanToGain: number, trimTo: number) {
+    const segs: Array<{ kind: RoadmapPhaseKind; exit: number; lean: number; from: number }> = [];
+    let lean = lean0;
+    let fat = fat0;
+    let left = leanToGain;
+    const c = ceiling / 100;
+    // Solving bf(lean + L, fat + fpl*L) = ceiling for L. A non-positive
+    // denominator means the added tissue is leaner than the ceiling, so the
+    // ceiling is never reached however much is added.
+    const denom = fatPerLean - c * (1 + fatPerLean);
+    // See MIN_RANGE_WIDTH_PCT. A trim that recovers a tenth of a point is not a
+    // phase, so the rail stands down rather than shredding the build into
+    // pieces nobody could measure.
+    const railWorthIt = ceiling - trimTo >= MIN_RANGE_WIDTH_PCT;
+    for (let guard = 0; left > 1e-6 && guard < MAX_CYCLES; guard++) {
+      const room = denom > 1e-9 && railWorthIt ? (c * (lean + fat) - fat) / denom : Infinity;
+      const room2 = Math.min(left, room > 1e-6 ? room : left);
+      // Take the whole remainder rather than stopping short of it, when what
+      // would be left over is too small to be worth a trim and a rebuild. See
+      // TRIM_REMAINDER_MIN_KG — without this a build that lands exactly on the
+      // ceiling gets an extra cut for a rounding crumb.
+      const step = left - room2 <= TRIM_REMAINDER_MIN_KG ? left : room2;
+      const from = bfOf(lean, fat);
+      lean += step;
+      fat += step * fatPerLean;
+      left -= step;
+      segs.push({ kind: 'build', exit: round1(bfOf(lean, fat)), lean: step, from });
+      if (left > 1e-6) {
+        const fromTrim = bfOf(lean, fat);
+        fat = fatAt(lean, trimTo);
+        segs.push({ kind: 'trim', exit: round1(trimTo), lean: 0, from: fromTrim });
       }
     }
-    return { kind, exit };
-  })();
-  const openerKind = resolvedOpener.kind;
-  const openerExit = resolvedOpener.exit;
+    return { segs, lean, fat };
+  }
 
-  // ── Durations ────────────────────────────────────────────────────────────
-  // These used to be five literal tuples sitting under a docstring claiming
-  // durations were emergent. Every one is now computed from the gap it
-  // actually covers, and estYears is the sum of them rather than a parallel
-  // calculation that could contradict them.
-  //
-  // Each estMonths is ONE repetition. The middle blocks carry repeats, so the
-  // journey total multiplies before summing.
-
-  // Muscle-memory regain deliberately reads the PRE-CAP curve rate. The
-  // state cap bounds demonstrated NOVEL progress; a returning lifter's
-  // answer describes their past and observes nothing about their regain
-  // speed, which is a different process (myonuclear retention — Seaborne,
-  // Staron). This line keeps regain byte-identical to the pre-cap model; the
-  // returning-vs-consistent test pins it. The DEXA cap's treatment here is
-  // inherited unchanged — Q6's cap-vs-regain question stays open, neither
-  // resolved nor worsened by the state cap.
+  // NOVEL only. Sizing this from the whole gap and THEN adding the regain
+  // months below charges the regained kilos twice, which made a returning
+  // lifter with a peak slower than a consistent one without — backwards, and
+  // exactly what the regain credit exists to prevent.
+  const totalBuildMonths: [number, number] | null =
+    novelKg > 0 ? monthsToBuildLean(novelKg, profile) : [0, 0];
   const regainRate = curveGainKgPerYear(profile);
-  const regainLo = regainRate && regainKg > 0 ? regainKg / (regainRate[1] * REGAIN_MULTIPLIER) : 0;
-  const regainHi = regainRate && regainKg > 0 ? regainKg / (regainRate[0] * REGAIN_MULTIPLIER) : 0;
-
-  /**
-   * Total months of BUILDING across the whole journey, novel growth plus
-   * regain. Curve-aware, because yearsToBuild walks the gap down from the
-   * user's measured position rather than applying a flat rate.
-   */
-  const totalBuildMonths: [number, number] | null = (() => {
-    const novel = monthsToBuildLean(novelKg > 0 ? novelKg : (gapKg ?? 0), profile);
-    if (!novel) return null;
-    return [novel[0] + regainLo * 12, novel[1] + regainHi * 12];
-  })();
-
-  /**
-   * The cycle count is DERIVED, not configured.
-   *
-   * Total build time divided by the block length the route asks for. So the
-   * number of phases now scales with how far the user is actually going, and
-   * — the point of the exercise — perBuild × cycles equals the total build
-   * time exactly, which is what makes estYears the sum of the phases rather
-   * than a second opinion about them.
-   */
-  const blockMonths = BUILD_BLOCK_MONTHS[route] ?? BUILD_BLOCK_MONTHS.balanced;
-  const cycles = totalBuildMonths
-    ? Math.min(
-        MAX_CYCLES,
-        Math.max(1, Math.round((totalBuildMonths[0] + totalBuildMonths[1]) / 2 / blockMonths)),
-      )
-    : 1;
-
-  const perBuild: [number, number] = totalBuildMonths
-    ? [round1(totalBuildMonths[0] / cycles), round1(totalBuildMonths[1] / cycles)]
+  const regainLo = regainRate && regainKg > 0 ? (regainKg / (regainRate[1] * REGAIN_MULTIPLIER)) * 12 : 0;
+  const regainHi = regainRate && regainKg > 0 ? (regainKg / (regainRate[0] * REGAIN_MULTIPLIER)) * 12 : 0;
+  const buildBudget: [number, number] = totalBuildMonths
+    ? [totalBuildMonths[0] + regainLo, totalBuildMonths[1] + regainHi]
     : [4, 9];
 
-  // A cycle trim always runs the full band, ceiling down to floor, so its
-  // duration is the same every repetition.
-  const cycleTrim: [number, number] =
-    leanNowKg != null ? monthsToCut(leanNowKg, ceiling, floor, profile) ?? [1, 3] : [1, 3];
-
-  // The opener is measured from where the user actually is, not from the band.
-  const openerMonths: [number, number] = (() => {
-    if (currentBodyFatPct == null || leanNowKg == null) {
-      return openerKind === 'trim' ? [1, 3] : [4, 7];
-    }
-    if (openerKind === 'trim') {
-      return monthsToCut(leanNowKg, currentBodyFatPct, openerExit, profile) ?? [1, 3];
-    }
-    if (openerKind === 'recomp') {
-      return monthsToRecomp(profile, currentWeightKg, currentBodyFatPct, openerExit) ?? [4, 7];
-    }
-    return perBuild;
-  })();
-
-  // Exit criteria are PER KIND: a recomp holds weight down to the ceiling, a
-  // trim cuts to the floor, a build runs back up to the ceiling, the reveal
-  // ends at the goal. (The old opener read `aboveBand ? ceiling : ceiling` —
-  // a ternary that could not branch.)
   const phases: RoadmapPhase[] = [];
+  const WEEKS_PER_MONTH = 4.345;
 
-  phases.push({
-    kind: openerKind,
-    index: 1,
-    exitBodyFatPct: openerExit,
-    estMonths: openerMonths,
-    repeats: 1,
-  });
+  /** Prescribed %BW/week for a leg running from `fromKg` to `toKg`. */
+  const rateFor = (
+    fromKg: number | undefined,
+    toKg: number | undefined,
+    months: [number, number],
+  ): number | undefined => {
+    if (fromKg == null || toKg == null || fromKg <= 0) return undefined;
+    const weeks = ((months[0] + months[1]) / 2) * WEEKS_PER_MONTH;
+    if (!(weeks > 0)) return undefined;
+    return Math.round((((toKg - fromKg) / weeks / fromKg) * 100) * 100) / 100;
+  };
 
-  // The middle blocks are COLLAPSED totals, not a literal alternation. Which
-  // one runs first is decided by where the opener LEAVES the user, not by what
-  // the opener was called: anyone standing at the floor has to build before
-  // there is anything to trim. Keying this off `kind` was why a recomp ending
-  // at the floor was followed by a trim from the floor to the floor.
-  if (openerExit <= floor) {
-    phases.push({ kind: 'build', index: 2, exitBodyFatPct: ceiling, estMonths: perBuild, repeats: cycles });
-    phases.push({ kind: 'trim', index: 3, exitBodyFatPct: floor, estMonths: cycleTrim, repeats: cycles });
-  } else {
-    phases.push({ kind: 'trim', index: 2, exitBodyFatPct: floor, estMonths: cycleTrim, repeats: cycles });
-    phases.push({ kind: 'build', index: 3, exitBodyFatPct: ceiling, estMonths: perBuild, repeats: cycles });
-  }
-
-  // The reveal starts wherever the phase before it ended, which differs by
-  // branch: a journey whose cycles run build-first ends on a trim at the floor,
-  // the other ends on a build at the ceiling.
-  //
-  // It is only pushed when there is something left to strip. A band floor BELOW
-  // the user's goal body fat means the cycles already leave them leaner than
-  // they asked to be, and appending a "cut" from 12% up to 13% — which is what
-  // this did — is not a phase, it is a rounding artifact wearing a name. That
-  // case only became reachable once the cycles started ordering themselves by
-  // where the opener leaves the user.
-  const revealFrom = phases[phases.length - 1].exitBodyFatPct;
-  if (revealFrom > goalBodyFatPct) {
-    const revealMonths: [number, number] =
-      (leanNowKg != null ? monthsToCut(leanNowKg, revealFrom, goalBodyFatPct, profile) : null) ??
-      REVEAL_MONTHS;
-
+  const push = (
+    kind: RoadmapPhaseKind,
+    exit: number,
+    months: [number, number],
+    exitWeightKg?: number,
+    fromWeightKg?: number,
+  ) =>
     phases.push({
-      kind: 'reveal',
-      index: cycles * 2 + 2,
-      exitBodyFatPct: goalBodyFatPct,
-      estMonths: revealMonths,
+      kind,
+      index: phases.length + 1,
+      exitBodyFatPct: exit,
+      exitWeightKg: exitWeightKg == null ? undefined : round1(exitWeightKg),
+      targetRatePctPerWeek: rateFor(fromWeightKg, exitWeightKg, months),
+      belowDetectionThreshold:
+        (months[0] + months[1]) / 2 < MIN_DETECTABLE_PHASE_MONTHS ? true : undefined,
+      estMonths: months,
       repeats: 1,
     });
+
+  const buildMonthsFor = (leanShare: number): [number, number] =>
+    gapKg && gapKg > 0
+      ? [round1((buildBudget[0] * leanShare) / gapKg), round1((buildBudget[1] * leanShare) / gapKg)]
+      : buildBudget;
+
+  if (leanNowKg == null || currentBodyFatPct == null || gapKg == null || gapKg <= 0) {
+    // Degraded path: no measured body fat, or nothing to build. Keep the old
+    // literal so a profile without a reading still renders a plan.
+    // TWO CASES REACH HERE and only one of them can be given a scale target.
+    // With a known lean mass (the "nothing left to build" case) the weight at
+    // the ceiling is derivable. Without a measured body fat there is no lean
+    // mass and no honest target, so this stays undefined and phaseTransition
+    // must decline to detect rather than guess.
+    push(
+      'build',
+      ceiling,
+      buildBudget,
+      leanNowKg != null ? leanNowKg / (1 - ceiling / 100) : undefined,
+    );
+  } else {
+    const nowFat = currentWeightKg - leanNowKg;
+    const goalFat = goalWeightKg * (goalBodyFatPct / 100);
+    const fatFromBuild = gapKg * fatPerLean;
+
+    // `floor` IS the bottom of the user's range, resolved above, and it is the
+    // deepest any cut in this plan may go — opening or mid-build. That is what
+    // stops the ceiling rail taking someone who set 16% down to 12% because the
+    // build happened to cross the top.
+    //
+    // The old inline computation of this depth ("wherever the fat the build adds
+    // lands you exactly on your goal", clamped up to the band floor because a
+    // large lean gap otherwise asks for a cut to 0%) now lives in
+    // operatingRangeFor as the DEFAULT bottom, so it still governs every profile
+    // that has not set one.
+    const trimTo = floor;
+
+    // THE ORDER OWNS THE OPENING CUT, THE RANGE OWNS EVERYTHING ELSE. These are
+    // orthogonal and used not to be: build-first was expressed by moving the
+    // bottom, which also moved every mid-build trim with it. Now a build-first
+    // user keeps the range they set — the rail still returns them to their own
+    // bottom whenever the build crosses their top — they simply do not cut into
+    // it before starting.
+    const order: PhaseOrder = profile.phaseOrder ?? defaultPhaseOrder(profile);
+    const needsCut = order === 'cut_first' && currentBodyFatPct > floor + 0.2;
+
+    if (!needsCut) {
+      const { segs, lean, fat } = planBuild(leanNowKg, nowFat, gapKg, trimTo);
+      // Walked rather than mapped, so every segment can carry the scale weight
+      // it ends at — the figure transition detection actually uses.
+      let wLean = leanNowKg;
+      let wFat = nowFat;
+      segs.forEach((sg) => {
+        // The weight the leg STARTS at, so targetRatePctPerWeek is populated
+        // here too. It was omitted while this branch only served users with
+        // nothing to cut; build_first now lands here as a dial at the top, and
+        // a build with no prescribed rate would have been a silent regression.
+        const wBefore = wLean + wFat;
+        if (sg.kind === 'build') {
+          wLean += sg.lean;
+          wFat += sg.lean * fatPerLean;
+          push('build', sg.exit, buildMonthsFor(sg.lean), wLean + wFat, wBefore);
+        } else {
+          wFat = fatAt(wLean, sg.exit);
+          push(
+            'trim',
+            sg.exit,
+            monthsToCut(leanNowKg + gapKg, sg.from, sg.exit, profile) ?? [1, 3],
+            wLean + wFat,
+            wBefore,
+          );
+        }
+      });
+      const endBf = bfOf(lean, fat);
+      if (endBf > goalBodyFatPct + 0.2) {
+        push(
+          'reveal',
+          goalBodyFatPct,
+          monthsToCut(lean, endBf, goalBodyFatPct, profile) ?? REVEAL_MONTHS,
+          lean + fatAt(lean, goalBodyFatPct),
+        );
+      }
+    } else {
+      // ── The cycles ────────────────────────────────────────────────────────
+      //
+      // ONE LOOP FOR BOTH ORDERS AND EVERY CYCLE COUNT. cycles === 1 reproduces
+      // the single-pass plan exactly: the one trim removes the whole of fatOut,
+      // landing on preBuildFat, and the one build puts the rest back — so the
+      // untouched-profile default is byte-identical to what shipped before
+      // chunking existed.
+      //
+      // Splitting is FREE. Total fat removed and total lean added are both
+      // fixed, so N only changes the path, never the duration — measured at
+      // 15.8 to 16.1 months across N of 1 to 4 on the same lifter. What it buys
+      // is a smaller excursion: 6.7 kg below goal weight at N=1 against 1.7 at
+      // N=4.
+      // ── ONE CUT AND ONE BUILD ─────────────────────────────────────────────
+      //
+      // A `cutStyle` option offering to split this into several short cuts was
+      // built on 18 Aug and REMOVED the same day. It was justified on weight
+      // excursion — chunking keeps you nearer your goal WEIGHT — and that was
+      // the wrong axis. Measured on mean body fat it is worse in every profile
+      // tested: 18.5% against 14.9% for a fat starter with a small lean gap,
+      // 15.0% against 14.9% for a lean starter with a large one, with four to
+      // five cuts instead of one and no time saved. It kept you near your goal
+      // weight by keeping you FATTER for longer.
+      //
+      // The evidence never covered it either: MATADOR and ICECAP chunk a
+      // DEFICIT against maintenance blocks. Nobody has tested alternating a
+      // deficit with a SURPLUS. Do not reintroduce this without a measurement
+      // on mean body fat, not on weight.
+      //
+      // NOTE this is not the same thing as the ceiling rail in planBuild below,
+      // which DOES still produce mid-build trims. Those are forced arithmetic —
+      // at 0.5 kg of fat per kg of lean you cannot add 16 kg of muscle without
+      // body fat crossing 18% somewhere — and they are correct.
+      const fatOut = nowFat - goalFat + fatFromBuild;
+      const leanPer = gapKg;
+      const fatPer = fatOut;
+
+      let lean = leanNowKg;
+      let fat = nowFat;
+
+      const doTrim = () => {
+        const from = bfOf(lean, fat);
+        fat = Math.max(0, fat - fatPer);
+        // Clamped at the DIAL, never at the goal. A cut must be allowed to go
+        // BELOW the goal body fat, because the build that follows puts fat back
+        // on — clamping to the goal instead made the single-cycle cut stop at
+        // 14% when it needed 13.6%, then need a third phase to finish.
+        //
+        // The clamp used to be the band floor, which is the dial's lower bound,
+        // so for a profile with no dial set this is the same number it always
+        // was. Raising the dial shortens this cut and leaves the rest to the
+        // terminal reveal, which is the entire point of the control.
+        const exit = Math.max(trimTo, round1(bfOf(lean, fat)));
+        const wBefore = lean + fatAt(lean, from);
+        fat = fatAt(lean, exit);
+        push('trim', exit, monthsToCut(lean, from, exit, profile) ?? [1, 3], lean + fat, wBefore);
+      };
+
+      const doBuild = () => {
+        const { segs } = planBuild(lean, fat, leanPer, trimTo);
+        segs.forEach((sg) => {
+          const from = bfOf(lean, fat);
+          const wBefore = lean + fat;
+          if (sg.kind === 'build') {
+            lean += sg.lean;
+            fat += sg.lean * fatPerLean;
+            push('build', sg.exit, buildMonthsFor(sg.lean), lean + fat, wBefore);
+          } else {
+            fat = fatAt(lean, sg.exit);
+            push('trim', sg.exit, monthsToCut(lean, from, sg.exit, profile) ?? [1, 3], lean + fat, wBefore);
+          }
+        });
+      };
+
+      // ONE ORDER HERE, because build_first is no longer a branch — it is the
+      // dial parked at current body fat, which makes needsCut false and sends
+      // that user to the no-cut path above with an identical result: the same
+      // build segments, then a terminal cut landing on the goal. Reaching this
+      // point at all means there is fat to shed before the build starts.
+      doTrim();
+      doBuild();
+
+      // Anything the cycles could not shed — a floor clamp above, or a build
+      // that overshot — comes off here.
+      const endBf = bfOf(lean, fat);
+      if (endBf > goalBodyFatPct + 0.2) {
+        push(
+          'reveal',
+          goalBodyFatPct,
+          monthsToCut(lean, endBf, goalBodyFatPct, profile) ?? REVEAL_MONTHS,
+          lean + fatAt(lean, goalBodyFatPct),
+        );
+      }
+
+      // A trim that lands the user ON their goal is the reveal, semantically:
+      // it is the phase that shows the physique rather than one that makes room
+      // for more building. Build-first always ends this way.
+      const tail = phases[phases.length - 1];
+      // ONLY when it lands ON the goal, not merely at or under it. The looser
+      // test renamed a trim that OVERSHOT — cycles ending at 10% against a 14%
+      // goal — and that erased a meaningful distinction: a roadmap with no
+      // terminal reveal is one where the user needs no final cut, and calling
+      // the overshooting trim a reveal made the two indistinguishable.
+      if (tail && tail.kind === 'trim' && Math.abs(tail.exitBodyFatPct - goalBodyFatPct) <= 0.2) {
+        tail.kind = 'reveal';
+      }
+
+      // Every cut rounds its exit to a tenth and resets fat mass to match, so a
+      // four-cycle plan accumulates about a tenth of a point of drift and ends
+      // reading 14.1% for a 14% goal. Too small for the reveal above to fire,
+      // and far too small to be real — the plan is CONSTRUCTED to land on the
+      // goal, so the last phase says so rather than showing the rounding.
+      if (tail && Math.abs(tail.exitBodyFatPct - goalBodyFatPct) <= 0.5) {
+        tail.exitBodyFatPct = goalBodyFatPct;
+        // The weight has to follow the snap or the two disagree, and the weight
+        // is the one detection reads.
+        tail.exitWeightKg = round1(lean + fatAt(lean, goalBodyFatPct));
+      }
+    }
   }
 
-  /**
-   * ONE model. estYears is the phases added up, and nothing else.
-   *
-   * That is only possible because the cycle count is derived: perBuild is the
-   * total build time divided by cycles, so perBuild x cycles reconstructs it
-   * exactly. Every earlier version here was a second opinion about the same
-   * journey — summing raw phases while builds carried a literal broke the
-   * regain credit, and taking the max of the sum and the gap let the phase
-   * cards add up to double the headline.
-   */
   const summedMonths = phases.reduce<[number, number]>(
     (acc, ph) => [acc[0] + ph.estMonths[0] * ph.repeats, acc[1] + ph.estMonths[1] * ph.repeats],
     [0, 0],

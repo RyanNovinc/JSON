@@ -63,7 +63,7 @@ function makeNav() {
 }
 
 /** The routes a user must never reach before a GoalsProfile exists. */
-const GATED_ROUTES = ['Q3DaysPerWeek', 'N5DietType'];
+const GATED_ROUTES = ['Q3DaysPerWeek', 'N3Age', 'N5DietType'];
 
 function assertNoGatedRoute(nav: { navigate: jest.Mock }) {
   const visited = nav.navigate.mock.calls.map((c) => c[0]);
@@ -208,29 +208,36 @@ describe('continueNutritionFlow', () => {
     expect(mockMergeNutritionAnswers).not.toHaveBeenCalled();
   });
 
-  // N1, N2, N3 and N4 all left the flow. There is no branch left: everyone is
-  // seeded the same way and lands on N5. The old "which path did this user
-  // take" state was the source of a whole class of bugs here.
-  it('always lands on N5, never on a screen that no longer exists', async () => {
+  // N3Age is the first screen as of 17 Aug 2026. Age and activity came BACK
+  // into the flow as their own steps, because they were the two answers that
+  // change the calorie target and neither was being asked here — activity was
+  // being collected on ConfirmStats instead, where the user could not see why.
+  //
+  // Still one path for everyone: no branch, no "which route did this user
+  // take" state, which was the source of a whole class of bugs in this file.
+  it('always lands on N3Age, never on a screen that no longer exists', async () => {
     const nav = makeNav();
 
     await continueNutritionFlow(nav);
 
-    expect(nav.navigate).toHaveBeenCalledWith('N5DietType', expect.any(Object));
+    expect(nav.navigate).toHaveBeenCalledWith('N3Age', expect.any(Object));
     const visited = nav.navigate.mock.calls.map((c: any[]) => c[0]);
-    ['N1Goal', 'N2Rate', 'N3AboutYou', 'N4Activity'].forEach((r) =>
-      expect(visited).not.toContain(r),
-    );
+    // N1Goal and N3AboutYou are genuinely gone. N2Rate exists but is reached
+    // from the summary, never as a step in this flow.
+    ['N1Goal', 'N3AboutYou', 'N2Rate'].forEach((r) => expect(visited).not.toContain(r));
   });
 
-  it('shifts the step count down by four so N5 onward keep their literals', async () => {
+  // Down by TWO now, not four: N3Age is the entry point and its literals
+  // assume it is the 3rd of 12, so every downstream screen keeps its own
+  // hardcoded numbers untouched.
+  it('shifts the step count down by two so the later screens keep their literals', async () => {
     const nav = makeNav();
 
     await continueNutritionFlow(nav, { flowStepOffset: 4 });
 
     expect(nav.navigate).toHaveBeenCalledWith(
-      'N5DietType',
-      expect.objectContaining({ flowStepOffset: 0 }),
+      'N3Age',
+      expect.objectContaining({ flowStepOffset: 2 }),
     );
   });
 
@@ -252,7 +259,7 @@ describe('continueNutritionFlow', () => {
     );
   });
 
-  it('seeds the profile fields the removed screens used to ask for', async () => {
+  it('seeds sex, height and weight from the profile', async () => {
     mockLoadGoalsProfile.mockResolvedValue({
       ...PROFILE_WITH_GOAL,
       sex: 'male',
@@ -265,14 +272,30 @@ describe('continueNutritionFlow', () => {
     await continueNutritionFlow(nav);
 
     expect(mockMergeNutritionAnswers).toHaveBeenCalledWith(
-      expect.objectContaining({
-        gender: 'male',
-        age: 28,
-        height: 185,
-        activityLevel: 'moderate',
-        weight: 80,
-      }),
+      expect.objectContaining({ gender: 'male', height: 185, weight: 80 }),
     );
+  });
+
+  // THE POINT OF THE 17 Aug CHANGE, asserted as a negative because that is the
+  // only way it can be. Age and activity are asked as their own steps, so
+  // seeding them from the profile would silently SKIP those questions for any
+  // user whose profile already carried them — which is the duplication the
+  // change removed, just inverted.
+  it('does NOT seed age or activity, so the questions are actually asked', async () => {
+    mockLoadGoalsProfile.mockResolvedValue({
+      ...PROFILE_WITH_GOAL,
+      sex: 'male',
+      ageYears: 28,
+      heightCm: 185,
+      activityLevel: 'moderate',
+    });
+    const nav = makeNav();
+
+    await continueNutritionFlow(nav);
+
+    const seeded = mockMergeNutritionAnswers.mock.calls[0][0];
+    expect(seeded).not.toHaveProperty('age');
+    expect(seeded).not.toHaveProperty('activityLevel');
   });
 
   // The user's own answer always wins over the derived one.
@@ -287,12 +310,12 @@ describe('continueNutritionFlow', () => {
     );
   });
 
-  it('still lands on N5 when there is no profile at all', async () => {
+  it('still lands on N3Age when there is no profile at all', async () => {
     mockLoadGoalsProfile.mockResolvedValue(null);
     const nav = makeNav();
 
     await continueNutritionFlow(nav);
 
-    expect(nav.navigate).toHaveBeenCalledWith('N5DietType', expect.any(Object));
+    expect(nav.navigate).toHaveBeenCalledWith('N3Age', expect.any(Object));
   });
 });

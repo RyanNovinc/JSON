@@ -255,30 +255,6 @@ export default function PhasePositionScreen() {
           {all.length} phases in total. They repeat: build up to the top of your band, trim back to
           the bottom, then a last cut to your goal.
         </Text>
-
-        {/* WHAT THIS GOVERNS, said out loud, because two halves of the app
-            answer to different authorities and the user cannot see the seam.
-
-            The phase set here drives what the app DISPLAYS and what the
-            generation prompts are TOLD. It does not drive the calorie and
-            protein targets: those come from derivePhase, which reads body fat,
-            goal and route.
-
-            That split is structural rather than an oversight left for later.
-            deriveRoadmap calls derivePhase to choose its opening phase, and
-            this screen's positions index into that roadmap — so a derivePhase
-            that also consumed the position would be reading a value derived
-            from itself.
-
-            The visible consequence, and the reason it is on the screen instead
-            of waiting to be discovered in a generated plan: set yourself to a
-            Build at 18% body fat and the plan will say Build while the numbers
-            stay where your measurements put them. */}
-        <Text style={styles.footNote}>
-          Setting your phase changes what the app shows you and what your plans are built for. Your
-          calorie and protein targets still follow your measurements, so they will not jump just
-          because you moved yourself along.
-        </Text>
       </ScrollView>
 
       {/* Nothing happens on the tap itself. Both directions edit a record the
@@ -286,11 +262,29 @@ export default function PhasePositionScreen() {
           different things, because they do different things. */}
       <Modal visible={pending != null} transparent animationType="fade" onRequestClose={() => setPending(null)}>
         <Pressable style={styles.scrim} onPress={() => setPending(null)} />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 22 }]}>
+        <View style={styles.sheet}>
           <View style={styles.grab} />
-          <Text style={styles.sheetTitle}>
-            {forward ? `Move to phase ${(pending ?? 0) + 1}?` : `Go back to phase ${(pending ?? 0) + 1}?`}
-          </Text>
+          {/* SCROLLABLE — a fixed sheet loses its bottom on a small phone,
+              and the bottom is where the source line and the dismiss sit. The
+              grab handle stays outside the scroll so it does not travel. */}
+          <View style={styles.sheetHead}>
+            <Text style={styles.sheetTitle}>
+              {forward ? `Move to phase ${(pending ?? 0) + 1}?` : `Go back to phase ${(pending ?? 0) + 1}?`}
+            </Text>
+          </View>
+          <ScrollView
+            style={styles.sheetScrollArea}
+            contentContainerStyle={styles.sheetScrollContent}
+            /* bounces LEFT ON, deliberately. Turning it off felt like the
+               right call for a contained sheet and was wrong: on iOS the
+               rubber-banding IS the smoothness, and without it the scroll
+               stops dead at both ends and reads as broken.
+               The indicator stays visible too — in a sheet that sometimes
+               scrolls and sometimes does not, it is the only thing telling
+               the user which one they have got. */
+            showsVerticalScrollIndicator
+            indicatorStyle="white"
+          >
 
           <Text style={styles.sheetBody}>
             {forward
@@ -314,6 +308,8 @@ export default function PhasePositionScreen() {
             </View>
           )}
 
+          </ScrollView>
+          <View style={[styles.sheetFooter, { paddingBottom: insets.bottom + 20 }]}>
           <TouchableOpacity
             style={[styles.confirm, { backgroundColor: themeColor }]}
             onPress={confirm}
@@ -338,6 +334,7 @@ export default function PhasePositionScreen() {
           >
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -401,19 +398,66 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 9, fontWeight: '700', letterSpacing: 1.1 },
 
   foot: { fontSize: 12.5, lineHeight: 19, color: '#4b4b52', marginTop: 26 },
-  footNote: { fontSize: 12.5, lineHeight: 19, color: '#4b4b52', marginTop: 14 },
 
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.66)' },
+  /**
+   * THE CAP BELONGS HERE, not on the ScrollView inside.
+   *
+   * A maxHeight on the scroll resolves against this sheet, and this sheet is
+   * sized by its own content — so the percentage depended on the thing it was
+   * meant to constrain. Short content inflated the sheet toward the top of the
+   * screen and the footer got clipped inside the scrollable area.
+   *
+   * Capping here and laying the sheet out as a column handles both: short
+   * content hugs, long content stops and scrolls under a pinned footer.
+   */
   sheet: {
     backgroundColor: '#111114',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#27272a',
-    paddingHorizontal: 20,
     paddingTop: 12,
+    maxHeight: '82%',
+    flexDirection: 'column',
   },
-  grab: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2f2f35', alignSelf: 'center', marginBottom: 16 },
+  grab: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2f2f35', alignSelf: 'center', marginBottom: 16, flexShrink: 0 },
+  /**
+   * flex shrink with minHeight: 0 — the minHeight is the part that is easy to
+   * miss. Without it a flex child will not shrink below its content height, so
+   * the ScrollView never engages and the overflow is simply clipped.
+   */
+  /**
+   * PADDING GOES ON contentContainerStyle, NOT style.
+   *
+   * A ScrollView's `style` is the viewport; padding there does not inset the
+   * scrolling content, which is why the first version had text running to the
+   * screen edge.
+   *
+   * flexShrink with minHeight: 0 is what lets the scroll engage at all — a flex
+   * child will not shrink below its content height without it, so the overflow
+   * is clipped rather than scrolled.
+   *
+   * Named sheetScrollArea rather than sheetBody because sheetBody is already a
+   * TEXT style in these files, and two keys of the same name in one StyleSheet
+   * silently resolve to whichever came last.
+   */
+  sheetScrollArea: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
+  sheetScrollContent: { paddingHorizontal: 20, paddingBottom: 10 },
+  /**
+   * The title sits OUTSIDE the scroll. Scrolling a long sheet used to carry the
+   * heading away, leaving the reader mid-paragraph with nothing saying what it
+   * was about.
+   */
+  sheetHead: { flexGrow: 0, flexShrink: 0, paddingHorizontal: 20, paddingBottom: 12 },
+  sheetFooter: {
+    flexGrow: 0,
+    flexShrink: 0,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1c1c20',
+  },
   sheetTitle: { fontSize: 21, fontWeight: '700', color: '#ffffff', letterSpacing: -0.4 },
   sheetBody: { fontSize: 14, lineHeight: 21, color: '#8e8e93', marginTop: 8 },
 

@@ -26,7 +26,10 @@ import {
   HEIGHT_CM_MIN,
   HEIGHT_CM_MAX,
 } from '../utils/goalsProfileStorage';
-import type { Sex, ActivityLevel } from '../utils/goalsProfile';
+import type { Sex } from '../utils/goalsProfile';
+import { WorkoutStorage } from '../utils/storage';
+import { recordWeightEntry } from '../utils/weightHistory';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
 import {
   continueWorkoutFlow,
   continueNutritionFlow,
@@ -50,61 +53,31 @@ import {
  * stale between plans. Not part of the numbered questionnaire progress
  * bar — it's a single confirm-or-edit step, not a flow of its own.
  *
- * It also carries the TOP-UP for sex / age / height. Those three moved onto
- * GoalsProfile with the shared intake, but GoalsIntake only ever runs on a
- * first run — so without this, every user who already had a profile would
- * keep those fields undefined forever, losing the FFMI plausibility check and
- * the phase model's sex-specific bands. This screen is the only place a
- * returning user is guaranteed to pass through, so the top-up lives here.
+ * The TOP-UP branch it used to carry (sex / age / height, shown as "A couple
+ * of gaps") was deleted 17 Aug 2026. Sex and height are mandatory in
+ * onboarding, so the branch was unreachable; age and activity moved to the
+ * nutrition questionnaire, where the answers actually change something the
+ * user can see.
  *
- * Only the MISSING fields are shown. A user who has all three sees the screen
- * exactly as it was, with no extra friction. Once answered, they never see the
- * top-up again.
+ * Sex is still LOADED here, and still needed: the body-fat field resolves
+ * its tiers against it. It is just no longer editable on this screen.
  */
 
 /**
- * Activity level joined the top-up on 9 Aug 2026, and it is not optional
- * cosmetics: N4 (the screen that used to ask) was deleted when the shared
- * intake started collecting it, and the intake is FIRST-RUN ONLY. A returning
- * user therefore had no activityLevel anywhere — computeMacros returns null
- * without it, so finalizeNutrition failed at the very last screen with
- * "Failed to finalize nutrition data from N9".
+ * HISTORY, because it is the reason to be careful here.
+ *
+ * Activity level was pulled into this screen's top-up on 9 Aug 2026 after N4
+ * was deleted and the shared intake — which is FIRST-RUN ONLY — became its
+ * only source. Returning users had no activityLevel anywhere, computeMacros
+ * returned null without it, and finalizeNutrition failed on the very last
+ * screen of the questionnaire.
+ *
+ * It has now gone back to being its own questionnaire step (N4Activity), which
+ * fixes that properly rather than by patching a hole in a screen that fires
+ * conditionally. Anything moved out of a questionnaire has to land somewhere a
+ * RETURNING user will still meet it.
  */
-const ACTIVITY_OPTIONS: Array<{ value: ActivityLevel; label: string; hint: string }> = [
-  { value: 'sedentary', label: 'Mostly sitting', hint: 'Desk job, little walking' },
-  { value: 'light', label: 'Lightly active', hint: 'On your feet some of the day' },
-  { value: 'moderate', label: 'Moderately active', hint: 'Lots of walking, or an active job' },
-  { value: 'heavy', label: 'Very active', hint: 'On your feet all day, physical job' },
-  { value: 'extreme', label: 'Extremely active', hint: 'Heavy manual work as well as training' },
-];
 
-const SEX_OPTIONS: Array<{ value: Sex; label: string }> = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'prefer_not_to_say', label: 'Rather not say' },
-];
-
-// Duplicated from GoalsIntakeScreen rather than shared, matching how the
-// option arrays are already duplicated across the profile screens. A third
-// copy (GoalsStatsScreen will need these when it gains the same fields)
-// is the point at which extracting them earns its keep.
-function validateAge(raw: string): string | null {
-  if (!raw.trim()) return null;
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n)) return 'Enter a number.';
-  if (n < AGE_MIN || n > AGE_MAX) return `Age should be between ${AGE_MIN} and ${AGE_MAX}.`;
-  return null;
-}
-
-function validateHeight(raw: string): string | null {
-  if (!raw.trim()) return null;
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n)) return 'Enter a number.';
-  if (n < HEIGHT_CM_MIN || n > HEIGHT_CM_MAX) {
-    return `Height should be between ${HEIGHT_CM_MIN} and ${HEIGHT_CM_MAX} cm.`;
-  }
-  return null;
-}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -155,6 +128,8 @@ export default function ConfirmStatsScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProps>();
   const { themeColor } = useTheme();
+  // The unit the entry is STORED in, so the chart shows what the user typed.
+  const { globalUnit } = useWeightUnit();
   const insets = useSafeAreaInsets();
 
   const nextFlow = route.params?.nextFlow ?? 'workout';
@@ -179,14 +154,7 @@ export default function ConfirmStatsScreen() {
   // ── Top-up state ───────────────────────────────────────────────────────────
   // needX is fixed at load time, not derived from the inputs, so the fields
   // don't disappear from under the user the moment they answer one.
-  const [needSex, setNeedSex] = useState(false);
-  const [needAge, setNeedAge] = useState(false);
-  const [needHeight, setNeedHeight] = useState(false);
-  const [needActivity, setNeedActivity] = useState(false);
-  const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(null);
   const [sex, setSex] = useState<Sex | null>(null);
-  const [ageInput, setAgeInput] = useState('');
-  const [heightInput, setHeightInput] = useState('');
 
   // How old each number is. The old screen asked "still accurate?" while
   // showing values with no dates, which is a question the user had no way to
@@ -209,14 +177,7 @@ export default function ConfirmStatsScreen() {
       }
       setHeightCmState(profile?.heightCm);
 
-      setNeedSex(profile?.sex == null);
-      setNeedAge(profile?.ageYears == null);
-      setNeedHeight(profile?.heightCm == null);
-      setNeedActivity(profile?.activityLevel == null);
-      if (profile?.activityLevel) setActivityLevel(profile.activityLevel);
       if (profile?.sex) setSex(profile.sex);
-      if (profile?.ageYears != null) setAgeInput(String(profile.ageYears));
-      if (profile?.heightCm != null) setHeightInput(String(profile.heightCm));
 
       // Read straight from the key rather than through WorkoutStorage. An
       // earlier version imported that module as a default export, which it may
@@ -224,11 +185,15 @@ export default function ConfirmStatsScreen() {
       // swallowed it, so both dates silently never appeared. Reading the key
       // has no such dependency, and this only needs the newest timestamp, not
       // the write queue and quarantine machinery the helper exists for.
+      // Was a raw AsyncStorage.getItem on the key, which bypassed the
+      // gateway's backup fallback and corruption recovery — so a user whose
+      // primary blob was damaged saw no date even though the backup held one.
+      // The import concern in the comment above is real but applies to the
+      // DEFAULT export; the named helper below is safe.
       let entries: any[] = [];
       try {
-        const raw = await AsyncStorage.getItem('weight_tracking_history');
-        const parsed = raw ? JSON.parse(raw) : [];
-        if (Array.isArray(parsed)) entries = parsed;
+        const read = await WorkoutStorage.loadWeightHistoryResult();
+        if (read.ok && Array.isArray(read.entries)) entries = read.entries;
       } catch {
         // leave it unknown: a missing date costs a label, never a value
       }
@@ -284,7 +249,36 @@ export default function ConfirmStatsScreen() {
       const newBodyFatPct = bodyFat.bodyFatPct;
 
       if (currentWeightKg != null && currentWeightKg !== originalWeightKg) {
-        await updateGoalsProfileField('currentWeightKg', currentWeightKg);
+        // ── RECORD IT, DO NOT JUST MIRROR IT, 19 Aug 2026 ─────────────────
+        //
+        // This used to write the profile scalar alone. Weight lives in two
+        // stores — the profile every plan is calculated from, and
+        // `weight_tracking_history`, the dated series the charts and the
+        // phase-transition trend read — and correcting your weight here moved
+        // only the first. So this screen showed the new number above its own
+        // "logged N days ago" label computed from a history that had not moved,
+        // and, worse, the trend that decides when a phase ends was missing this
+        // weigh-in entirely.
+        //
+        // recordWeightEntry writes the entry FIRST with read-back verification
+        // and mirrors the profile after, non-fatally — so the ordering that
+        // cannot lose data now applies here too, and the profile update below
+        // is no longer needed because the helper does it.
+        const rec = await recordWeightEntry({
+          weightKg: currentWeightKg,
+          unit: globalUnit === 'lbs' ? 'lbs' : 'kg',
+          origin: 'ConfirmStatsScreen',
+        });
+        if (!rec.ok) {
+          console.error(
+            '[ConfirmStats] weigh-in not recorded:',
+            'reason' in rec ? rec.reason : 'unknown',
+          );
+          // Fall back to the profile write so the plan is at least calculated
+          // from the number the user just typed. A missing history row is a
+          // smaller loss than a plan built on a stale weight.
+          await updateGoalsProfileField('currentWeightKg', currentWeightKg);
+        }
       }
       if (newBodyFatPct !== originalBodyFatPct) {
         await updateGoalsProfileField('currentBodyFatPct', newBodyFatPct);
@@ -297,19 +291,6 @@ export default function ConfirmStatsScreen() {
           // the stale marking can never fire.
           await recordBodyFatReading(newBodyFatPct, bodyFat.source, 'ConfirmStatsScreen');
         }
-      }
-
-      if (needSex && sex) {
-        await updateGoalsProfileField('sex', sex);
-      }
-      if (needAge && ageInput.trim() && !validateAge(ageInput)) {
-        await updateGoalsProfileField('ageYears', parseInt(ageInput, 10));
-      }
-      if (needHeight && heightInput.trim() && !validateHeight(heightInput)) {
-        await updateGoalsProfileField('heightCm', parseInt(heightInput, 10));
-      }
-      if (needActivity && activityLevel) {
-        await updateGoalsProfileField('activityLevel', activityLevel);
       }
 
       // NOTE: this used to detour through the Route screen when the roadmap had
@@ -328,10 +309,7 @@ export default function ConfirmStatsScreen() {
     }
   };
 
-  const ageError = validateAge(ageInput);
-  const heightError = validateHeight(heightInput);
   const resolvedBodyFat = resolveBodyFat(bodyFat, sex ?? undefined, heightCm);
-  const showTopUp = needSex || needAge || needHeight || needActivity;
 
   // Stale is MARKED, never blocking. It is their body, and a number they have
   // not updated is not the same as one the plan cannot be built without.
@@ -344,10 +322,7 @@ export default function ConfirmStatsScreen() {
   // height there is no plausibility check, and without sex the phase model
   // falls back to male body-fat bands for everyone.
   const topUpComplete =
-    (!needSex || sex !== null) &&
-    (!needAge || (ageInput.trim().length > 0 && !ageError)) &&
-    (!needHeight || (heightInput.trim().length > 0 && !heightError)) &&
-    (!needActivity || activityLevel !== null);
+    true;
 
   if (loading) {
     return (
@@ -389,129 +364,25 @@ export default function ConfirmStatsScreen() {
         >
           <Text style={styles.eyebrow}>BEFORE WE BUILD</Text>
           <Text style={styles.title}>
-            {showTopUp ? 'A couple of gaps.' : anythingStale ? 'Worth a check.' : 'These still right?'}
+            {anythingStale ? 'Worth a check.' : 'These still right?'}
           </Text>
           <Text style={styles.subtitle}>
-            {showTopUp
-              ? 'The plan cannot be built without these. Height sets the plausibility check, and sex decides which body fat ranges apply to you.'
-              : anythingStale
-                ? 'Your plan is calculated from these, and one of them has not moved in a while.'
-                : 'Your plan is calculated from them. Change anything that has moved.'}
+            {anythingStale
+              ? 'Your plan is calculated from these, and one of them has not moved in a while.'
+              : 'Your plan is calculated from these. Change anything that has moved.'}
           </Text>
 
-          {needSex ? (
-            <>
-              <Text style={styles.groupLabel}>Sex</Text>
-              <View style={styles.pillRow}>
-                {SEX_OPTIONS.map((opt) => {
-                  const active = sex === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[
-                        styles.pill,
-                        active && { borderColor: themeColor, backgroundColor: '#14181b' },
-                      ]}
-                      onPress={() => setSex(opt.value)}
-                      activeOpacity={0.8}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <Text
-                        style={[styles.pillText, active && { color: themeColor }]}
-                        numberOfLines={1}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-
-          {needAge ? (
-            <View style={styles.inputRow}>
-              <View style={styles.inputRowIcon}>
-                <Ionicons name="calendar-outline" size={18} color="#a1a1aa" />
-              </View>
-              <View style={styles.inputRowContent}>
-                <Text style={styles.inputRowLabel}>Age</Text>
-                <TextInput
-                  style={styles.inlineInput}
-                  placeholder="e.g. 28"
-                  placeholderTextColor="#52525b"
-                  keyboardType="number-pad"
-                  value={ageInput}
-                  onChangeText={(t) => setAgeInput(t.replace(/[^0-9]/g, ''))}
-                  maxLength={3}
-                  returnKeyType="done"
-                />
-              </View>
-            </View>
-          ) : null}
-          {needAge && ageError ? (
-            <Text style={styles.inputError}>{ageError}</Text>
-          ) : null}
-
-          {needActivity ? (
-            <>
-              <Text style={styles.groupLabel}>Day-to-day activity</Text>
-              {ACTIVITY_OPTIONS.map((opt) => {
-                const active = activityLevel === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      styles.activityRow,
-                      active && { borderColor: themeColor, backgroundColor: '#14181b' },
-                    ]}
-                    onPress={() => setActivityLevel(opt.value)}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                  >
-                    <View style={styles.activityBody}>
-                      <Text style={[styles.activityLabel, active && { color: themeColor }]}>
-                        {opt.label}
-                      </Text>
-                      <Text style={styles.activityHint}>{opt.hint}</Text>
-                    </View>
-                    {active ? (
-                      <Ionicons name="checkmark-circle" size={18} color={themeColor} />
-                    ) : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </>
-          ) : null}
-
-          {needHeight ? (
-            <View style={styles.inputRow}>
-              <View style={styles.inputRowIcon}>
-                <Ionicons name="resize-outline" size={18} color="#a1a1aa" />
-              </View>
-              <View style={styles.inputRowContent}>
-                <Text style={styles.inputRowLabel}>Height</Text>
-                <TextInput
-                  style={styles.inlineInput}
-                  placeholder="e.g. 178"
-                  placeholderTextColor="#52525b"
-                  keyboardType="number-pad"
-                  value={heightInput}
-                  onChangeText={(t) => setHeightInput(t.replace(/[^0-9]/g, ''))}
-                  maxLength={3}
-                  returnKeyType="done"
-                />
-              </View>
-              {heightInput ? <Text style={styles.unitSuffix}>cm</Text> : null}
-            </View>
-          ) : null}
-          {needHeight && heightError ? (
-            <Text style={styles.inputError}>{heightError}</Text>
-          ) : null}
-
-          {showTopUp ? <View style={styles.divider} /> : null}
+          {/* TOP-UP BRANCH DELETED 17 Aug 2026.
+              
+              It asked for sex and height when either was missing, under the
+              title "A couple of gaps." Both are mandatory in onboarding — a
+              user cannot reach this screen without having answered them — so
+              the branch was unreachable and its only effect was to make this
+              screen look like it might ask for things it never asks for.
+              
+              Age and activity left the same way earlier today, to the
+              nutrition questionnaire. What remains is what this screen was
+              always for: confirming the numbers that go stale. */}
 
           {/* Plain list rows: no card surface, no border, no icon tile. Two
               bordered cards for two values made the screen feel like a form to
@@ -725,34 +596,6 @@ const styles = StyleSheet.create({
   // Amber, not red: an old number is a gap to close, not an error.
   statRowAgeStale: { color: '#f0b429' },
 
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#131316',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-    gap: 12,
-  },
-  inputRowIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#1f1f23',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputRowContent: {
-    flex: 1,
-  },
-  inputRowLabel: {
-    fontSize: 13,
-    color: '#a1a1aa',
-    marginBottom: 4,
-  },
   inlineInput: {
     fontSize: 15,
     color: '#ffffff',
@@ -763,29 +606,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#71717a',
     fontWeight: '500',
-  },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#131316',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#27272a',
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
-  },
-  activityBody: { flex: 1 },
-  activityLabel: { fontSize: 14, fontWeight: '600', color: '#ffffff' },
-  activityHint: { fontSize: 11.5, color: '#71717a', marginTop: 2 },
-  groupLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    color: '#71717a',
-    textTransform: 'uppercase',
-    marginBottom: 8,
   },
   pillRow: {
     flexDirection: 'row',
@@ -807,18 +627,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#a1a1aa',
-  },
-  inputError: {
-    fontSize: 12,
-    color: '#f87171',
-    marginTop: -4,
-    marginBottom: 10,
-    paddingHorizontal: 4,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#27272a',
-    marginVertical: 18,
   },
   optionalTag: {
     fontSize: 11,

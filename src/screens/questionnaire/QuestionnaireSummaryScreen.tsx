@@ -17,7 +17,9 @@
 //   so edits show up immediately without a manual refresh.
 //
 // Start over:
-//   Confirms via Alert, then clears storage and navigates to Q1.
+//   Confirms via Alert, then clears storage and replaces this screen
+//   with a fresh Q3DaysPerWeek (the first screen in the flow since Q1
+//   was deleted on 9 Aug 2026).
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -214,7 +216,14 @@ export default function QuestionnaireSummaryScreen() {
           style: 'destructive',
           onPress: async () => {
             await clearQuestionnaireAnswers();
-            navigation.navigate('Q1PrimaryGoal' as never);
+            // Q3 is the first screen since Q1 left the flow on 9 Aug 2026.
+            // `replace` rather than `navigate`: navigate would reuse an
+            // existing Q3 instance still sitting in the stack, carrying its
+            // old answersSoFar params, so a restarted questionnaire would
+            // open with the previous answer preselected despite storage
+            // having just been cleared. replace also drops this summary
+            // screen from the stack, which is what "start over" means.
+            navigation.replace('Q3DaysPerWeek' as never, {} as never);
           },
         },
       ],

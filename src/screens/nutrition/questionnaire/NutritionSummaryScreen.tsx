@@ -53,7 +53,6 @@ import {
 import { computeMacros, finalizeNutrition } from '../../../utils/nutritionMacros';
 import { loadCuratedFavoritesV2, picksCount } from '../../../utils/curatedFavoritesStorage';
 import { WorkoutStorage } from '../../../utils/storage';
-import GoalsProfileSummaryCard from '../../../components/GoalsProfileSummaryCard';
 import { restartNutritionFlow } from '../../../utils/questionnaireRouting';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
@@ -107,28 +106,47 @@ interface RowConfig {
 }
 
 const ROWS: RowConfig[] = [
-  // Goal and Rate rows removed 9 Aug 2026 along with N1 and N2. Both are
-  // properties of the roadmap PHASE, not one-time answers: the phase decides
-  // gaining vs losing, and the rate changes at every phase transition. Showing
-  // them here as editable rows invited the same contradiction that started this
-  // work — a plan saying "recomp first" next to a row saying "gain 0.5%/week".
-  // They live on the route screen now.
+  // The Goal and Rate rows were removed 9 Aug 2026 along with N1 and N2,
+  // because both are properties of the roadmap PHASE rather than one-time
+  // answers, and showing them as editable rows invited the contradiction that
+  // started this work — a plan saying "recomp first" next to a row saying
+  // "gain 0.5%/week".
+  //
+  // WEIGHT TARGET, added 17 Aug, is not a reversal of that. It reads FROM the
+  // phase rather than overriding it, so the contradiction cannot recur: on a
+  // recomp it says the weight is held, on a build it says the derived pace, and
+  // on a cut it is the one case where the user has a real choice to make.
+  //
+  // Formatting reads targetRatePercentage, which the seed path re-resolves from
+  // the phase on every flow entry — so this row cannot show a stale rate the
+  // way a stored answer would.
   {
-    // Points at Goals & Stats, not N3: sex, age, height and weight moved onto
-    // GoalsProfile with the shared intake, and N3 left the flow on 9 Aug 2026.
-    // Editing them here would have written to the nutrition draft only, so the
-    // profile and the plan would disagree the moment the draft was cleared.
-    label: 'About you',
-    route: 'GoalsStats',
+    label: 'Weight target',
+    route: 'N2Rate',
     format: (a) => {
-      const parts = [
-        a.age != null ? `${a.age}` : null,
-        a.gender ? GENDER_LABELS[a.gender] ?? a.gender : null,
-        a.height != null ? `${a.height} cm` : null,
-        a.weight != null ? `${a.weight} kg` : null,
-      ].filter(Boolean);
-      return parts.length ? parts.join(' · ') : '—';
+      if (a.goal === 'maintain') return 'Hold steady — fat down, muscle up';
+      const pct = a.targetRatePercentage;
+      if (pct == null) return a.goal === 'gain_weight' ? 'A small surplus' : 'A steady deficit';
+      const dir = a.goal === 'gain_weight' ? 'Up' : 'Down';
+      const kg = a.weight != null ? ` (${((a.weight * pct) / 100).toFixed(2)} kg)` : '';
+      return `${dir} ${pct}% a week${kg}`;
     },
+  },
+  {
+    /**
+     * WAS "About you" showing age, sex, height and weight, routed to
+     * GoalsStats. Split 17 Aug 2026 because the four values are no longer
+     * owned by one screen: age is its own questionnaire step now, and sex,
+     * height and weight are edited on the route summary, which already lists
+     * them.
+     *
+     * Only age remains here, because only age is answered in this flow. A row
+     * that showed four values and could only edit them by sending the user to
+     * a fifth screen was the duplication this pass was removing.
+     */
+    label: 'Age',
+    route: 'N3Age',
+    format: (a) => (a.age != null ? `${a.age}` : 'Not set'),
   },
   {
     label: 'Diet',
@@ -453,8 +471,10 @@ export default function NutritionSummaryScreen() {
 
         {/* Goals & stats — surfaced here so current stats, goal, and
             derived phase are visible where the plan is reviewed. */}
-        <GoalsProfileSummaryCard />
-
+        {/* GoalsProfileSummaryCard removed 17 Aug 2026. It duplicated the
+            ABOUT YOU row below it — same weight, same body fat, twice on one
+            screen — and the route screen already carries the stats and the
+            phase badge it added on top. */}
         {/* Macro recap */}
         {macros && (
           <View style={styles.macroCard}>

@@ -44,9 +44,9 @@ interface MealPlanningContextType extends NutritionState, SimplifiedMealPlanOper
   getMealRating: (mealId: string) => MealRating | null;
   
   // Weight Tracking
-  addWeightEntry: (entry: WeightEntry) => Promise<void>;
-  getLatestWeight: () => WeightEntry | null;
-  updateMacrosBasedOnWeight: () => Promise<void>;
+  // addWeightEntry and getLatestWeight REMOVED 19 Aug 2026 — see the note where
+  // they used to be defined. They served a third weight store that nothing
+  // wrote to and nothing read from.
   
   // Meal History
   addMealToHistory: (mealId: string, modifications?: string) => Promise<void>;
@@ -80,7 +80,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
     currentMealPlan: null,
     favoriteMeals: [],
     mealHistory: [],
-    weightEntries: [],
     completedMeals: {},
     isLoading: true,
     hasCompletedQuestionnaire: false,
@@ -101,7 +100,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         currentMealPlan,
         favoriteMeals,
         mealHistory,
-        weightEntries,
         mealRatings,
         completedMeals,
       ] = await Promise.all([
@@ -109,7 +107,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         loadCurrentMealPlan(),
         loadFavoriteMeals(),
         loadMealHistory(),
-        loadWeightEntries(),
         loadMealRatings(),
         loadCompletedMeals(),
       ]);
@@ -120,7 +117,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         currentMealPlan,
         favoriteMeals,
         mealHistory,
-        weightEntries,
         completedMeals: completedMeals || {},
         isLoading: false,
         hasCompletedQuestionnaire: !!userProfile,
@@ -197,16 +193,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
       return data ? JSON.parse(data) : [];
     } catch (error) {
       console.error('Failed to load meal history:', error);
-      return [];
-    }
-  };
-
-  const loadWeightEntries = async (): Promise<WeightEntry[]> => {
-    try {
-      const data = await AsyncStorage.getItem(NUTRITION_STORAGE_KEYS.WEIGHT_ENTRIES);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('Failed to load weight entries:', error);
       return [];
     }
   };
@@ -520,66 +506,28 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
     return null;
   };
 
-  const addWeightEntry = async (entry: WeightEntry) => {
-    try {
-      const updatedEntries = [...state.weightEntries, entry].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      
-      await AsyncStorage.setItem(
-        NUTRITION_STORAGE_KEYS.WEIGHT_ENTRIES,
-        JSON.stringify(updatedEntries)
-      );
-      
-      setState(prev => ({
-        ...prev,
-        weightEntries: updatedEntries,
-      }));
-
-      // Auto-adjust macros if enabled
-      if (state.userProfile?.macros?.autoAdjust) {
-        await updateMacrosBasedOnWeight();
-      }
-    } catch (error) {
-      console.error('Failed to add weight entry:', error);
-      throw error;
-    }
-  };
-
-  const getLatestWeight = (): WeightEntry | null => {
-    return state.weightEntries.length > 0 ? state.weightEntries[0] : null;
-  };
-
-  const updateMacrosBasedOnWeight = async () => {
-    try {
-      if (!state.userProfile || state.weightEntries.length < 2) return;
-
-      const latest = state.weightEntries[0];
-      const previous = state.weightEntries[1];
-      const weightChange = latest.weight - previous.weight;
-
-      // Adjust calories based on weight change
-      let calorieAdjustment = 0;
-      if (Math.abs(weightChange) > 0.5) { // Significant change
-        if (state.userProfile.goals?.primaryGoal === 'weight_loss' && weightChange > 0) {
-          calorieAdjustment = -100; // Reduce calories
-        } else if (state.userProfile.goals?.primaryGoal === 'weight_gain' && weightChange < 0) {
-          calorieAdjustment = 100; // Increase calories
-        }
-      }
-
-      if (calorieAdjustment !== 0) {
-        const updatedMacros = {
-          ...state.userProfile.macros,
-          calories: (state.userProfile.macros?.calories ?? 0) + calorieAdjustment,
-        };
-
-        await updateUserProfile({ macros: updatedMacros });
-      }
-    } catch (error) {
-      console.error('Failed to update macros based on weight:', error);
-    }
-  };
+  // ── A THIRD WEIGHT STORE, REMOVED 19 Aug 2026 ─────────────────────────────
+  //
+  // `addWeightEntry`, `getLatestWeight`, `loadWeightEntries` and
+  // `updateMacrosBasedOnWeight` all lived off `@nutrition_weight_entries`, a
+  // store no screen ever wrote to and no component ever read. It was parsed
+  // into memory on every launch and then ignored.
+  //
+  // The real series is `weight_tracking_history`, written through
+  // `recordWeightEntry` in utils/weightHistory.ts, which keeps the dated
+  // entries and the GoalsProfile scalar in step and is what the charts and
+  // phase-transition detection read. Anything needing a weigh-in goes there.
+  //
+  // `updateMacrosBasedOnWeight` is the one worth naming, because it was not
+  // merely unused — it was dangerous. It compared the two most recent entries
+  // and moved calories by 100 whenever they differed by more than 0.5 kg.
+  // Day-to-day bodyweight varies by about 0.53% (Vasey 2023), which for an
+  // 80 kg person is 0.4 kg, so that threshold sits INSIDE normal water
+  // fluctuation. Wired to anything, it would have cut a user's calories for
+  // drinking less the night before, repeatedly, each time from a lower
+  // baseline. That is the exact failure the 28-day decision window and the
+  // confidence-interval pace check in phaseTransition exist to prevent.
+  // Deleted rather than left for someone to discover and connect up.
 
   const addMealToHistory = async (mealId: string, modifications?: string) => {
     try {
@@ -693,7 +641,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.CURRENT_MEAL_PLAN),
         AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.FAVORITE_MEALS),
         AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.MEAL_HISTORY),
-        AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.WEIGHT_ENTRIES),
         AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.MEAL_RATINGS),
         AsyncStorage.removeItem(NUTRITION_STORAGE_KEYS.COMPLETED_MEALS),
       ]);
@@ -703,7 +650,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
         currentMealPlan: null,
         favoriteMeals: [],
         mealHistory: [],
-        weightEntries: [],
         completedMeals: {},
         isLoading: false,
         hasCompletedQuestionnaire: false,
@@ -1316,9 +1262,6 @@ export const MealPlanningProvider = ({ children }: MealPlanningProviderProps) =>
     getFavoriteMeals,
     rateMeal,
     getMealRating,
-    addWeightEntry,
-    getLatestWeight,
-    updateMacrosBasedOnWeight,
     addMealToHistory,
     getMealHistory,
     markMealCompleted,
@@ -1354,4 +1297,3 @@ export const useMealPlanning = (): MealPlanningContextType => {
   }
   return context;
 };
-

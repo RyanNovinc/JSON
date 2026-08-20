@@ -187,10 +187,19 @@ export function frameZoneFor(
  * Returned as a discriminant rather than a component so the sheet stays a
  * presentation concern.
  */
-export type EvidenceTopic = 'rated' | 'ceiling';
+export type EvidenceTopic = 'rated' | 'ceiling' | 'lean-stop' | 'range-width';
 
-/** The topic a zone's verdict line should open when tapped. Zones that talk
- *  about the rated band open that; everything else opens the ceiling. */
+/**
+ * The topic a zone's verdict line should open when tapped. Zones that talk
+ * about the rated band open that; everything else opens the ceiling.
+ *
+ * `lean-stop` and `range-width` are NOT reachable from a zone — they belong to
+ * the two limits on the range screen, which are properties of the control
+ * rather than of where a goal lands on the frame gauge. They live in this union
+ * so that every claim in the flow opens the same sheet with the same two
+ * levels, rather than the range screen growing a second explanation mechanism
+ * beside this one.
+ */
 export function evidenceTopicFor(key: FrameZoneKey): EvidenceTopic {
   return key === 'under' || key === 'rated' || key === 'stretch' ? 'rated' : 'ceiling';
 }

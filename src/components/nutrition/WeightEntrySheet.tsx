@@ -32,7 +32,13 @@ import {
   markCrossingDismissed,
   clearCrossingDismissals,
 } from '../../utils/phaseTransition';
-import type { TransitionCheck, BodyFatReading } from '../../utils/phaseTransition';
+import type {
+  TransitionCheck,
+  WeightReading,
+  PreciseBodyFatReading,
+} from '../../utils/phaseTransition';
+import { isPreciseBodyFatSource } from '../../utils/goalsProfile';
+import type { BodyFatSource } from '../../utils/goalsProfile';
 import { loadPhaseJourney } from '../../utils/phaseJourney';
 
 /**
@@ -118,13 +124,74 @@ function transitionAlertContent(check: TransitionCheck): {
   title: string;
   message: string;
 } {
+  // COPY NOW LEADS ON WEIGHT, 18 Aug 2026. Detection moved off body fat
+  // because consumer readings cannot resolve the change a phase targets, and
+  // the message has to match what was actually measured or the user is told
+  // their body fat "reached" a number no device of theirs can see. The body
+  // fat still appears — it is what the phase MEANS — but as the interpretation,
+  // not the evidence.
   const kind = TRANSITION_KIND_LABELS[check.currentKind] ?? check.currentKind;
+  const at = check.thresholdKg != null ? `${check.thresholdKg} kg` : 'your target';
+
+  // ── ARRIVING TOO FAST IS NOT AN ACHIEVEMENT ───────────────────────────────
+  //
+  // The single most likely way a weight target gets misread: hit 76.7 kg by any
+  // means and the app says well done. But a large share of weight lost quickly
+  // is lean tissue — Garthe 2011's slow group GAINED lean while losing fat and
+  // her fast group merely held it — so a target met at double the prescribed
+  // rate has cost the user exactly what the phase existed to protect.
+  //
+  // Same on a build: gaining faster than prescribed is fat, not muscle, because
+  // the rate muscle can be built at is capped and food does not raise the cap.
+  //
+  // So this branch reaches the SAME conclusion — the phase is over, move on —
+  // but refuses to call it a win, and says what it cost. It deliberately does
+  // not scold or tell them to undo anything: it is already done, and the useful
+  // thing now is that they slow down in the next phase.
+  if (check.pace === 'too_fast') {
+    const measured =
+      check.ratePctPerWeek != null && check.targetRatePctPerWeek != null
+        ? `${Math.abs(check.ratePctPerWeek).toFixed(1)}% of your bodyweight a week against the ` +
+          `${Math.abs(check.targetRatePctPerWeek).toFixed(1)}% this phase planned for`
+        : 'faster than this phase planned for';
+    const losing = (check.targetRatePctPerWeek ?? 0) < 0;
+    return {
+      title: `You've hit ${at} — faster than planned`,
+      message:
+        `That's ${measured}. ` +
+        (losing
+          ? 'Weight lost that quickly is partly muscle, so you may be lighter than the plan intended but carrying less of what you were training for. '
+          : 'Weight gained that quickly is mostly fat rather than muscle, since muscle can only be built so fast. ') +
+        'Nothing to undo — worth easing off to the planned rate from here.',
+    };
+  }
+  // A SCAN GETS ITS OWN COPY. When the scan fires and the weight has not, the
+  // user is being told a phase is over while their scale disagrees — and left
+  // unexplained that reads as a bug. Naming the evidence is what makes it read
+  // as a better measurement instead.
+  if (check.reachedBy === 'scan') {
+    const scanKind = TRANSITION_KIND_LABELS[check.currentKind] ?? check.currentKind;
+    const next = check.nextKind
+      ? ` Next up: a ${TRANSITION_KIND_LABELS[check.nextKind] ?? check.nextKind}` +
+        (check.nextExitBodyFatPct != null ? ` to ~${check.nextExitBodyFatPct}%.` : '.')
+      : ' That was the plan, and you did it.';
+    return {
+      title: `Your ${scanKind} is done`,
+      message:
+        `Your scan puts you past the ${check.thresholdBodyFatPct}% this phase was ` +
+        'aiming for, so it counts even though your weight trend has not got there ' +
+        'yet — a scan measures this directly and the scale only infers it.' +
+        next,
+    };
+  }
+
   if (!check.nextKind) {
     return {
-      title: 'You\u2019ve reached your goal body fat',
+      title: 'You\u2019ve reached your goal',
       message:
-        `Your body-fat trend has reached ~${check.thresholdPct}% \u2014 the ${kind} ` +
-        'that finishes your route is complete. That was the plan, and you did it.',
+        `Your weight trend has reached ${at}, which is about ` +
+        `${check.thresholdBodyFatPct}% body fat \u2014 the ${kind} that finishes ` +
+        'your route is complete. That was the plan, and you did it.',
     };
   }
   const next = TRANSITION_KIND_LABELS[check.nextKind] ?? check.nextKind;
@@ -133,8 +200,9 @@ function transitionAlertContent(check: TransitionCheck): {
   return {
     title: `Your ${kind} is done`,
     message:
-      `Your body-fat trend has reached ~${check.thresholdPct}% \u2014 the phase that ` +
-      `opened your route is complete. Next up: a ${next}${nextTarget}. ` +
+      `Your weight trend has reached ${at}, which is about ` +
+      `${check.thresholdBodyFatPct}% body fat \u2014 this phase is complete. ` +
+      `Next up: a ${next}${nextTarget}. ` +
       'Update your plans so they target the new phase.',
   };
 }
@@ -151,6 +219,22 @@ interface WeightEntry {
    * to GoalsProfile.currentBodyFatPct so the questionnaire and macro
    * calc read the same number. */
   bodyFatPct?: number;
+  /**
+   * Which device produced `bodyFatPct`, recorded PER ENTRY rather than read
+   * from the profile.
+   *
+   * The profile carries one `bodyFatSource` describing how the user measures
+   * TODAY. That is the wrong thing to ask of a history: someone who bought a
+   * DXA in March has scale readings before it and scans after, and stamping
+   * every past entry with their current method would either promote old
+   * bathroom-scale numbers to scan-grade or demote real scans. Provenance
+   * belongs to the reading, not to the person.
+   *
+   * Absent on every entry written before 19 Aug 2026, and absent is treated as
+   * imprecise — those readings keep being displayed and stop being trusted,
+   * which is the safe direction when the device is unknowable.
+   */
+  bodyFatSource?: BodyFatSource;
 }
 
 // GoalsProfile carries currentWeightKg / currentBodyFatPct. Declared
@@ -176,6 +260,38 @@ interface Props {
    */
   title?: string;
 }
+
+/**
+ * The measurement methods a user can pick from, and what each is FOR.
+ *
+ * ONLY DXA COUNTS TOWARD ENDING A PHASE — see PRECISE_BODY_FAT_SOURCES. The
+ * notes say that plainly rather than warning about accuracy on every option,
+ * because a warning on every option is a paragraph people read once and then
+ * stop seeing. Telling someone what their reading is for is more useful than
+ * telling them what it is not.
+ */
+const BF_SOURCE_OPTIONS: ReadonlyArray<{ id: BodyFatSource; label: string; note: string }> = [
+  {
+    id: 'scale',
+    label: 'Smart scale',
+    note: 'Tracked and charted. Your weight is what ends a phase — scales are usually out by several points and move with hydration.',
+  },
+  {
+    id: 'calipers',
+    label: 'Calipers',
+    note: 'Tracked and charted. Good for spotting a direction if the same person measures each time, but your weight is what ends a phase.',
+  },
+  {
+    id: 'tape',
+    label: 'Tape',
+    note: 'Tracked and charted. Depends on hitting the same spot each time, so your weight is what ends a phase.',
+  },
+  {
+    id: 'dxa',
+    label: 'DXA scan',
+    note: 'Precise enough to count. A scan can finish a phase on its own, alongside your weight.',
+  },
+];
 
 export default function WeightEntrySheet({
   visible,
@@ -204,6 +320,14 @@ export default function WeightEntrySheet({
   // hook always has a navigator to reach.
   const navigation = useNavigation<any>();
   const [bfFocused, setBfFocused] = useState(false);
+  /**
+   * How this reading was measured. Defaults to the profile's current method so
+   * a regular DXA user is not re-picking it every weigh-in, and falls back to
+   * 'scale' rather than to nothing — an unset source would be treated as
+   * imprecise, which is right for legacy rows but wrong for a user who is
+   * actively telling us a number now.
+   */
+  const [bodyFatSource, setBodyFatSource] = useState<BodyFatSource>('scale');
   const [lastBodyFatPct, setLastBodyFatPct] = useState<number | null>(null);
 
   // ---------- Animation state ----------
@@ -344,6 +468,9 @@ export default function WeightEntrySheet({
         notes: notes.trim() || undefined,
         bodyFatPct:
           parsedBf == null ? undefined : Math.round(parsedBf * 10) / 10,
+        // Stamped at the moment of entry, so the history stays honest when the
+        // user changes how they measure.
+        bodyFatSource: parsedBf == null ? undefined : bodyFatSource,
       };
 
       // Read the CURRENT history before prepending. loadWeightHistoryResult
@@ -411,13 +538,41 @@ export default function WeightEntrySheet({
       // derived fresh from the just-mirrored profile, so the check sees
       // exactly what the prompts will see on regeneration.
       let transition: TransitionCheck | null = null;
-      if (entry.bodyFatPct != null) {
+      // GATE MOVED FROM BODY FAT TO WEIGHT. This used to run only when the save
+      // carried a body-fat reading, because that was what detection read. Every
+      // weigh-in carries a weight, so the check now runs on all of them — which
+      // is also the point: a user who never enters body fat can still finish a
+      // phase.
+      if (Number.isFinite(entry.weight) && entry.weight > 0) {
         try {
           const profileNow = await loadGoalsProfile();
           if (profileNow) {
-            const readings: BodyFatReading[] = [entry, ...history]
-              .filter((e: any) => typeof e?.bodyFatPct === 'number' && e?.date)
+            // NORMALISED TO KILOGRAMS. Entries are stored in the unit they
+            // were typed in, so a user who switched from lbs to kg has both in
+            // their history — feeding those straight to the trend would read a
+            // 176 and an 80 as a 96 kg swing. The same conversion is already
+            // applied above when mirroring to the profile.
+            // PRECISE SOURCES ONLY. phaseTransition never sees a source field,
+            // so filtering here is what stops a smart-scale reading ending a
+            // phase — the exact failure the weight path exists to prevent.
+            // Consumer BIA is ±4-8 percentage points against DXA; a phase moves
+            // someone 2-3 points. Only a scan clears that.
+            const scans: PreciseBodyFatReading[] = [entry, ...history]
+              .filter(
+                (e: any) =>
+                  typeof e?.bodyFatPct === 'number' &&
+                  e.bodyFatPct > 0 &&
+                  e?.date &&
+                  isPreciseBodyFatSource(e.bodyFatSource),
+              )
               .map((e: any) => ({ dateISO: e.date, bodyFatPct: e.bodyFatPct }));
+
+            const readings: WeightReading[] = [entry, ...history]
+              .filter((e: any) => typeof e?.weight === 'number' && e.weight > 0 && e?.date)
+              .map((e: any) => ({
+                dateISO: e.date,
+                weightKg: e.unit === 'lbs' ? e.weight * 0.453592 : e.weight,
+              }));
             // The journey count is what tells evaluateTransition WHERE the
             // user is standing. Without it the detector falls back to
             // roadmap.phases[0] — the opener, a definition rather than a
@@ -430,6 +585,7 @@ export default function WeightEntrySheet({
               undefined,
               Date.now(),
               journey.length,
+              scans,
             );
             if (check?.crossed && (await shouldPromptForCrossing(check))) {
               transition = check;
@@ -643,6 +799,48 @@ export default function WeightEntrySheet({
             <Text style={styles.bfPercent}>%</Text>
           </View>
 
+          {/* HOW IT WAS MEASURED. Only shown once a number has been typed —
+              asking an empty field how it was measured is noise, and body fat
+              is optional.
+
+              This exists because 'reported' used to cover a DXA scan and a
+              bathroom scale alike, and the difference between them is the
+              difference between a reading that can end a phase (±1-2 points)
+              and one that cannot (±4-8). The app could not see it. */}
+          {bodyFat.trim().length > 0 && (
+            <>
+              <View style={styles.srcRow}>
+                {BF_SOURCE_OPTIONS.map((opt) => {
+                  const active = bodyFatSource === opt.id;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[
+                        styles.srcChip,
+                        active && { borderColor: themeColor, backgroundColor: '#16232a' },
+                      ]}
+                      onPress={() => setBodyFatSource(opt.id)}
+                      activeOpacity={0.85}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: active }}
+                      accessibilityLabel={`${opt.label}. ${opt.note}`}
+                    >
+                      <Text style={[styles.srcChipText, active && { color: themeColor }]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {/* One line, rewritten per source. Says what the reading is FOR
+                  rather than warning about accuracy, because a warning on every
+                  option is a paragraph people stop seeing. */}
+              <Text style={styles.srcNote}>
+                {BF_SOURCE_OPTIONS.find((o) => o.id === bodyFatSource)?.note}
+              </Text>
+            </>
+          )}
+
           {bfInvalidVisible && (
             <Text style={styles.errorText}>
               Body fat should be between 3 and 60, or left blank.
@@ -819,6 +1017,18 @@ const styles = StyleSheet.create({
     color: '#71717a',
     marginTop: 2,
   },
+  srcRow: { flexDirection: 'row', gap: 7, marginTop: 10, flexWrap: 'wrap' },
+  srcChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#27272a',
+    backgroundColor: '#17171a',
+  },
+  srcChipText: { fontSize: 12, color: '#8e8e93' },
+  srcNote: { fontSize: 12, lineHeight: 18, color: '#6b6b70', marginTop: 8 },
+
   bfInput: {
     fontSize: 20,
     fontWeight: '600',

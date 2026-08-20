@@ -46,6 +46,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
+import { recordWeightEntry } from '../utils/weightHistory';
 import { loadGoalsProfile, updateGoalsProfileField } from '../utils/goalsProfileStorage';
 import { recordBodyFatReading } from '../utils/bodyFatHistory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -67,16 +68,24 @@ import {
   ffmiLimitsFor,
   FFMI_UNTRAINED,
   type Roadmap,
+  operatingRangeFor,
+  MIN_RANGE_WIDTH_PCT,
 } from '../utils/roadmap';
+import { leanStopFor } from '../utils/operatingBands';
 import { ATTRACTIVE_BF_RANGE, ATTRACTIVE_BF_CENTRE } from '../utils/attractivenessTargets';
 import { frameZoneFor, evidenceTopicFor, type EvidenceTopic } from '../utils/routeZones';
 import type {
+  PhaseOrder,
   GoalsProfile,
   PeakLeanness,
   RoutePreference,
   Sex,
   TrainingState,
 } from '../utils/goalsProfile';
+// A VALUE, not a type — it is called at load time to pick the order for a user
+// who has never been asked. goalsProfile was previously imported type-only here,
+// so this is a second, separate import line rather than a widened one.
+import { defaultPhaseOrder } from '../utils/goalsProfile';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 type Beat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
@@ -101,6 +110,67 @@ type Beat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
  * often you interrupt growing to cut. It is not a speed setting. Copy here that
  * implies one route reaches the goal sooner needs a trial that does not exist.
  */
+/**
+ * WHICH HALF FIRST. This replaced the three band routes on beat 9, 17 Aug 2026.
+ *
+ * The band routes had stopped meaning anything. Once a build's fat cost came
+ * from the prescribed surplus instead of the band width, 'lean' and 'balanced'
+ * produced byte-identical plans for every profile tested, and 'roomy' differed
+ * only because derivePhase maps it to `bulk` (0.5 fat per kg lean rather than
+ * 0.2) — an option Helms 2023 and Garthe 2013 both say buys no extra muscle.
+ * Three labels, one real distinction, and that distinction was strictly worse.
+ *
+ * The order is the choice that survives, and it is an honest one: modelled both
+ * ways the totals land within about half a month of each other, so it is a
+ * preference like the band width was, not a speed setting. What genuinely
+ * differs is the two years in between.
+ *
+ * `cost` is not softening. Every option here has one and both are stated,
+ * because a picker that lists only upsides is not offering a choice.
+ */
+export const ORDER_OPTIONS: Array<{
+  id: PhaseOrder;
+  name: string;
+  gain: string;
+  cost: string;
+}> = [
+  {
+    id: 'cut_first',
+    name: 'Get lean first',
+    // The two thumbs on the scale, and both are weak on purpose. Galgani 2025
+    // found a surplus started fatter deposits more fat per unit of surplus
+    // (sedentary, no exercise prescribed, [B]); and ICECAP found shorter diets
+    // easier to adhere to. Neither is a performance claim.
+    gain: 'Lean in 5 months, and the cut is behind you.',
+    cost: 'Not growing until it is done.',
+  },
+  {
+    id: 'build_first',
+    name: 'Start growing first',
+    // Deliberately the weaker case, stated as weakly as it deserves. Muscle IS
+    // the slow half — years against months — and that is the whole argument.
+    gain: 'Growing from day one.',
+    cost: 'Soft for most of it, and the cut waits until the end.',
+  },
+];
+
+/**
+ * Cut counts read as words up to the point where a numeral is clearer. The
+ * count is not monotonic across the dial — holding a user under the ceiling
+ * costs cuts, and once the dial is too close to the ceiling for that to be
+ * possible the rail stands down and the count drops back to two — so this is
+ * a figure the user watches change, not one they can predict.
+ */
+const CUT_WORDS: Record<number, string> = {
+  0: 'No cuts',
+  1: 'One cut',
+  2: 'Two cuts',
+  3: 'Three cuts',
+  4: 'Four cuts',
+  5: 'Five cuts',
+  6: 'Six cuts',
+};
+
 export const ROUTE_OPTIONS: Array<{
   id: RoutePreference;
   name: string;
@@ -125,7 +195,19 @@ export const ROUTE_OPTIONS: Array<{
   },
   {
     id: 'roomy',
-    name: 'Grow faster',
+    /**
+     * RENAMED from "Grow faster" on 17 Aug 2026, because it did not.
+     *
+     * This route shares the SAME 18% ceiling as balanced — it does not let a
+     * user carry more fat. What differs is the floor: balanced cuts back to
+     * 12%, this one only to 14%. And what actually makes it quicker is the
+     * longer build block between trims, not anything about growth rate.
+     *
+     * "Grow faster" promised quicker muscle, which the app's own model says is
+     * impossible: the gain rate is capped by the FFMI curve and food does not
+     * raise it. The name was making a claim two RCTs contradict.
+     */
+    name: 'Fewest cuts',
     trade: 'Fewest interruptions, and a softer look through the middle.',
     feel: (f, c, k) =>
       `Long uninterrupted stretches of growing between ${f} and ${c}% body fat, with only ${k} trims.`,
@@ -229,41 +311,73 @@ function helpFor(beat: number, sex?: Sex): BeatHelp | null {
     };
   }
   if (beat === 9) {
+    /**
+     * CUT TO BULLETS, 18 Aug 2026. This was two paragraphs of prose plus five
+     * groups, 258 words, and it scrolled. Ryan's note: a user should not have
+     * to read an essay to understand two toggles.
+     *
+     * It matters more than it used to. The pickers themselves now carry no
+     * copy at all, so this sheet is the only place on beat 9 with words in it
+     * — which is an argument for it being SHARP, not for it being long.
+     *
+     * Three lines went for reasons worth keeping:
+     *  - the paragraph describing the muscle bracket, which explained the
+     *    chart to someone looking at the chart
+     *  - the "What decides the length" group, already answered by the
+     *    "why the range?" sheet, and contradicted here by the first line
+     *  - "cutting is easier now than two years in", a motivational hunch
+     *    sitting in a list of claims with papers behind them
+     *
+     * The word "diet" appeared twice in the old version ("a clean end to the
+     * dieting", "short diets beat one long diet"). It is banned across this
+     * journey because a bulk is a diet too. Both now say cut.
+     */
     return {
-      title: 'The three routes',
+      title: 'Same finish either way',
+      // The dial cannot change the total. Opening cut plus final cut comes to
+      // the same fat whichever depth is chosen, because the fat the building
+      // adds is fixed by the surplus — so the trough cancels out of the sum.
+      // Stated first because a user assumes a faster setting exists.
       body:
-        'Every route builds muscle at the same rate. No study in trained lifters shows that the body fat you cycle within changes how fast you gain. What differs is how often you stop growing to trim back, and trimming is time not spent growing — so a route with more trims can take a little longer overall. That is time spent cutting, not slower muscle gain. All three finish in the same place.',
+        'Same muscle, same total time at every setting. What you are choosing is when the hard part happens.',
       groups: [
         {
-          title: 'Stay lean',
+          title: 'Take it off first',
           points: [
-            'Narrowest band, trimmed most often',
-            'You look your best the whole way',
-            'Most interruptions to growing',
+            'Lean in months, not years',
+            // Galgani 2025 measured a surplus started fatter depositing more
+            // fat per unit of surplus (sedentary men, no exercise prescribed).
+            // Stated as a fat claim, never as a muscle one.
+            'A surplus started leaner adds less fat',
+            'Cost: the lowest weight you will see',
           ],
         },
         {
-          title: 'Balanced',
+          title: 'Leave it for later',
           points: [
-            'Middle band, trimmed a few times',
-            'Never far from lean, never stuck trimming',
-            'A few interruptions',
+            'Growing from day one, nothing to shed first',
+            // Was "fall off partway", which assumed quitting. "Stop early"
+            // also covers deciding you are big enough.
+            'Stop early and you finish bigger, not just leaner',
+            'Cost: softer for longer, and one long cut at the end',
           ],
         },
         {
-          title: 'Grow faster',
+          // Its own group ON PURPOSE, and more so now that the pickers are
+          // wordless: this is the only text left on the screen, so the
+          // uncertainty has to be as visible as the claims it qualifies.
+          title: 'What is not known',
           points: [
-            'Widest band, fewest interruptions',
-            'Softest through the middle',
-            'Longest uninterrupted growing',
+            'No trial has compared where to start',
+            'Reasoned defaults, not proven ones',
           ],
         },
       ],
+      // Trimmed to author and year. The journals were four lines of grey text
+      // in a box nobody reads at 10.5pt, and the names are what a curious user
+      // searches for anyway.
       sources:
-        // The band width itself is a preference, not a finding. These sources
-        // cover surplus size and lean-mass retention, NOT the effect of the
-        // body fat band on gain rate — nothing establishes that.
-        'Slater et al. 2019, Frontiers in Nutrition \u00b7 Murphy and Koehler 2022, Scandinavian Journal of Medicine and Science in Sports \u00b7 Helms et al. 2023, Sports Medicine Open',
+        'Helms 2023 \u00b7 Garthe 2013 \u00b7 Murphy and Koehler 2022 \u00b7 Galgani 2025'
     };
   }
   if (beat === 8) {
@@ -366,6 +480,10 @@ const PHASE_LABEL: Record<string, string> = {
   reveal: 'The reveal',
 };
 
+/** Matches roadmap.ts's own rounding, so a value this screen writes and a value
+ *  the engine resolves cannot disagree by a hundredth of a point. */
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
 const SECTIONS: Array<{ label: string; beats: Beat[]; quiet?: boolean }> = [
   { label: 'ABOUT YOU', beats: [1, 2, 3, 4, 5, 6] },
   { label: 'YOUR GOAL', beats: [7, 8] },
@@ -396,6 +514,35 @@ export default function RouteScreen() {
 
   const [profile, setProfile] = useState<GoalsProfile | null>(null);
   const [preference, setPreference] = useState<RoutePreference>('balanced');
+  const [order, setOrder] = useState<PhaseOrder>('cut_first');
+  /**
+   * THE RANGE, both edges. Null means untouched, so `operatingRangeFor`'s
+   * default stands and the screen shows what the plan would do anyway.
+   */
+  const [bottom, setBottom] = useState<number | null>(null);
+  const [top, setTop] = useState<number | null>(null);
+  /**
+   * Beat 9 is THREE screens, not three beats.
+   *
+   * 0 the range, 1 how you get into it, 2 the plan. Renumbering `Beat` would
+   * touch its forty-odd references and every section map with it, for a
+   * sequence that is one question split into its parts. `back` and `advance`
+   * intercept this before they touch `beat`, so the rest of the flow is
+   * unaware of it.
+   */
+  const [rangeStep, setRangeStep] = useState<0 | 1 | 2>(0);
+  /**
+   * A short settle on the number that just changed.
+   *
+   * The chart already eases over 350ms when the range moves, so without this
+   * the figure snapped to its new value while the band it describes was still
+   * travelling — two halves of one change moving at different speeds, which
+   * reads as a glitch rather than as a control. Scale rather than opacity: the
+   * number must stay legible throughout, and a value that fades is a value you
+   * cannot read at the moment you are trying to read it.
+   */
+  const loPulse = useRef(new Animated.Value(1)).current;
+  const hiPulse = useRef(new Animated.Value(1)).current;
   const [loading, setLoading] = useState(true);
   /** Unset onboarding gate. Drives the beat 1 intent line and the food door. */
   const [firstRun, setFirstRun] = useState(false);
@@ -411,6 +558,16 @@ export default function RouteScreen() {
   const [evidence, setEvidence] = useState<EvidenceTopic | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  /**
+   * The "why is this a range" sheet, opened from the TIME stat.
+   *
+   * DECLARED HERE WITH THE OTHER HOOKS, not next to the value it explains.
+   * The first version sat beside the estYears destructure two hundred lines
+   * down, which is after the conditional returns — so on some renders it ran
+   * and on others it did not, and React threw "rendered more hooks than during
+   * the previous render". Hooks run unconditionally or not at all.
+   */
+  const [varianceOpen, setVarianceOpen] = useState(false);
   const [estimatorOpen, setEstimatorOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -476,6 +633,11 @@ export default function RouteScreen() {
         setProfile(p ?? seedProfile());
         setTrainingStateAnswered(p != null);
         if (p?.routePreference) setPreference(p.routePreference);
+        // No stored answer means not asked yet, so fall to the arithmetic
+        // default rather than assuming a choice the user never made.
+        if (p) setOrder(p.phaseOrder ?? defaultPhaseOrder(p));
+        setBottom(p?.preBuildBf ?? null);
+        setTop(p?.ceilingBf ?? null);
         setBodyFat(emptyBodyFatValue(p?.currentBodyFatPct));
         setLoading(false);
       });
@@ -503,7 +665,14 @@ export default function RouteScreen() {
   }, [profile, provisionalGoalBf]);
 
   const effProfile: GoalsProfile | null = profile
-    ? { ...profile, goalWeightKg: provisionalGoalW ?? undefined, goalBodyFatPct: provisionalGoalBf }
+    ? {
+        ...profile,
+        goalWeightKg: provisionalGoalW ?? undefined,
+        goalBodyFatPct: provisionalGoalBf,
+        phaseOrder: order,
+        preBuildBf: bottom ?? undefined,
+        ceilingBf: top ?? undefined,
+      }
     : null;
 
   // deriveRoadmap walks the whole phase sequence, and this used to run on every
@@ -520,6 +689,9 @@ export default function RouteScreen() {
       provisionalGoalW,
       provisionalGoalBf,
       preference,
+      order,
+      bottom,
+      top,
     ],
   );
 
@@ -553,9 +725,20 @@ export default function RouteScreen() {
     }
   };
 
-  const choose = async (next: RoutePreference) => {
-    setPreference(next);
-    await updateGoalsProfileField('routePreference', next);
+  /**
+   * Same shape as onWeightDrag: every reported step updates state so the chart
+   * and the two figures move under the finger, and only the settle writes. The
+   * ruler reports in whole points, so a full drag across the range is at most
+   * eight roadmap derivations rather than one per frame.
+   */
+  /**
+   * The route into the range. A REAL input again since 20 Aug: it owns whether
+   * there is an opening cut and nothing else, so choosing it cannot disturb the
+   * range set on the previous screen.
+   */
+  const chooseOrder = async (next: PhaseOrder) => {
+    setOrder(next);
+    await updateGoalsProfileField('phaseOrder', next);
   };
 
   /**
@@ -570,6 +753,13 @@ export default function RouteScreen() {
     // arrived directly at this one.
     if (single || beat <= 1) {
       navigation.goBack();
+      return;
+    }
+    // Beat 9's sub-steps come before the beat itself, and the route question
+    // is stepped over in BOTH directions when it does not apply — skipping it
+    // forward only would trap someone who reached the plan and pressed back.
+    if (beat === 9 && rangeStep > 0) {
+      setRangeStep(rangeStep === 2 && !routeMatters ? 0 : ((rangeStep - 1) as 0 | 1 | 2));
       return;
     }
     const prev = beat === 7 && skipsPeakBeat ? 5 : beat - 1;
@@ -591,6 +781,27 @@ export default function RouteScreen() {
     // finishes the flow and is still reported as not having finished it.
     if (beat === 9 && profile != null && profile.routePreference == null) {
       await patch('routePreference', preference);
+    }
+    // Same silent-choice problem as routePreference above: the range opens on a
+    // default, and for users with nothing to cut it is never shown at all.
+    // Either way what they leave with has to be recorded.
+    //
+    // The range is re-derived here rather than read from the render body,
+    // because that value is computed after the conditional returns and this
+    // closure must not depend on having reached them.
+    if (beat === 9 && profile != null && effProfile != null) {
+      const r = operatingRangeFor(effProfile, preference);
+      if (r) {
+        if (profile.preBuildBf == null) await patch('preBuildBf', r.bottom);
+        if (profile.ceilingBf == null) await patch('ceilingBf', r.top);
+        if (profile.phaseOrder == null) await patch('phaseOrder', order);
+      }
+    }
+
+    // Beat 9's sub-steps advance before the beat does.
+    if (beat === 9 && rangeStep < 2) {
+      setRangeStep(rangeStep === 0 && !routeMatters ? 2 : ((rangeStep + 1) as 0 | 1 | 2));
+      return;
     }
     if (beat === 8) {
       // The commitment point: provisional values become the saved goal, so
@@ -620,6 +831,43 @@ export default function RouteScreen() {
     if (busy) return;
     setBusy(true);
     try {
+      // ── RECORD THE WEIGH-IN, 19 Aug 2026 ──────────────────────────────────
+      //
+      // Weight lives in two stores: `GoalsProfile.currentWeightKg`, which every
+      // plan is calculated from, and `weight_tracking_history`, the dated series
+      // the charts and the phase-transition trend read. This flow only ever
+      // wrote the first. So a user who updated their weight here had a profile
+      // that had moved and a history that had not — and the trend that decides
+      // when a phase ends was computed from a series missing exactly the
+      // weigh-ins people take after a while away.
+      //
+      // ONCE, AT LOCK-IN, NOT PER DRAG COMMIT. The weight beat is a ruler:
+      // dragging 78 to 82 commits at every release, and recording each would
+      // write five weigh-ins the user never stood on a scale for. The profile
+      // write on release stays as it is; only the dated entry is deferred to
+      // here, where the number is one the user has settled on.
+      //
+      // Non-fatal. recordWeightEntry returns a result rather than throwing, and
+      // a failed weigh-in must never block someone finishing their plan.
+      if (profile?.currentWeightKg != null && profile.currentWeightKg > 0) {
+        const rec = await recordWeightEntry({
+          weightKg: profile.currentWeightKg,
+          unit: globalUnit === 'lbs' ? 'lbs' : 'kg',
+          bodyFatPct: profile.currentBodyFatPct,
+          bodyFatSource: profile.bodyFatSource,
+          origin: 'RouteScreen.lockIn',
+        });
+        // `'reason' in rec` rather than `!rec.ok`: the result is a discriminated
+        // union and narrowing on the boolean does not hold under this repo's
+        // compiler settings. The `in` check narrows in every configuration.
+        if (!rec.ok) {
+          console.error(
+            '[RouteScreen] weigh-in not recorded:',
+            'reason' in rec ? rec.reason : 'unknown',
+          );
+        }
+      }
+
       if (profile && roadmap) await recordRoadmapSnapshot(profile, preference, roadmap);
       // Close the onboarding gate on COMPLETION, not just on the way out.
       // IntentForkModal used to write these when the user picked from the
@@ -677,7 +925,133 @@ export default function RouteScreen() {
       : null;
 
   const [yrLo, yrHi] = roadmap?.estYears ?? [0, 0];
-  const selected = ROUTE_OPTIONS.find((o) => o.id === preference);
+
+  // operatingRangeFor is the same function deriveRoadmap resolves the range
+  // through, so the screen cannot drift from the plan the way a re-implemented
+  // check here would. Null means there is nothing to set: no measured body fat,
+  // no goal, nothing to build, or a goal body fat above where they stand.
+  const range = effProfile ? operatingRangeFor(effProfile, preference) : null;
+  const rangeMatters = range != null;
+  const leanStop = leanStopFor(profile.sex);
+  /**
+   * THE ROUTE QUESTION ONLY EXISTS WHEN THEY START OUTSIDE THEIR RANGE. Someone
+   * already inside it has nothing to get into, so the screen is skipped rather
+   * than shown with one answer — the same rule that hid the order picker.
+   */
+  const routeMatters =
+    range != null && currentBf != null && currentBf > range.top + 0.2;
+  const noCutNeeded = (roadmap?.gapKg ?? 0) > 0;
+  const exits = roadmap?.phases.map((ph) => ph.exitBodyFatPct) ?? [];
+
+  /**
+   * The two figures the dial actually decides, read off the plan rather than
+   * recomputed. Everything here is derived from `roadmap`, so it cannot say one
+   * thing while the chart above it draws another.
+   *
+   * LOWEST INCLUDES TODAY'S WEIGHT ON PURPOSE. With the dial at the top there
+   * is no opening cut, so the smallest number the user ever sees on the scale
+   * is the one they are standing on — taking the minimum of the phase exits
+   * alone would report the goal weight, which they only reach at the end and
+   * after passing well above it.
+   */
+  const exitWeights =
+    roadmap?.phases.map((ph) => ph.exitWeightKg).filter((w): w is number => w != null) ?? [];
+  const lowestKg = Math.min(profile.currentWeightKg, ...exitWeights);
+  const opener = roadmap?.phases[0];
+  const lowestBf =
+    opener?.kind === 'trim' ? opener.exitBodyFatPct : (profile.currentBodyFatPct ?? null);
+  // Softest is the peak of the PLAN, not of today. A user cutting first is
+  // never softer than they are right now, and saying 20% when the plan tops
+  // out at 17.6% would report the starting point as a consequence of a choice.
+  const softestBf = exits.length ? Math.max(...exits) : null;
+  // THE HEAVIEST TIME THEY ARE THAT SOFT, not the first. Where the rail holds a
+  // user at the ceiling the plan touches that number several times, at rising
+  // weights — 18% at 82.9 kg early and again at 91.5 kg later on the same plan.
+  // Taking the first match reported the lighter one, which is the same body fat
+  // wearing eight fewer kilos and reads as a smaller consequence than it is.
+  // (findLast is avoided deliberately: Hermes does not carry it on every RN
+  // version this ships to.)
+  const softestKg =
+    softestBf == null
+      ? null
+      : (roadmap?.phases ?? []).reduce<number | null>(
+          (best, ph) =>
+            ph.exitBodyFatPct === softestBf && ph.exitWeightKg != null
+              ? Math.max(best ?? 0, ph.exitWeightKg)
+              : best,
+          null,
+        );
+  const cutCount = roadmap?.phases.filter((ph) => ph.kind === 'trim' || ph.kind === 'reveal').length ?? 0;
+  const fmtKg = (kg: number) => (imperial ? `${Math.round(kgToLb(kg))} lbs` : `${kg.toFixed(1)} kg`);
+  /**
+   * The summary row's value line, and the reason hiding the pickers is not the
+   * same as hiding the choice: whatever the defaults resolved to is stated on
+   * the screen in words before it is ever persisted.
+   *
+   * Built from whichever axes actually apply. With both hidden this string is
+   * never rendered — the forced-plan sentence takes its place.
+   */
+  // Was the order's name ("Get lean first") until the dial replaced the order
+  // picker on 20 Aug. It states the number the user is about to accept, in the
+  // unit they set it in, because the row exists to make the default visible
+  // before `advance` writes it.
+  const runSummary =
+    opener?.kind === 'trim' ? `Down to ${fmtKg(lowestKg)} first` : 'Straight into growing';
+
+  /**
+   * Both edges as the user is currently setting them. `range` has already
+   * clamped whatever is in state, so these are what the plan is actually built
+   * from and what the chart is actually drawing — never the raw state.
+   */
+  const bandLo = range?.bottom ?? 0;
+  const bandHi = range?.top ?? 0;
+  const atLeanStop = range != null && bandLo <= range.leanStop;
+  const atMinWidth = range != null && bandHi - bandLo <= range.minWidth;
+
+  const pulse = (v: Animated.Value) => {
+    v.setValue(0.86);
+    Animated.spring(v, {
+      toValue: 1,
+      friction: 5,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const nudge = (which: 'lo' | 'hi', by: number) => {
+    if (!range) return;
+    pulse(which === 'lo' ? loPulse : hiPulse);
+    if (which === 'lo') {
+      const next = Math.min(
+        Math.max(round1(bandLo + by), range.leanStop),
+        Math.max(range.leanStop, range.topStop),
+      );
+      setBottom(next);
+      void updateGoalsProfileField('preBuildBf', next);
+      // The top follows rather than blocking the bottom: a user pushing the
+      // bottom up into the top means to move the range, not to be stopped by it.
+      if (bandHi - next < range.minWidth) {
+        const t = round1(next + range.minWidth);
+        setTop(t);
+        void updateGoalsProfileField('ceilingBf', t);
+      }
+    } else {
+      const next = Math.max(round1(bandHi + by), round1(bandLo + range.minWidth));
+      setTop(next);
+      void updateGoalsProfileField('ceilingBf', next);
+    }
+  };
+
+  /** Sets BOTH ends, because the suggestion is a range rather than a width. */
+  const useSuggested = () => {
+    if (!range) return;
+    pulse(loPulse);
+    pulse(hiPulse);
+    setBottom(range.suggestedBottom);
+    setTop(range.suggestedTop);
+    void updateGoalsProfileField('preBuildBf', range.suggestedBottom);
+    void updateGoalsProfileField('ceilingBf', range.suggestedTop);
+  };
   const inRated =
     profile.sex !== 'female' &&
     provisionalGoalBf >= ATTRACTIVE_BF_RANGE[0] &&
@@ -731,6 +1105,12 @@ export default function RouteScreen() {
     9: 'See the whole plan',
     10: 'Lock in my plan',
   };
+
+  // Beat 9 is three screens, so its one label cannot serve all of them:
+  // "See the whole plan" under a range that has not been turned into a plan yet
+  // promises the next tap does something it does not.
+  const ctaLabel =
+    beat === 9 && rangeMatters && rangeStep < 2 ? 'Continue' : CTA[beat];
 
   // Only shown when there is something to warn about. Printing "in range for a
   // drug-free lifter" under every ordinary choice is the app congratulating the
@@ -1272,66 +1652,313 @@ export default function RouteScreen() {
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
-        {beat === 9 && roadmap ? (
+        {/* ── BEAT 9, SCREEN 1 OF 3: THE RANGE ────────────────────────────
+            Set before any plan is drawn, because no plan has been chosen yet.
+            The chart is the same component and the same geometry as screens 2
+            and 3, in `bandOnly` mode, so the band does not move between them
+            and the line simply arrives on the next screen. */}
+        {beat === 9 && roadmap && rangeStep === 0 && rangeMatters && range ? (
           <>
             <View style={styles.beat1Body}>
-              <Text style={styles.beatLabel}>CHOOSE YOUR ROUTE</Text>
+              {/* SAYS BODY FAT. "What range" named no unit at all, on a screen
+                  whose only other numbers are percentages beside the word TOP,
+                  so the thing being set was left to be inferred. */}
+              <Text style={styles.rangeQ}>
+                Where should your body fat sit while you grow?
+              </Text>
+              {/* TELLS THEM THE NEXT QUESTION EXISTS. This is the first screen
+                  of the three, so a band with no context reads as a rule they
+                  have to obey — that they must get inside some percentage
+                  before they are allowed to build. The choice to grow from
+                  where they are is on the very next screen, and one line here
+                  is the difference between a constraint and a setting. */}
+              <Text style={styles.rangeSub}>
+                Next: cut into it first, or grow from where you are.
+              </Text>
+              <JourneyChart
+                profile={profile}
+                roadmap={roadmap}
+                color={themeColor}
+                bare
+                bandOnly
+                frame
+                leanStopPct={leanStop}
+              />
 
-              {/* The picker is a control and the chart is its answer. As three
-                  cards it was ragged, because only the selected one carried the
-                  paragraph that explained the line. */}
-              <View style={styles.routeSeg}>
-                {ROUTE_OPTIONS.map((opt) => {
-                  const active = preference === opt.id;
+              {/* Hairline rows rather than cards. Four boxed surfaces on beat 9
+                  was the thing that got it called messy on 18 Aug, and a range
+                  is one setting with two ends, not two objects. */}
+              {/* TOP ABOVE BOTTOM, matching the chart directly above them. The
+                  first pass had them the other way round and the rows argued
+                  with the picture: the value labelled BOTTOM sat higher on the
+                  screen than the one labelled TOP. */}
+              <View style={styles.edgeRows}>
+                {([
+                  { key: 'hi' as const, label: 'TOP', v: bandHi, dis: atMinWidth, a: hiPulse },
+                  { key: 'lo' as const, label: 'BOTTOM', v: bandLo, dis: atLeanStop, a: loPulse },
+                ]).map((row) => (
+                  <View key={row.key} style={styles.edgeRow}>
+                    <Text style={styles.edgeKey}>{row.label}</Text>
+                    <View style={styles.edgeCtl}>
+                      <TouchableOpacity
+                        style={[styles.stepBtn, row.dis && styles.stepBtnOff]}
+                        onPress={() => nudge(row.key, -0.5)}
+                        disabled={row.dis}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Lower the ${row.label.toLowerCase()} of your range`}
+                      >
+                        <Text style={styles.stepGlyph}>{'\u2212'}</Text>
+                      </TouchableOpacity>
+                      <Animated.Text
+                        style={[styles.edgeVal, { transform: [{ scale: row.a }] }]}
+                      >
+                        {row.v}%
+                      </Animated.Text>
+                      <TouchableOpacity
+                        style={styles.stepBtn}
+                        onPress={() => nudge(row.key, 0.5)}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Raise the ${row.label.toLowerCase()} of your range`}
+                      >
+                        <Text style={styles.stepGlyph}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Each limit explains itself ONLY while someone is standing on
+                  it. A screen that carries both warnings permanently teaches
+                  people to stop reading them. */}
+              {atLeanStop ? (
+                <TouchableOpacity
+                  style={styles.rangeLimitRow}
+                  onPress={() => setEvidence('lean-stop')}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.rangeLimitDot} />
+                  <Text style={styles.rangeLimitText}>
+                    {`${leanStop}% is as lean as this goes. `}
+                    <Text style={{ color: themeColor }}>Why?</Text>
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {atMinWidth ? (
+                <TouchableOpacity
+                  style={styles.rangeLimitRow}
+                  onPress={() => setEvidence('range-width')}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.rangeLimitDot} />
+                  <Text style={styles.rangeLimitText}>
+                    {`${MIN_RANGE_WIDTH_PCT} points is as narrow as it goes. `}
+                    <Text style={{ color: themeColor }}>Why?</Text>
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {/* A link, never a mode. The suggestion is three points wide, a
+                  convention rather than a finding, so it sits out of the way. */}
+              {bandLo !== range.suggestedBottom || bandHi !== range.suggestedTop ? (
+                <TouchableOpacity onPress={useSuggested} activeOpacity={0.7}>
+                  <Text style={styles.suggestLink}>
+                    {`Use the suggested ${range.suggestedBottom} to ${range.suggestedTop}%`}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+
+        {/* ── BEAT 9, SCREEN 2 OF 3: GETTING INTO IT ──────────────────────
+            Only reachable when they start ABOVE their range, which is the only
+            case where there is a question. Each option carries a miniature of
+            its own shape, because the difference between them is a shape. */}
+        {beat === 9 && roadmap && rangeStep === 1 && routeMatters ? (
+          <>
+            <View style={styles.beat1Body}>
+              <Text style={styles.rangeQ}>
+                You are above that today. Get in now, or later?
+              </Text>
+              <Text style={styles.rangeSub}>
+                {`Either way you finish at ${Math.round(provisionalGoalBf)}%. This is when the cutting happens.`}
+              </Text>
+              <JourneyChart
+                profile={profile}
+                roadmap={roadmap}
+                color={themeColor}
+                bare
+                frame
+                muscleKg={
+                  roadmap.gapKg != null && roadmap.gapKg > 0 ? Math.round(roadmap.gapKg) : undefined
+                }
+              />
+
+              <View style={styles.edgeRows}>
+                {ORDER_OPTIONS.map((opt) => {
+                  const on = order === opt.id;
+                  const preview = effProfile
+                    ? deriveRoadmap({ ...effProfile, phaseOrder: opt.id }, preference)
+                    : null;
+                  const n =
+                    preview?.phases.filter((ph) => ph.kind === 'trim' || ph.kind === 'reveal')
+                      .length ?? 0;
                   return (
                     <TouchableOpacity
                       key={opt.id}
-                      style={[styles.routeSegBtn, active && styles.routeSegBtnOn]}
-                      onPress={() => choose(opt.id)}
-                      activeOpacity={0.8}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
+                      style={styles.optRow}
+                      onPress={() => chooseOrder(opt.id)}
+                      activeOpacity={0.85}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: on }}
+                      accessibilityLabel={`${opt.name}. ${opt.gain} ${opt.cost}`}
                     >
-                      <Text style={[styles.routeSegText, active && styles.routeSegTextOn]}>
-                        {opt.name}
-                      </Text>
+                      {preview ? (
+                        <View style={styles.optMini}>
+                          <JourneyChart
+                            profile={profile}
+                            roadmap={preview}
+                            color={on ? themeColor : '#54545e'}
+                            sparkline
+                          />
+                        </View>
+                      ) : null}
+                      <View style={styles.optMain}>
+                        <Text style={[styles.optName, on && styles.optNameOn]}>{opt.name}</Text>
+                        <Text style={styles.optMeta}>
+                          {CUT_WORDS[n] ?? `${n} cuts`}
+                        </Text>
+                      </View>
+                      <View style={[styles.optDot, on && { backgroundColor: themeColor }]} />
                     </TouchableOpacity>
                   );
                 })}
               </View>
 
-              {/* Named. Nothing on this screen used to say what was being
-                  plotted, which is why the line read as decoration. */}
-              <Text style={styles.chartTitle}>BODY FAT OVER TIME</Text>
-              <JourneyChart profile={profile} roadmap={roadmap} color={themeColor} bare />
-              <View style={styles.chartEnds}>
-                <Text style={styles.chartEnd}>TODAY</Text>
-                <Text style={styles.chartEnd}>{yrHi} YEARS</Text>
+              <View style={styles.edgeRows}>
+                <View style={styles.edgeRow}>
+                  <Text style={styles.edgeKey}>LOWEST</Text>
+                  <Text style={styles.edgeVal}>{fmtKg(lowestKg)}</Text>
+                </View>
+                <View style={styles.edgeRow}>
+                  <Text style={styles.edgeKey}>SOFTEST</Text>
+                  <Text style={styles.edgeVal}>
+                    {softestKg != null ? fmtKg(softestKg) : '\u2014'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : null}
+
+        {/* ── BEAT 9, SCREEN 3 OF 3: THE PLAN ─────────────────────────────
+            The summary, unchanged in structure from what it was before the
+            range existed: it is the confidence moment, and it now has no
+            controls on it at all. The two rows state what was chosen and jump
+            back to the screen that owns each. */}
+        {beat === 9 && roadmap && (rangeStep === 2 || !rangeMatters) ? (
+          <>
+            <View style={styles.beat1Body}>
+              {/* ── The destination, stated plainly ──────────────────────
+                  This is the confidence moment: someone four screens in wants
+                  to see where they end up, not decode a line. It OWNS the two
+                  weights — the chart below deliberately repeats them at its
+                  endpoints because they read as a journey there rather than as
+                  a fact, but nothing else on the screen restates them. */}
+              <View style={styles.destRow}>
+                <View style={styles.destCol}>
+                  <Text style={styles.destKey}>TODAY</Text>
+                  <Text style={styles.destBig}>
+                    {Math.round(profile.currentWeightKg)}
+                    <Text style={styles.destUnit}>kg</Text>
+                  </Text>
+                  <Text style={styles.destSub}>{Math.round(currentBf ?? 0)}% body fat</Text>
+                </View>
+                <Text style={[styles.destArrow, { color: themeColor }]}>{'\u2192'}</Text>
+                <View style={[styles.destCol, styles.destColEnd]}>
+                  <Text style={styles.destKey}>GOAL</Text>
+                  <Text style={[styles.destBig, { color: themeColor }]}>
+                    {Math.round(provisionalGoalW ?? 0)}
+                    <Text style={styles.destUnit}>kg</Text>
+                  </Text>
+                  <Text style={styles.destSub}>{Math.round(provisionalGoalBf)}% body fat</Text>
+                </View>
               </View>
 
-              {/* The three numbers that actually differ between the routes. The
-                  sentence said the same things in prose and took four lines to
-                  do it. */}
-              <View style={styles.stats}>
-                <View style={styles.stat}>
-                  <Text style={styles.statKey}>TIME</Text>
-                  <Text style={[styles.statValue, { color: themeColor }]}>
-                    {yrLo} to {yrHi} yr
-                  </Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text style={styles.statKey}>BODY FAT</Text>
-                  <Text style={styles.statValue}>
-                    {roadmap.band.floor}&ndash;{roadmap.band.ceiling}%
-                  </Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text style={styles.statKey}>TRIMS</Text>
-                  <Text style={styles.statValue}>
-                    {roadmap.phases.find((ph) => ph.kind === 'trim')?.repeats ?? 0}
-                  </Text>
-                </View>
+              <View style={styles.chartGap} />
+              <JourneyChart
+                profile={profile}
+                roadmap={roadmap}
+                color={themeColor}
+                bare
+                frame
+                muscleKg={roadmap.gapKg != null && roadmap.gapKg > 0 ? Math.round(roadmap.gapKg) : undefined}
+              />
+              <View style={styles.chartEnds}>
+                <Text style={styles.chartEnd}>TODAY</Text>
+                {/* Was `{yrHi} YEARS`, which put the PESSIMISTIC bound where a
+                    glance reads it as the answer. The TIME card used to carry
+                    the range; with the card gone the axis has to. */}
+                <Text style={styles.chartEnd}>
+                  {yrLo}&ndash;{yrHi} YR
+                </Text>
               </View>
+              <TouchableOpacity
+                onPress={() => setVarianceOpen(true)}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Estimated ${yrLo} to ${yrHi} years. Tap to find out why it is a range.`}
+              >
+                <Text style={[styles.whyRange, { color: themeColor }]}>why the range?</Text>
+              </TouchableOpacity>
+
+              {/* NO CONTROLS HERE. Each row states a choice and jumps back to
+                  the screen that owns it, which is also the revisit path — the
+                  choice is never buried behind a settings menu. */}
+              {rangeMatters && range ? (
+                <View style={styles.edgeRows}>
+                  <TouchableOpacity
+                    style={styles.edgeRow}
+                    onPress={() => setRangeStep(0)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Your range, ${bandLo} to ${bandHi} percent. Tap to change.`}
+                  >
+                    <View>
+                      <Text style={styles.edgeKey}>YOUR RANGE</Text>
+                      <Text style={styles.edgeLine}>{`${bandLo} to ${bandHi}%`}</Text>
+                    </View>
+                    <Text style={[styles.edgeChange, { color: themeColor }]}>Change</Text>
+                  </TouchableOpacity>
+                  {routeMatters ? (
+                    <TouchableOpacity
+                      style={styles.edgeRow}
+                      onPress={() => setRangeStep(1)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${runSummary}. Tap to change.`}
+                    >
+                      <View>
+                        <Text style={styles.edgeKey}>GETTING IN</Text>
+                        <Text style={styles.edgeLine}>
+                          {`${runSummary} \u00b7 ${CUT_WORDS[cutCount] ?? `${cutCount} cuts`}`}
+                        </Text>
+                      </View>
+                      <Text style={[styles.edgeChange, { color: themeColor }]}>Change</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : (
+                <Text style={[styles.orderNone, styles.orderNoneSpaced]}>
+                  {noCutNeeded
+                    ? 'You are already leaner than your goal, so there is nothing to cut first. One long build.'
+                    : 'You already carry the muscle your goal needs, so this is one stretch of fat loss.'}
+                </Text>
+              )}
             </View>
           </>
         ) : null}
@@ -1361,27 +1988,11 @@ export default function RouteScreen() {
                 <Text style={styles.summaryUnit}>% body fat</Text>
               </View>
 
-              {/* The exit percentage is a band edge, not something the user
-                  typed, and until now nothing said so — which produced the
-                  reasonable "where did 14% come from" reaction. Named by the
-                  ROUTE LABEL they picked rather than by "band", so it points at
-                  a decision they remember making. The reveal exits at their own
-                  goal, so it needs no attribution. */}
-              {(() => {
-                const first = roadmap.phases[0];
-                if (first.kind === 'reveal' || first.kind === 'recomp') return null;
-                const routeName =
-                  ROUTE_OPTIONS.find((o) => o.id === (roadmap.route ?? 'balanced'))?.name ?? '';
-                if (!routeName) return null;
-                const atFloor = Math.abs(first.exitBodyFatPct - roadmap.band.floor) < 0.5;
-                return (
-                  <Text style={styles.bandSource}>
-                    {`${Math.round(first.exitBodyFatPct)}% is the ${
-                      atFloor ? 'lean end' : 'top'
-                    } of your ${routeName} route`}
-                  </Text>
-                );
-              })()}
+              {/* The band-edge attribution ("12% is the lean end of your Stay
+                  lean route") used to sit here. Removed 20 Aug at Ryan's
+                  request — it was the only small-grey line between the two big
+                  numbers and the estimate, and the screen reads cleaner
+                  without it. The explanation still lives in helpFor(9). */}
 
               <View style={styles.durRow}>
                 <Text style={styles.durValue}>
@@ -1497,7 +2108,7 @@ export default function RouteScreen() {
           accessibilityState={{ disabled: ctaBlocked }}
         >
           <Text style={[styles.ctaText, { color: ctaBlocked ? '#3f3f46' : themeColor }]}>
-            {ctaBlocked ? 'Pick one to continue' : single ? 'Done' : CTA[beat]}
+            {ctaBlocked ? 'Pick one to continue' : single ? 'Done' : ctaLabel}
           </Text>
           {ctaBlocked ? null : (
             <Ionicons name="chevron-forward" size={16} color={themeColor} />
@@ -1513,15 +2124,118 @@ export default function RouteScreen() {
           goalWeightKg={goalW}
           goalBodyFatPct={provisionalGoalBf}
           leanTargetKg={goalLean}
+          leanStopPct={leanStop}
+          minWidthPct={MIN_RANGE_WIDTH_PCT}
           onClose={() => setEvidence(null)}
         />
       ) : null}
 
+      {/* WHY THE RANGE.
+          
+          Two and a half to five years is a wide enough spread that leaving it
+          unexplained reads as the app not knowing, rather than as honest
+          uncertainty.
+          
+          What is actually in it: the ±35% band this model carries on the gain
+          rate for individual response, widening further when a user's
+          self-reported training state disagrees with their FFMI position, plus
+          the 0.5–1%/wk range on each trim.
+          
+          What is NOT in it is adherence, and that is the line worth having.
+          Someone who assumes missed sessions land them at the slow end will
+          read five years as their worst case when it is not. */}
+      <Modal
+        visible={varianceOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVarianceOpen(false)}
+      >
+        <Pressable style={styles.scrim} onPress={() => setVarianceOpen(false)} />
+        <View style={styles.sheet}>
+          <View style={styles.grab} />
+          <View style={styles.sheetHead}>
+            <Text style={styles.sheetTitle}>Why the range?</Text>
+          </View>
+          <ScrollView
+            style={styles.sheetScrollArea}
+            contentContainerStyle={styles.sheetScrollContent}
+            /* bounces LEFT ON, deliberately. Turning it off felt like the
+               right call for a contained sheet and was wrong: on iOS the
+               rubber-banding IS the smoothness, and without it the scroll
+               stops dead at both ends and reads as broken.
+               The indicator stays visible too — in a sheet that sometimes
+               scrolls and sometimes does not, it is the only thing telling
+               the user which one they have got. */
+            showsVerticalScrollIndicator
+            indicatorStyle="white"
+          >
+            <Text style={styles.sheetBody}>
+              {'People respond differently to the same training. Two lifters running the identical program can build at quite different rates, and there is no way to know which you are until you start — the fast end assumes you respond well, the slow end assumes you do not.'}
+            </Text>
+            <Text style={styles.sheetBody}>
+              {'How fast you trim moves it too. Cutting at the quicker end of what is safe shortens each trim, though it is a smaller part of the total.'}
+            </Text>
+            {/* Deliberately not the word "genetics". Accurate, but it reads as
+                an excuse and invites people to write themselves off before
+                they have started. */}
+            <Text style={styles.sheetBody}>
+              {'Not following the plan is not in this range. Missed sessions and off-plan weeks do not put you at the slow end — they put you outside it. The estimate assumes you train and eat as planned throughout.'}
+            </Text>
+          </ScrollView>
+          <View style={[styles.sheetFooter, { paddingBottom: insets.bottom + 20 }]}>
+            <TouchableOpacity
+              style={styles.sheetGhost}
+              onPress={() => setVarianceOpen(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sheetGhostText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/**
+       * THE RUN-IT SHEET. Both beat 9 pickers live here as of 18 Aug 2026.
+       *
+       * The preview at the top is the load-bearing part, not decoration. The
+       * muscle bracket's POSITION is the only thing that shows WHEN you grow,
+       * which is the entire difference between the two orders — and with the
+       * pickers off the screen, a user changing one would otherwise have to
+       * dismiss the sheet to see what they did. It draws the same roadmap as
+       * the chart behind the scrim, from the same memo, so the two cannot
+       * disagree.
+       *
+       * NO COPY IN HERE, decided 18 Aug 2026 after seeing it running. A gain
+       * and a cost sentence per picker came to 42 words in a sheet whose whole
+       * job is two taps. The `gain`/`cost` strings still reach a screen reader
+       * through each button's accessibilityLabel, and helpFor(9) states both
+       * costs for both axes in full — that sheet is the long form, this one is
+       * the control.
+       */}
       <Modal visible={helpOpen} transparent animationType="fade" onRequestClose={() => setHelpOpen(false)}>
         <Pressable style={styles.scrim} onPress={() => setHelpOpen(false)} />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
+        <View style={styles.sheet}>
           <View style={styles.grab} />
-          <Text style={styles.sheetTitle}>{beatHelp?.title}</Text>
+          {/* SCROLLABLE. This sheet can carry a title, a body, three groups of
+              bullets and a sources line — on a small phone the sources and the
+              dismiss button fell off the bottom with no way to reach them.
+              The grab handle stays outside the scroll so it does not move. */}
+          <View style={styles.sheetHead}>
+            <Text style={styles.sheetTitle}>{beatHelp?.title}</Text>
+          </View>
+          <ScrollView
+            style={styles.sheetScrollArea}
+            contentContainerStyle={styles.sheetScrollContent}
+            /* bounces LEFT ON, deliberately. Turning it off felt like the
+               right call for a contained sheet and was wrong: on iOS the
+               rubber-banding IS the smoothness, and without it the scroll
+               stops dead at both ends and reads as broken.
+               The indicator stays visible too — in a sheet that sometimes
+               scrolls and sometimes does not, it is the only thing telling
+               the user which one they have got. */
+            showsVerticalScrollIndicator
+            indicatorStyle="white"
+          >
           <Text style={styles.sheetBody}>{beatHelp?.body}</Text>
           {beatHelp?.groups?.map((g) => (
             <View key={g.title} style={styles.helpGroup}>
@@ -1539,13 +2253,16 @@ export default function RouteScreen() {
               <Text style={styles.sheetSourcesText}>{beatHelp.sources}</Text>
             </View>
           ) : null}
-          <TouchableOpacity
-            style={styles.sheetGhost}
-            onPress={() => setHelpOpen(false)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.sheetGhostText}>Got it</Text>
-          </TouchableOpacity>
+          </ScrollView>
+          <View style={[styles.sheetFooter, { paddingBottom: insets.bottom + 20 }]}>
+            <TouchableOpacity
+              style={styles.sheetGhost}
+              onPress={() => setHelpOpen(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sheetGhostText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
@@ -1554,9 +2271,19 @@ export default function RouteScreen() {
           to ask it. */}
       <Modal visible={confirming} transparent animationType="fade" onRequestClose={() => setConfirming(false)}>
         <Pressable style={styles.scrim} onPress={() => setConfirming(false)} />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
+        {/* sheetPad, because styles.sheet no longer carries horizontal padding
+            — that moved onto the head/body/footer when the long sheets gained
+            a pinned footer, and this short one has none of those parts. It is
+            not long enough to need scrolling, so it keeps the simple shape and
+            just adds its own inset. */}
+        <View style={[styles.sheet, styles.sheetPad, { paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.grab} />
-          <Text style={styles.sheetTitle}>Lock in {selected?.name}?</Text>
+          {/* Named the BAND route until 17 Aug and the ORDER until 20 Aug.
+              With the order collapsed into the dial there is no option name
+              left to confirm — the dial is a number, and "Lock in 12%?" asks
+              the user to confirm an engine coordinate rather than the plan
+              they have been looking at. The plan itself is the thing. */}
+          <Text style={styles.sheetTitle}>Lock this plan in?</Text>
           <Text style={styles.sheetBody}>
             This saves your goal and builds the phase sequence around it. You can change it later in
             Goals and stats, but the plans get rebuilt when you do.
@@ -1698,21 +2425,118 @@ const styles = StyleSheet.create({
   qmark: { width: 19, height: 19, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', opacity: 0.6 },
   qmarkText: { fontSize: 11, fontWeight: '700' },
 
-  routeSeg: {
+  /**
+   * NOT A CARD as of 18 Aug 2026. It was a filled, bordered, rounded box, and
+   * with the chart and two pickers below it the screen carried four boxed
+   * surfaces competing to be read first. A hairline underneath does the same
+   * separating job and leaves the chart as the only object on the screen.
+   */
+  destRow: {
     flexDirection: 'row',
-    backgroundColor: '#111114',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#1f1f23',
-    borderRadius: 12,
-    padding: 3,
-    marginBottom: 18,
+    alignItems: 'flex-end',
+    gap: 10,
+    paddingBottom: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#232328',
   },
-  routeSegBtn: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
-  routeSegBtnOn: { backgroundColor: '#1e1e22' },
-  routeSegText: { fontSize: 12.5, fontWeight: '600', color: '#6b6b70' },
-  routeSegTextOn: { color: '#ffffff' },
+  destCol: { flex: 1 },
+  destColEnd: { alignItems: 'flex-end' },
+  destKey: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, color: '#4b4b52', marginBottom: 5 },
+  destBig: { fontSize: 24, fontWeight: '700', letterSpacing: -0.6, color: '#e8e8ea' },
+  destUnit: { fontSize: 14, fontWeight: '600' },
+  destSub: { fontSize: 12, color: '#9a9aa0', marginTop: 3 },
+  // Sits with the numbers rather than the labels now that the row is bottom
+  // aligned, since flex-end would otherwise drop it onto the body fat line.
+  destArrow: { fontSize: 19, paddingBottom: 14 },
 
-  chartTitle: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.6, color: '#4b4b52', marginTop: 26, marginBottom: 8 },
+  /* The row that replaced both pickers. A filled block rather than a hairline
+     one: it is the only tappable thing between the chart and the CTA, and it
+     has to read as a control rather than as another line of the chart's
+     caption. */
+
+
+  // Was marginTop 2, which put it hard against the axis label above so the
+  // two right-aligned lines read as one block.
+  whyRange: { fontSize: 11, textAlign: 'right', marginTop: 8 },
+  // The house weights, not the mockup's. Every other beat on this flow states
+  // itself in 700 — beatLabel at 11 and bigValue at 70 — so a 300 weight
+  // question and a 300 weight value read as a different app two screens later.
+  rangeQ: {
+    fontSize: 21,
+    fontWeight: '700',
+    lineHeight: 28,
+    color: '#ffffff',
+    letterSpacing: -0.3,
+    marginBottom: 8,
+  },
+  rangeSub: { fontSize: 13.5, lineHeight: 20, color: '#8e8e93', marginBottom: 22 },
+  // Hairline rows, no fills. The Ledger treatment, chosen 20 Aug: a range is
+  // one setting with two ends rather than two objects, and beat 9 has already
+  // been called messy once for stacking boxed surfaces.
+  edgeRows: { marginTop: 22, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#232328' },
+  edgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 62,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#232328',
+  },
+  // Same spec as beatLabel, which every other beat uses for its field name.
+  // Left aligned rather than centred because it sits in a row beside a value.
+  edgeKey: { fontSize: 11, fontWeight: '700', letterSpacing: 2.6, color: '#5b5b62' },
+  edgeCtl: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  edgeVal: {
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: -0.6,
+    minWidth: 96,
+    textAlign: 'center',
+  },
+  edgeLine: { fontSize: 14, fontWeight: '600', color: '#e8e8ea', marginTop: 5 },
+  edgeChange: { fontSize: 13, fontWeight: '600' },
+  stepBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#232328',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Dimmed rather than removed: a control that disappears at a limit leaves the
+  // user wondering where it went, and the note beside it explains the stop.
+  stepBtnOff: { opacity: 0.22 },
+  stepGlyph: { fontSize: 15, lineHeight: 17, color: '#8e8e93' },
+  rangeLimitRow: { flexDirection: 'row', gap: 9, marginTop: 14, alignItems: 'flex-start' },
+  rangeLimitDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#d1a44a', marginTop: 6 },
+  rangeLimitText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: '#8e8e93' },
+  suggestLink: { fontSize: 12.5, color: '#8e8e93', marginTop: 16 },
+  optRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    minHeight: 74,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#232328',
+  },
+  // 116pt because the miniature has to read as a SHAPE. At the 88 the first
+  // pass used, the sawtooth and the single hump were indistinguishable.
+  optMini: { width: 116 },
+  optMain: { flex: 1 },
+  optName: { fontSize: 15, fontWeight: '600', color: '#8e8e93' },
+  optNameOn: { color: '#ffffff' },
+  optMeta: { fontSize: 10, fontWeight: '700', letterSpacing: 1.3, color: '#4b4b52', marginTop: 7 },
+  optDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'transparent' },
+  orderNone: { fontSize: 13, lineHeight: 20, color: '#8e8e93', marginBottom: 4 },
+  // Only when it stands in for the summary row on the screen itself. Inside the
+  // sheet the same text sits directly under the preview and needs no gap.
+  orderNoneSpaced: { marginTop: 26 },
+
+  // Was `chartTitle`, a BODY FAT OVER TIME heading. The chart is now the only
+  // thing on the screen it could possibly describe.
+  chartGap: { height: 26 },
   chartEnds: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   chartEnd: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.1, color: '#3f3f46' },
   stats: { flexDirection: 'row', gap: 8, marginTop: 24 },
@@ -1728,6 +2552,48 @@ const styles = StyleSheet.create({
   },
   statKey: { fontSize: 8.5, fontWeight: '700', letterSpacing: 1.1, color: '#4b4b52' },
   statValue: { fontSize: 14.5, fontWeight: '700', color: '#e4e4e7', marginTop: 5 },
+  // A hairline border rather than a button treatment: enough to say this one
+  // is tappable, not enough to compete with the route picker above it.
+  statTappable: { borderColor: '#2a3a3e' },
+  statHint: { fontSize: 9, marginTop: 5, letterSpacing: 0.3 },
+  /**
+   * flex: 1 with minHeight: 0.
+   *
+   * The minHeight is the part that is easy to miss — without it a flex child
+   * refuses to shrink below its content height, so the ScrollView never
+   * actually scrolls and the overflow is simply clipped.
+   */
+  /**
+   * PADDING GOES ON contentContainerStyle, NOT style.
+   *
+   * A ScrollView's `style` is the viewport; padding there does not inset the
+   * scrolling content, which is why the first version had text running to the
+   * screen edge. `contentContainerStyle` is the one that wraps the content.
+   *
+   * flexShrink with minHeight: 0 is what actually lets the scroll engage — a
+   * flex child will not shrink below its content height without it, so the
+   * overflow gets clipped rather than scrolled.
+   */
+  sheetPad: { paddingHorizontal: 20 },
+  sheetScrollArea: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
+  sheetScrollContent: { paddingHorizontal: 20, paddingBottom: 10 },
+  /**
+   * The title sits OUTSIDE the scroll.
+   *
+   * Scrolling a long sheet used to carry the heading away, leaving the user
+   * reading a paragraph mid-sentence with nothing saying what it was about.
+   * Pinning it costs one line of height and keeps the sheet legible at any
+   * scroll position.
+   */
+  sheetHead: { flexGrow: 0, flexShrink: 0, paddingHorizontal: 20, paddingBottom: 12 },
+  sheetFooter: {
+    flexGrow: 0,
+    flexShrink: 0,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1c1c20',
+  },
 
   // No divider above the bar: it was drawing a box under a screen that has
   // nothing else boxed on it.
@@ -1737,7 +2603,6 @@ const styles = StyleSheet.create({
 
   // Amber, matching the caution zone and the stale-number marking elsewhere.
   // Not red: an unreachable goal is a thing to know, not an error the user made.
-  bandSource: { fontSize: 13, color: '#5b5b62', marginTop: 9 },
 
   limitRow: { flexDirection: 'row', gap: 9, marginTop: 24, alignItems: 'flex-start' },  limitDot: {
     width: 7,
@@ -1790,14 +2655,29 @@ const styles = StyleSheet.create({
   secondaryText: { fontSize: 13, fontWeight: '500', color: '#71717a' },
 
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  /**
+   * THE CAP BELONGS HERE, not on the ScrollView inside.
+   *
+   * The first version put maxHeight on the ScrollView, whose parent is this
+   * sheet — and this sheet is sized by its own content, so the percentage
+   * resolved against a height that depended on it. The result was a sheet that
+   * inflated toward the top of the screen for three short paragraphs, with the
+   * dismiss button clipped inside the scroll.
+   *
+   * Capping the sheet and making it a column fixes both cases: short content
+   * hugs, long content stops at 82% and scrolls beneath a pinned footer.
+   * paddingHorizontal moves to the body and footer so the scrollbar can sit at
+   * the true edge.
+   */
   sheet: {
     backgroundColor: '#111114',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#27272a',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 20,
     paddingTop: 10,
+    maxHeight: '82%',
+    flexDirection: 'column',
   },
 
   summaryBody: { flex: 1, justifyContent: 'center', paddingBottom: 20 },
@@ -1815,7 +2695,7 @@ const styles = StyleSheet.create({
   intentDetail: { fontSize: 12.5, lineHeight: 18, color: '#6b6b70', marginTop: 5 },
   intentScale: { fontSize: 12.5, lineHeight: 18, color: '#8e8e93', marginTop: 8 },
   intentScaleStrong: { color: '#e4e4e7', fontWeight: '600' },
-  durRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  durRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22 },
   durValue: { fontSize: 21, fontWeight: '700', color: '#ffffff', letterSpacing: -0.4 },
   durTag: {
     fontSize: 9.5,
@@ -1831,11 +2711,14 @@ const styles = StyleSheet.create({
   glow: { position: 'absolute' },
 
 
-  grab: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2f2f35', alignSelf: 'center', marginBottom: 16 },
+  // flexShrink 0 so the handle keeps its height when the body is squeezed.
+  grab: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2f2f35', alignSelf: 'center', marginBottom: 16, flexShrink: 0 },
   sheetCta: { height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   sheetGhost: { height: 50, borderRadius: 13, backgroundColor: '#1c1c20', alignItems: 'center', justifyContent: 'center' },
   sheetGhostText: { fontSize: 14, fontWeight: '600', color: '#d4d4d8' },
   sheetCtaText: { fontSize: 15, fontWeight: '600', color: '#0a0a0b' },
+  // marginBottom removed — sheetHead owns the spacing now that the title is
+  // pinned outside the scroll.
   sheetTitle: { fontSize: 19, fontWeight: '700', color: '#ffffff', marginBottom: 8, lineHeight: 25 },
   sheetBody: { fontSize: 14, lineHeight: 22, color: '#b4b4b8', marginBottom: 16 },
   helpGroup: { marginBottom: 16 },

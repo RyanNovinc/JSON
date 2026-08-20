@@ -22,12 +22,37 @@ import { updateQuestionnaireField } from '../../utils/questionnaireStorage';
 
 /**
  * Q6 — Volume Preference
- * Step 6 of 7.
+ * Step 4 of 5 in the current flow. (The literals below still read
+ * stepOffset + 5 of + 6 and are CORRECT: Q3 hands off at stepOffset - 1
+ * since Q1 was deleted, so this renders as 4 of 5. The old "Step 6 of 7"
+ * comment was stale, not the numbers.)
  *
  * Values must match the volumePreference expected by the storage layer.
  * On Continue, routes to Q7RestStyle.
  *
- * Shows weekly volume ranges for muscle building.
+ * Copy revision, 18 Aug 2026
+ * --------------------------
+ * "Maximum growth stimulus" was removed from the High tier. It is not the
+ * maximum and it implies a ceiling the data does not show: the weekly volume
+ * dose-response is monotone with diminishing returns (Pelland et al. 2026,
+ * Sports Med 56(2):481-505, ~0.24% more hypertrophy per additional set at
+ * 12.25 weekly fractional sets), superiority only becomes undetectable past
+ * roughly 31 fractional weekly sets, and Enes et al. 2024 ran a group to 52
+ * weekly sets and still saw a small advantage. This screen's 16-20 top tier
+ * sits nearer the middle of the useful range than the top of it.
+ *
+ * This screen owns the GROWTH claim. Q3 owns logistics only. The closing
+ * line names the Q3 answer so the two screens agree out loud, instead of
+ * both implying they drive muscle gain.
+ *
+ * Deliberately NOT shown: sets per muscle per session. Weekly sets divided
+ * by training days is wrong arithmetic, because the split decides how many
+ * sessions each muscle actually gets and the AI picks the split.
+ *
+ * The closing line renders only when totalTrainingDays is present on
+ * answersSoFar. On the normal flow it always is (Q3 runs first). Reaching
+ * this screen in editMode from the summary may not carry it, in which case
+ * the line is omitted rather than guessed.
  */
 
 type VolumePreferenceValue = '8-12' | '12-16' | '16-20';
@@ -43,19 +68,22 @@ const OPTIONS: VolumeOption[] = [
   {
     value: '8-12',
     title: 'Conservative',
-    subtitle: '8-12 sets per muscle per week. Ideal for beginners or recovery focus.',
+    subtitle:
+      '8 to 12 sets per muscle per week. Enough to grow on. Good if you are new to lifting or short on time.',
     icon: 'leaf-outline',
   },
   {
     value: '12-16',
     title: 'Moderate',
-    subtitle: '12-16 sets per muscle per week. Balanced growth and recovery.',
+    subtitle:
+      '12 to 16 sets per muscle per week. Solid growth without your week revolving around the gym.',
     icon: 'speedometer-outline',
   },
   {
     value: '16-20',
-    title: 'High Volume',
-    subtitle: '16-20 sets per muscle per week. Maximum growth stimulus.',
+    title: 'High',
+    subtitle:
+      '16 to 20 sets per muscle per week. More stimulus, and more fatigue to recover from. Needs sleep and food behind it.',
     icon: 'flame-outline',
   },
 ];
@@ -76,6 +104,11 @@ export default function Q6VolumePreferenceScreen() {
   const [selected, setSelected] = useState<VolumePreferenceValue | null>(
     (answersSoFar.volumePreference as VolumePreferenceValue) ?? null,
   );
+
+  const trainingDays =
+    typeof answersSoFar.totalTrainingDays === 'number'
+      ? (answersSoFar.totalTrainingDays as number)
+      : null;
 
   const handleNext = async () => {
     if (!selected) return;
@@ -114,7 +147,8 @@ export default function Q6VolumePreferenceScreen() {
       >
         <Text style={styles.question}>How much volume?</Text>
         <Text style={styles.subtitle}>
-          More sets build more muscle. Fewer sets allow better recovery.
+          Sets per muscle per week. This is the dial that drives growth, and it
+          keeps paying as it climbs, just by less each time.
         </Text>
 
         <View>
@@ -129,6 +163,21 @@ export default function Q6VolumePreferenceScreen() {
             />
           ))}
         </View>
+
+        {trainingDays !== null && (
+          <View style={styles.tieLine}>
+            <Ionicons
+              name="information-circle"
+              size={15}
+              color={themeColor}
+              style={{ marginTop: 1 }}
+            />
+            <Text style={styles.tieLineText}>
+              Your {trainingDays} {trainingDays === 1 ? 'day' : 'days'} a week
+              decides how these sets get split up, not how many there are.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
       <View
@@ -184,6 +233,26 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 28,
   },
+
+  tieLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(34, 211, 238, 0.06)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(34, 211, 238, 0.25)',
+    borderRadius: 12,
+  },
+  tieLineText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#d4d4d8',
+    lineHeight: 18,
+  },
+
   ctaBar: {
     paddingHorizontal: 20,
     paddingTop: 12,

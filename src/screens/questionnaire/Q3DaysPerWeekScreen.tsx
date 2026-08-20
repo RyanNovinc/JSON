@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  LayoutChangeEvent,
 } from 'react-native';
 import {
   useNavigation,
@@ -30,38 +31,64 @@ import { updateQuestionnaireField } from '../../utils/questionnaireStorage';
  *
  * Captures `totalTrainingDays` (number).
  *
- * Redesign goals
- * --------------
- * The previous 3-column grid put 7 days as an orphan single cell on
- * its own row, breaking the visual rhythm and making selection of
- * "7" feel awkward and isolated. The hint text floated far below the
- * grid, disconnected from the choice.
+ * Copy revision, 18 Aug 2026
+ * --------------------------
+ * The previous DAY_HINTS read as a quality ladder ("the sweet spot" at 3,
+ * "demands serious sleep, food, and recovery" at 6), which implied more days
+ * means more muscle. That is not what the evidence says, and it is not what
+ * this app does: weekly sets per muscle are chosen on Q6 and that ceiling
+ * does not move with the number of training days. Two of the old hints were
+ * also plainly wrong ("1: Maintenance only", "2: Minimum to build").
  *
- * This version:
- *   - Single horizontal row of 7 equal-width tiles. All options
- *     visible at a glance; no orphan row.
- *   - Big animated "X days a week" display below the row. Confirms
- *     the selection visually with weight and presence.
- *   - Contextual hint sits right under the display, so the meaning
- *     of the choice is tied directly to the choice itself.
- *   - When nothing is selected the display area shows a neutral
- *     prompt so the screen never feels empty.
+ * This screen now owns LOGISTICS only. Days decides how the weekly sets are
+ * distributed and how long each session runs. Q6 owns the growth claim, and
+ * closes with a line naming this answer so the two screens agree out loud.
  *
- * Tiles use `flex: 1` rather than fixed widths so the row scales
- * cleanly down to small phones (iPhone SE-class) and up to larger
- * devices without needing breakpoints.
+ * Evidence behind the change:
+ *   - Schoenfeld, Grgic & Krieger 2019 (J Sports Sci 37(11):1286-95, 25
+ *     studies): frequency does not meaningfully affect hypertrophy when
+ *     weekly volume is equated.
+ *   - Pelland et al. 2026 (Sports Med 56(2):481-505, 67 studies, 2,058
+ *     participants): the frequency slope for hypertrophy is compatible with
+ *     negligible effects. Frequency DOES help strength.
+ *   - Remmert et al. per-session meta-regression: hypertrophy point of
+ *     diminishing returns at ~11 fractional sets in a single session, which
+ *     is what rules 1 day per week out rather than any "maintenance" claim.
+ *
+ * RECOMMENDED_DAYS band
+ * ---------------------
+ * 3 to 5, shown as a muted bracket under those tiles. Deliberately grey
+ * rather than themeColor so the selected tile stays the loudest element and
+ * the band reads as guidance, not a second selection state.
+ *   - Floor: the ACSM 2026 Position Stand (MSSE, 137 systematic reviews)
+ *     anchors on training each major muscle group at least twice a week.
+ *     1 day cannot do that and forces the whole week into one session.
+ *     2 clears it with a full body split, so 2 is legitimate, not warned
+ *     against; it just constrains which Q6 tier is comfortably deliverable.
+ *   - Ceiling: past 5 the extra sessions buy no stimulus, and 7 removes the
+ *     rest day, which cuts against the adherence point that is the ACSM's
+ *     actual headline.
+ *
+ * The bracket is positioned from a measured row width rather than flex
+ * weights, because flex spacers land ~1px off once the 5px gaps are counted.
+ * Tiles keep `flex: 1` so the row still scales from iPhone SE upward.
  */
 
 const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
+/** Inclusive band highlighted under the tiles. Must be contiguous. */
+const RECOMMENDED_DAYS = [3, 4, 5];
+
+const TILE_GAP = 5;
+
 const DAY_HINTS: Record<number, string> = {
-  1: 'Maintenance only. Hard to make real progress at this frequency.',
-  2: 'Minimum to build. Full-body sessions twice a week.',
-  3: 'The sweet spot. Push/pull/legs or upper/lower split.',
-  4: 'Great for intermediates. Upper/lower repeated twice.',
-  5: 'Body part split. Good if recovery and sleep are solid.',
-  6: 'High frequency. Demands serious sleep, food, and recovery.',
-  7: 'Daily training. Mix in active recovery and lower-intensity days.',
+  1: 'Everything in one long session. Past a point, extra sets in a single session stop paying off.',
+  2: 'Two longer full body sessions. The accepted minimum for hitting each muscle twice.',
+  3: 'Three moderate sessions. Comfortably fits any volume you pick later.',
+  4: 'Four shorter sessions. Easy to hit every muscle twice a week.',
+  5: 'Five shorter sessions. More trips to the gym, less time in each.',
+  6: 'Six short sessions. Same weekly sets as four days, cut into smaller pieces.',
+  7: 'Every day, no rest day. Very short sessions, and the weekly total is unchanged.',
 };
 
 type ParamList = {
@@ -80,6 +107,18 @@ export default function Q3DaysPerWeekScreen() {
   const [selected, setSelected] = useState<number | null>(
     (answersSoFar.totalTrainingDays as number) ?? null,
   );
+
+  // Measured so the band bracket lines up exactly with tiles 3 through 5.
+  const [rowWidth, setRowWidth] = useState(0);
+  const tileWidth =
+    rowWidth > 0 ? (rowWidth - TILE_GAP * (DAY_OPTIONS.length - 1)) / DAY_OPTIONS.length : 0;
+  const bandStartIndex = RECOMMENDED_DAYS[0] - 1;
+  const bandLeft = bandStartIndex * (tileWidth + TILE_GAP);
+  const bandWidth =
+    RECOMMENDED_DAYS.length * tileWidth + (RECOMMENDED_DAYS.length - 1) * TILE_GAP;
+
+  const handleRowLayout = (e: LayoutChangeEvent) =>
+    setRowWidth(e.nativeEvent.layout.width);
 
   const handleNext = async () => {
     if (!selected) return;
@@ -119,11 +158,12 @@ export default function Q3DaysPerWeekScreen() {
       >
         <Text style={styles.question}>How many days a week?</Text>
         <Text style={styles.subtitle}>
-          Pick what you can actually stick to. Quality beats quantity.
+          Your weekly sets stay the same either way. More days means shorter
+          sessions, fewer days means longer ones.
         </Text>
 
         {/* Single horizontal row of 7 tiles. */}
-        <View style={styles.row}>
+        <View style={styles.row} onLayout={handleRowLayout}>
           {DAY_OPTIONS.map((day) => {
             const isSelected = selected === day;
             return (
@@ -153,6 +193,19 @@ export default function Q3DaysPerWeekScreen() {
             );
           })}
         </View>
+
+        {/* Recommended band bracket under tiles 3 to 5. */}
+        {rowWidth > 0 && (
+          <View style={styles.bandRow}>
+            <View
+              style={[
+                styles.bandBracket,
+                { marginLeft: bandLeft, width: bandWidth },
+              ]}
+            />
+          </View>
+        )}
+        <Text style={styles.bandLabel}>Most people land here</Text>
 
         {/* Big "X days a week" display + context hint. */}
         <View style={styles.displayBlock}>
@@ -239,7 +292,7 @@ const styles = StyleSheet.create({
   // Row of 7 tiles
   row: {
     flexDirection: 'row',
-    gap: 5,
+    gap: TILE_GAP,
   },
   cell: {
     flex: 1,
@@ -256,9 +309,31 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
 
+  // Recommended band. Muted on purpose: the selected tile owns themeColor.
+  bandRow: {
+    flexDirection: 'row',
+    marginTop: 9,
+  },
+  bandBracket: {
+    height: 6,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#3f3f46',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  bandLabel: {
+    fontSize: 11,
+    color: '#71717a',
+    textAlign: 'center',
+    letterSpacing: 0.4,
+    marginTop: 6,
+  },
+
   // Big display block under the row
   displayBlock: {
-    marginTop: 36,
+    marginTop: 30,
     alignItems: 'center',
   },
   displayNumber: {
@@ -283,7 +358,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    marginTop: 20,
+    marginTop: 18,
     paddingHorizontal: 14,
     paddingVertical: 12,
     backgroundColor: 'rgba(34, 211, 238, 0.06)',

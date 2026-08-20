@@ -438,9 +438,9 @@ const styles = StyleSheet.create({
   choiceTitleLocked: { color: '#52525b' },
   choiceHint: { fontSize: 13, color: '#5b5b62', marginTop: 4 },
 
-  // Pinned rather than flowed: the route is the base of the screen, and the
-  // space above it is deliberate rather than left over.
-  footer: { marginTop: 'auto' },
+  // Fills the space left under the choices and centers the route in it, so the
+  // block floats in its own section rather than sitting on the screen's base.
+  footer: { flex: 1, justifyContent: 'center' },
 
 
   titleBlock: { paddingTop: 24, paddingBottom: 26 },

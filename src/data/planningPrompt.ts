@@ -135,6 +135,8 @@ This is the first of three steps:
 1. I'll write the draft below.
 2. You'll review it and reply "happy" — I'll run a quality check.
 3. Reply "happy" again after that, and I'll turn it into your file.
+
+Don't want to read all of it? Skip to 📋 Your plan at a glance at the bottom.
 \`\`\`
 
 This callout tells the user what to expect from the whole flow so they don't get lost between steps. After the callout, continue with the program work as normal.
@@ -144,6 +146,8 @@ This callout tells the user what to expect from the whole flow so they don't get
 Code blocks (triple backticks) are RESERVED for the opening callout above and the closing callout at the end of your response. Do not use code blocks anywhere else — not for exercise names, not for sample workouts, not for tables, not for any other content. This visual treatment is reserved so the user's eye is drawn to the two callouts that contain their next-step instructions.
 
 Use **bold**, headers, tables, and bullet lists freely for the program itself — just no code blocks in the middle.
+
+Emoji in a HEADING is reserved the same way. The only heading in your entire response allowed to carry an emoji is the summary heading near the end, described under "Finish with Your plan at a glance". Every other heading is plain text. Status markers such as ⚠️ and ℹ️ inside tables and prose are unaffected — this rule is about headings only, and it exists so the user can find the summary by scrolling without reading.
 
 ---
 
@@ -213,20 +217,58 @@ Present the complete program clearly so the user can review and iterate before c
 
 Write naturally — this is a planning conversation, not a final document. The user will request changes before moving to JSON conversion.
 
-### Finish with "What I decided"
+### Finish with "Your plan at a glance"
 
-After the program, before the closing callout, write a short section headed "What I decided". Five or six bullets, no more.
+The LAST thing in your response before the closing callout is one section, headed exactly:
 
-This exists because the user is being asked to review something they did not watch you build. The program itself reads as finished work — what they actually need to see are the JUDGEMENT CALLS you made on their behalf, because those are the only things they might want changed. Do not restate the program or list its exercises back.
+## 📋 Your plan at a glance
 
-Cover, in plain language and only where it applies:
-- Why this split, in one line — what about their days per week, schedule or experience led there rather than an obvious alternative.
-- Any muscle group deliberately under- or over-weighted against the standard landmarks, and why.
-- Equipment or exercise choices you had to work around — anything they don't have that shaped a substitution.
-- Anything their profile asked for that you could not fit, with the constraint that blocked it. One line, no re-derivation.
-- Where the hardest sessions land in the week, so they can say if that clashes with their life.
+Everything above this section is your working. This section is the only part written for someone DECIDING rather than reading, because the user is about to be asked whether they are happy with several thousand words they did not watch you build. If they read nothing else, this has to be enough for them to say yes, or to name the one thing they want changed.
 
-End it with one sentence telling them what they can change and that saying so is enough — they do not need to understand programming to ask for a different day layout or to drop an exercise they hate.`;
+Write it in this exact order, and write nothing else in it:
+
+1. **One bold line, OUTSIDE the quote:** program name · duration · days per week · split · phase.
+2. **A block table, OUTSIDE the quote.** One row per block in the program, INCLUDING blocks whose exercises have not been written yet. Columns: Block | Weeks | What it does | What changes | Deload. "What it does" is plain language a non-lifter would follow, not a rep range. "What changes" says how that block differs from the one before it; for the first block, write a dash.
+3. **Everything from here down goes INSIDE a blockquote** — every line prefixed with a > character, including the blank lines between paragraphs. Three fixed lines first, in this order: the training week laid out day by day on ONE line; the longest session and its estimated duration; whether every muscle landed inside its target range, naming any that did not.
+4. **A bold "What I decided" label, then AT MOST FIVE bullets, ONE LINE EACH.** These are the JUDGEMENT CALLS you made on their behalf, because those are the only things they might want changed. Do not restate the program or list its exercises back. Cover only where it applies: why this split rather than the obvious alternative; any muscle deliberately under- or over-weighted against the landmarks; an equipment or exercise workaround you had to make; anything their profile asked for that you could not fit and the constraint that blocked it; where the hardest sessions land in their week.
+5. **One closing sentence** telling them they can change any of it by saying so in plain words, and that they do not need to understand programming to ask.
+
+Hard rules for this section:
+
+- THE BLOCKQUOTE IS NOT DECORATION. It is what makes this section look different from the several thousand words above it, so the user can find the part written for them. Every single line inside it starts with a > character. A blank line inside the quote is "> " on its own, NOT an empty line — an unprefixed blank line ends the quote early and splits the section in two.
+- The block table stays OUTSIDE the quote. Tables nested inside blockquotes render inconsistently across different AI apps, and this file is read by several.
+- ONE LINE per bullet, not one paragraph per bullet. If a decision needs three sentences to justify, the justification belongs earlier in the program document and the bullet carries only the conclusion.
+- Five bullets is a ceiling, not a target. Four is better than five.
+- No tables other than the block table. No volume enumeration, no exercise lists, no re-derivation of anything above.
+- The whole section must fit on one phone screen. If it does not, cut bullets — never cut the block table.
+- It goes immediately before the closing callout, nowhere else.
+- This is the only heading in the response that may carry an emoji.
+
+Shape to follow, including the > prefixes exactly as shown. The content is illustrative only — use the real program:
+
+---
+
+## 📋 Your plan at a glance
+
+**12-Week Recomp Program · 12 weeks · 6 days/week · Push / Legs / Pull twice over · Recomp phase**
+
+| Block | Weeks | What it does | What changes | Deload |
+|---|---|---|---|---|
+| 1 | 1-6 | Builds the base. Same exercises every week, load creeps up | — | Week 6 |
+| 2 | 7-12 | Same split, same volume, new variation of each movement | Exercises rotate, structure does not | Week 12 |
+
+> **Your week:** Mon Push A · Tue Legs A · Wed Pull A · Thu rest · Fri Push B · Sat Legs B · Sun Pull B
+> **Longest session:** Legs A, 60-70 min
+> **Volume:** all 14 muscles inside their target range
+>
+> **What I decided**
+> - Push/Legs/Pull twice over rather than Upper/Lower, because six days splits evenly across PPL
+> - One overhead press only, because pressing alone already puts front delts near their ceiling
+> - Lateral raises spread over four days, because 19 sets across two sessions would be junk volume
+> - Decline bench on Push B, the one barbell press that does not tag front delts
+> - Wrist curls and shrugs are deliberate; nothing else in the program hits forearms or traps
+>
+> Don't like something? Say so in plain words — a different day layout, an exercise you hate, shorter sessions. You don't need the programming reasons, and I'll tell you what the change costs.`;
 
 export const EXERCISE_LIBRARY = `---
 

@@ -7,6 +7,7 @@
 // and the one whose numbers have been checked by hand.
 
 import type { GoalsProfile } from '../goalsProfile';
+import { FAT_PER_LEAN_KG } from '../syntheticNutritionAnswers';
 import {
   leanMassKg,
   weightAtBodyFat,
@@ -28,6 +29,8 @@ import {
   monthsToCut,
   monthsToLoseWeight,
   monthsToRecomp,
+  operatingRangeFor,
+  MIN_RANGE_WIDTH_PCT,
 } from '../roadmap';
 
 const REAL: GoalsProfile = {
@@ -575,14 +578,24 @@ describe('deriveRoadmap', () => {
     expect(r.ffmi).toBeCloseTo(22.56, 1);
   });
 
-  // Above the band ceiling, the opening phase must be a recomp — never a cut.
-  // phase-selection.md forbids presenting a cut as a prerequisite for
-  // building, and the band rule forbids a surplus above the ceiling. Recomp
-  // is the only phase that satisfies both.
-  it('opens with a recomp when the user is above the band ceiling', () => {
-    const r = deriveRoadmap(REAL)!; // 20.4% against a balanced ceiling of 18
-    expect(r.phases[0].kind).toBe('recomp');
-    expect(r.phases.some((p) => p.kind === 'trim' && p.index === 1)).toBe(false);
+  // WAS 'opens with a recomp when the user is above the band ceiling'. The
+  // recomp opener went with the 17 Aug fat-per-lean correction: a recomp is the
+  // SLOWEST way to shed fat (monthsToRecomp 20->14 is [6.9, 12.3] against
+  // monthsToCut's [2.1, 3.5]) and it existed only to reach a band ceiling that
+  // the prescribed surplus never pushes anyone past.
+  //
+  // What phase-selection.md actually forbids is a cut presented as a
+  // PREREQUISITE for building. That rule is now kept by the ORDER being the
+  // user's, not by the opener's kind — so this asserts the same protection at
+  // its new site. If build_first ever stops producing a build opener, the cut
+  // has quietly become mandatory again.
+  it('never forces a cut first — the order belongs to the user', () => {
+    const cutFirst = deriveRoadmap({ ...REAL, phaseOrder: 'cut_first' })!;
+    const buildFirst = deriveRoadmap({ ...REAL, phaseOrder: 'build_first' })!;
+    expect(cutFirst.phases[0].kind).toBe('trim');
+    expect(buildFirst.phases[0].kind).toBe('build');
+    // Unasked, someone 7.4 points above their goal defaults to cutting first.
+    expect(deriveRoadmap(REAL)!.phases[0].kind).toBe('trim');
   });
 
   it('opens with a build when already inside the band', () => {
@@ -632,17 +645,117 @@ describe('deriveRoadmap', () => {
   // The route ARGUMENT overrides the stored routePreference for the opener,
   // so scrubbing between routes on the route screen previews each candidate
   // route's own opener — not the stored one's.
+  //
+  // REWRITTEN 20 Aug 2026, when the range became the user's. The FLOOR is no
+  // longer a route figure at all: it is `operatingRangeFor`'s resolved bottom,
+  // read from the profile, so it is identical whichever route is previewed.
+  // This fixture has nothing to shed before building, so both resolve to the
+  // user's current 16%.
+  //
+  // Was: expect(lean.band).toEqual({ floor: 12, ceiling: 15 }) and roomy
+  // { floor: 14, ceiling: 18 }. What the route still previews is the FALLBACK
+  // CEILING for a profile that has not set one, so the test's intent survives
+  // on that half — and the floors being equal is now itself the assertion
+  // worth making, because a floor that still moved with the route would mean
+  // the retirement had not happened.
   it('previews the candidate route, not the stored routePreference', () => {
     const p: GoalsProfile = { ...REAL, currentBodyFatPct: 16, routePreference: 'roomy' };
-    expect(deriveRoadmap(p, 'lean')!.phases[0].kind).toBe('recomp'); // 16 > lean ceiling 15
-    expect(deriveRoadmap(p, 'roomy')!.phases[0].kind).toBe('build'); // 16 ≤ roomy ceiling 18
+    const lean = deriveRoadmap(p, 'lean')!;
+    const roomy = deriveRoadmap(p, 'roomy')!;
+    expect(lean.band.ceiling).toBe(15);
+    expect(roomy.band.ceiling).toBe(18);
+    expect(lean.band.floor).toBe(roomy.band.floor);
+    // The opener's KIND no longer separates the routes — both build, because
+    // neither has fat to shed before building. What still separates them is
+    // that roomy maps to `bulk` (0.5 kg fat per kg lean against lean_bulk's
+    // 0.2), so its build actually reaches the ceiling and the rail splits it.
+    expect(roomy.phases.length).toBeGreaterThan(lean.phases.length);
   });
 
-  it('ends on the reveal at the goal body fat', () => {
-    const r = deriveRoadmap(REAL)!;
+  // The two edges of the range are now SET rather than derived, and this pins
+  // the three rules that govern them. Added 20 Aug 2026 with the range.
+  it('resolves the operating range from the profile, not the route', () => {
+    const p: GoalsProfile = { ...REAL, preBuildBf: 13, ceilingBf: 16 };
+    const r = operatingRangeFor(p, 'balanced')!;
+    expect(r.bottom).toBe(13);
+    expect(r.top).toBe(16);
+    // Same range under a different route argument.
+    expect(operatingRangeFor(p, 'lean')!.top).toBe(16);
+    // The stop is sex-based and the bottom cannot go under it.
+    expect(operatingRangeFor({ ...p, preBuildBf: 5 }, 'balanced')!.bottom).toBe(r.leanStop);
+    // A top closer than MIN_RANGE_WIDTH_PCT is widened, never accepted.
+    expect(operatingRangeFor({ ...p, ceilingBf: 13.5 }, 'balanced')!.top).toBe(
+      13 + MIN_RANGE_WIDTH_PCT,
+    );
+    // No upper clamp: a ceiling above where the build tops out is allowed
+    // through, because refusing it would be choosing for the user.
+    expect(operatingRangeFor({ ...p, ceilingBf: 30 }, 'balanced')!.top).toBe(30);
+  });
+
+  // The suggestion is a RANGE, not a width added to wherever the user happens
+  // to have left the bottom. Added 20 Aug 2026, after a bottom nudged to 15.5
+  // produced "the suggested 15.5 to 18.5%".
+  it('suggests both ends, independent of where the user left the bottom', () => {
+    const a = operatingRangeFor({ ...REAL, preBuildBf: 15.5 }, 'balanced')!;
+    const b = operatingRangeFor({ ...REAL, preBuildBf: 12 }, 'balanced')!;
+    expect(a.suggestedBottom).toBe(b.suggestedBottom);
+    expect(a.suggestedTop).toBe(b.suggestedTop);
+    expect(a.suggestedTop - a.suggestedBottom).toBeGreaterThanOrEqual(MIN_RANGE_WIDTH_PCT);
+    // And it is a value the control could actually be set to.
+    expect(a.suggestedBottom).toBeGreaterThanOrEqual(a.leanStop);
+    expect(a.suggestedBottom).toBeLessThanOrEqual(Math.max(a.leanStop, a.topStop));
+  });
+
+  // Nothing to shed means no range to choose. Cycling someone toward a goal
+  // body fat ABOVE where they stand trims them back to today's leanness on the
+  // way, and the plan then ends below the goal because the terminal cut only
+  // fires on an overshoot.
+  it('offers no range to a user whose goal body fat is above their own', () => {
+    const p: GoalsProfile = { ...REAL, currentBodyFatPct: 14, goalBodyFatPct: 18 };
+    expect(operatingRangeFor(p, 'balanced')).toBeNull();
+    const r = deriveRoadmap(p, 'balanced')!;
+    expect(r.phases.filter((ph) => ph.kind === 'trim').length).toBe(0);
+  });
+
+  // The order and the range are ORTHOGONAL, and this is the test that says so.
+  // Build-first used to be expressed by parking the bottom at current body fat,
+  // which silently moved every mid-build trim with it. Added 20 Aug 2026.
+  it('keeps the range the user set whichever order they choose', () => {
+    const base: GoalsProfile = { ...REAL, preBuildBf: 13, ceilingBf: 16 };
+    const cut = deriveRoadmap({ ...base, phaseOrder: 'cut_first' }, 'balanced')!;
+    const build = deriveRoadmap({ ...base, phaseOrder: 'build_first' }, 'balanced')!;
+    // Same range on both, read back off the plan.
+    expect(cut.band).toEqual(build.band);
+    expect(cut.band.floor).toBe(13);
+    expect(cut.band.ceiling).toBe(16);
+    // Only the opening cut differs.
+    expect(cut.phases[0].kind).toBe('trim');
+    expect(build.phases[0].kind).toBe('build');
+  });
+
+  // A build that lands exactly on the ceiling used to leave a rounding crumb of
+  // lean behind, and the rail inserted a whole trim and rebuild for it — which
+  // finished the plan at the BOTTOM of the range instead of the goal. The
+  // remainder guard is the fix; this pins the outcome rather than the guard.
+  it('does not interrupt a build for a remainder too small to be a phase', () => {
+    const p: GoalsProfile = { ...REAL, preBuildBf: 12, ceilingBf: 15 };
+    const r = deriveRoadmap(p, 'balanced')!;
     const last = r.phases[r.phases.length - 1];
-    expect(last.kind).toBe('reveal');
-    expect(last.exitBodyFatPct).toBe(13);
+    expect(last.exitBodyFatPct).toBeLessThanOrEqual(REAL.goalBodyFatPct! + 0.25);
+    r.phases.forEach((ph) => {
+      if (ph.kind === 'build') expect(ph.estMonths[1]).toBeGreaterThan(0);
+    });
+  });
+
+  // The KIND of the final phase now depends on the order — cutting first ends
+  // on the build that lands on the goal, building first ends on a reveal. The
+  // invariant that survives, and the one that actually matters, is that the
+  // plan finishes exactly where the user asked.
+  it('ends at the goal body fat whichever order is chosen', () => {
+    (['cut_first', 'build_first'] as const).forEach((phaseOrder) => {
+      const r = deriveRoadmap({ ...REAL, phaseOrder })!;
+      expect(r.phases[r.phases.length - 1].exitBodyFatPct).toBe(13);
+    });
   });
 
   it('gives every phase a range, never a fixed duration', () => {
@@ -664,11 +777,39 @@ describe('deriveRoadmap', () => {
     expect(with_[1]).toBeLessThan(without[1]);
   });
 
-  it('gives the lean route more cycles than the roomy one', () => {
-    const lean = deriveRoadmap(REAL, 'lean')!;
-    const roomy = deriveRoadmap(REAL, 'roomy')!;
-    const cyclesOf = (r: typeof lean) => r.phases.find((p) => p.kind === 'trim')!.repeats;
-    expect(cyclesOf(lean)).toBeGreaterThan(cyclesOf(roomy));
+  // WAS 'gives the lean route more cycles than the roomy one'. Cycle count no
+  // longer comes from band width, which is the whole 17 Aug correction, so
+  // that assertion tested the defect rather than the behaviour.
+  //
+  // THIS IS THE INVARIANT THAT REPLACED IT, and it is the most important one in
+  // the file. A build's fat cost comes from FAT_PER_LEAN_KG (0.2 on a lean
+  // bulk), never from the band. The old model ran every build floor -> ceiling,
+  // which implied 2.65 kg of fat per kg of lean on the balanced route against
+  // the 0.2 the nutrition side actually prescribes — so the roadmap drew a plan
+  // the macros would never produce, and scheduled four trims that could never
+  // fire. If a lean-bulk build ever exits at the ceiling again, this trips.
+  it('sizes a lean-bulk build from the surplus, not the band width', () => {
+    // REWRITTEN 18 Aug when FAT_PER_LEAN_KG rose to 0.5. The old assertion was
+    // that a build exits well BELOW the ceiling, which only held because 0.2
+    // made body fat asymptote at 16.7% and put an 18% ceiling out of reach. At
+    // 0.5 the asymptote is 33%, so a build legitimately approaches the ceiling
+    // and that assertion would fail for the right reason.
+    //
+    // This tests the actual invariant instead: the fat a build adds is
+    // leanGained x FAT_PER_LEAN_KG. Under the old band-driven model every build
+    // ran floor to ceiling regardless, which for the balanced route implied
+    // 2.65 kg of fat per kg of lean against the 0.5 the kitchen prescribes. If
+    // the band ever drives fat gain again, this ratio moves and this trips.
+    const r = deriveRoadmap(REAL)!;
+    const build = r.phases.find((p) => p.kind === 'build')!;
+    const before = r.phases[r.phases.indexOf(build) - 1];
+    const leanAt = r.leanNowKg!;
+    const fatAtBf = (lean: number, bf: number) => (lean * (bf / 100)) / (1 - bf / 100);
+    const fatBefore = fatAtBf(leanAt, before.exitBodyFatPct);
+    const leanAfter = leanAt + r.gapKg!;
+    const fatAfter = fatAtBf(leanAfter, build.exitBodyFatPct);
+    const impliedRatio = (fatAfter - fatBefore) / r.gapKg!;
+    expect(impliedRatio).toBeCloseTo(FAT_PER_LEAN_KG.lean_bulk, 1);
   });
 
   it('still produces a plan without body fat, just without the gap', () => {

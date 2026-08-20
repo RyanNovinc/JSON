@@ -189,13 +189,16 @@ export default function ProfileScreen() {
 
   const handleResetOnboarding = () => {
     Alert.alert(
-      'Reset Onboarding?',
-      'You\'ll see the onboarding flow again next time you open the app.',
+      'Show the intro again?',
+      'Your workouts, plans and progress are all kept — this only replays the ' +
+        'intro screens.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reset',
-          style: 'destructive',
+          // Not destructive: nothing is destroyed. The red styling said the
+          // opposite of what the action does, which is half of why the row read
+          // as dangerous.
+          text: 'Show it',
           onPress: async () => {
             try {
               await AsyncStorage.removeItem('@onboarding/completedAt');
@@ -213,9 +216,23 @@ export default function ProfileScreen() {
   };
 
   const handleClearAllData = () => {
+    // ── THE COPY NOW MATCHES WHAT HAPPENS, 19 Aug 2026 ────────────────────
+    //
+    // This promised "ALL your workouts, meal plans, weight history, and
+    // settings" while the reset named 14 keys out of well over a hundred: the
+    // weight series, goals profile, roadmap, check-ins, custom meals and every
+    // nutrition plan all survived. clearAllData now enumerates and deletes
+    // everything bar a short preserve list, so the promise is nearly true —
+    // and the two places it still is not are named rather than glossed.
+    //
+    // Naming the survivors is the point. "Everything" that quietly keeps your
+    // theme is a smaller lie than before but still a lie, and a user resetting
+    // for privacy reasons deserves to know an install id stays.
     Alert.alert(
       'Clear All Data?',
-      'This deletes ALL your workouts, meal plans, weight history, and settings. This CANNOT be undone.',
+      'This deletes your workouts, meal plans, weight history, goals and progress. ' +
+        'Your theme and units are kept, along with an anonymous install ID. ' +
+        'This CANNOT be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -223,8 +240,16 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await WorkoutStorage.clearAllData();
-              Alert.alert('Cleared', 'All app data has been deleted.');
+              const result = await WorkoutStorage.clearAllData();
+              // Reports what actually happened rather than an unconditional
+              // success. The old version said "All app data has been deleted"
+              // even when the write failed, because clearAllData swallowed its
+              // own error and returned void.
+              if (result.ok) {
+                Alert.alert('Cleared', `${result.removed} items deleted.`);
+              } else {
+                Alert.alert('Error', 'Could not clear your data. Please try again.');
+              }
             } catch (error) {
               console.error('Failed to clear data:', error);
               Alert.alert('Error', 'Failed to clear data. Please try again.');
@@ -554,7 +579,12 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.rowText}>
             <Text style={styles.rowTitle}>Reset onboarding</Text>
-            <Text style={styles.rowSub}>Clears data and shows the slideshow again</Text>
+            {/* Was "Clears data and shows the slideshow again", which was false
+                in the one direction that matters: it clears NOTHING. The
+                handler removes two onboarding flags and nothing else. The old
+                wording scared off the people who wanted this and drew in the
+                people who wanted the row above it. */}
+            <Text style={styles.rowSub}>Shows the intro again. Keeps everything.</Text>
           </View>
           <Ionicons name="chevron-forward" size={14} color="#71717a" />
         </TouchableOpacity>
@@ -569,7 +599,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.rowText}>
             <Text style={[styles.rowTitle, { color: '#ef4444' }]}>Clear all data</Text>
-            <Text style={styles.rowSub}>Deletes everything. Cannot be undone.</Text>
+            <Text style={styles.rowSub}>Deletes your data. Cannot be undone.</Text>
           </View>
           <Ionicons name="chevron-forward" size={14} color="#71717a" />
         </TouchableOpacity>

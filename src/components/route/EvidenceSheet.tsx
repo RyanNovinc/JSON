@@ -52,6 +52,14 @@ interface Props {
   goalWeightKg: number;
   goalBodyFatPct: number;
   leanTargetKg: number;
+  /**
+   * The user's own lean stop, for the 'lean-stop' topic. Sex-dependent — 12 for
+   * men and 22 for women — so the copy states THEIR number rather than a
+   * constant, and the sheet does not import operatingBands to find out.
+   */
+  leanStopPct?: number;
+  /** The narrowest permitted range, for the 'range-width' topic. */
+  minWidthPct?: number;
   onClose: () => void;
 }
 
@@ -63,10 +71,48 @@ function levelOne(
   goalWeightKg: number,
   goalBodyFatPct: number,
   leanTargetKg: number,
+  leanStopPct?: number,
+  minWidthPct?: number,
 ): { icon: string; tint: string; title: string; lines: string[]; more: string } {
   const w = goalWeightKg.toFixed(1);
   const lean = Math.round(leanTargetKg);
   const bf = Math.round(goalBodyFatPct);
+
+  // THE STOP IS A MARGIN, AND THE COPY SAYS SO. The honest version is that the
+  // number is chosen rather than measured, and that the constraint people
+  // actually hit first is arithmetic — a small fat store cannot supply a normal
+  // deficit — not a health threshold. Claiming a threshold here would be
+  // claiming evidence this app does not have.
+  if (topic === 'lean-stop') {
+    const stop = leanStopPct ?? 12;
+    return {
+      icon: 'shield-outline',
+      tint: '#d8a13f',
+      title: `${stop}% is as lean as the plan goes`,
+      lines: [
+        'Below this your fat store cannot release energy fast enough to cover a normal deficit, so the difference starts coming off muscle instead.',
+        'The number itself is a margin rather than a measured line, set well above where anything has been recorded going wrong.',
+      ],
+      more: 'Where this comes from',
+    };
+  }
+
+  // A PRACTICALITY LIMIT, NOT A PHYSIOLOGICAL ONE, and the difference matters:
+  // nothing bad happens to a person in a one-point range, the APP just cannot
+  // tell whether it worked.
+  if (topic === 'range-width') {
+    const w2 = minWidthPct ?? 2;
+    return {
+      icon: 'resize-outline',
+      tint: '#d8a13f',
+      title: `${w2} points is as narrow as it goes`,
+      lines: [
+        'A tighter range means each stretch of building and each cut finishes before a bathroom scale could show it worked.',
+        'Nothing is wrong with living in a one point range. The app just could not tell you whether you were on track, so it will not plan one.',
+      ],
+      more: 'Where this comes from',
+    };
+  }
 
   if (topic === 'rated') {
     return {
@@ -122,6 +168,59 @@ function levelOne(
 /** Level two. Unchanged by zone: the evidence does not depend on where the
  *  user happens to have dragged the line. */
 function levelTwo(topic: EvidenceTopic): { blocks: Block[]; sources: string } {
+  if (topic === 'lean-stop') {
+    return {
+      blocks: [
+        {
+          key: 'WHAT ACTUALLY BINDS FIRST',
+          grade: 'B',
+          gradeLabel: 'THEORETICAL MODEL [B]',
+          body: 'Alpert put a limit on how fast fat can release energy, and the app uses a deliberately conservative figure. Set the deficit a rate needs equal to what a fat store can supply and the bodyweight cancels out, leaving a single body fat percentage: about 11% at the slow rate this app plans, and about 23% at the fast one. That is why the faster option disappears as you lean out.',
+        },
+        {
+          key: 'WHY THE STOP IS HIGHER THAN THAT',
+          body: 'Because the arithmetic above is sex blind, and the lean end is not. For women the stop sits at 22%, near where menstrual function is documented as maintained, and a plan that returns someone to that line every cycle for years is a different proposition from one that visits it once.',
+        },
+        {
+          key: 'WHERE HARM HAS ACTUALLY BEEN MEASURED',
+          grade: 'B',
+          gradeLabel: 'CASE STUDY [B]',
+          body: 'One drug-free man taken from 15% to 4.5% lost most of his testosterone and had not fully recovered his strength six months later. That is far below this stop, which is the point: the margin is wide on purpose.',
+        },
+        {
+          key: "WHAT IT DOESN'T TELL YOU",
+          body: 'Nothing about you specifically, and nothing about being leaner than this briefly. It is where the app will keep putting you for years, which is a higher bar than where a person can visit.',
+        },
+      ],
+      sources:
+        'Alpert 2005, J Theor Biol 233(1):1-13 \u00b7 Rossow et al. 2013, PMID 23412685 \u00b7 Fagerberg 2018, Int J Sport Nutr Exerc Metab \u00b7 Mursu, Hulmi et al. 2023, Nutrients 15(2):382',
+    };
+  }
+
+  if (topic === 'range-width') {
+    return {
+      blocks: [
+        {
+          key: 'MEASURED IN THIS APP',
+          gradeLabel: 'OUR OWN MODEL, NOT A TRIAL',
+          body: 'Same lifter, widening the range: half a point gives ten cuts and twenty phases, ten of them too short to read on a scale. One point gives six cuts and five. Two points gives four cuts and one, and the one is the final cut, which is short at every width. Two and a half gives none.',
+        },
+        {
+          key: 'WHY SHORTNESS IS THE PROBLEM',
+          body: 'A phase ends on a body fat number, and body fat is measured with error. A phase that finishes inside that error cannot be confirmed as finished, so the app would be moving you between phases on noise.',
+        },
+        {
+          key: 'WHAT WIDTH IS NOT',
+          grade: 'B',
+          gradeLabel: 'PREFERENCE [B]',
+          body: 'Nothing says a narrow range builds less muscle or takes longer. The closest trial ran interrupted against continuous restriction in trained lifters and found them identical on strength, hormones, sleep and lean mass, with the interrupted arm reporting less hunger. Width is a preference with a real cost on both sides, and this limit is only about what can be verified.',
+        },
+      ],
+      sources:
+        'Peos et al. 2021, Med Sci Sports Exerc 53(8):1685-1698 \u00b7 phase counts from this app\u2019s own roadmap model, not from a trial',
+    };
+  }
+
   if (topic === 'rated') {
     return {
       blocks: [
@@ -181,6 +280,8 @@ export default function EvidenceSheet({
   goalWeightKg,
   goalBodyFatPct,
   leanTargetKg,
+  leanStopPct,
+  minWidthPct,
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -192,7 +293,15 @@ export default function EvidenceSheet({
     if (visible) setExpanded(false);
   }, [visible]);
 
-  const one = levelOne(topic, zoneKey, goalWeightKg, goalBodyFatPct, leanTargetKg);
+  const one = levelOne(
+    topic,
+    zoneKey,
+    goalWeightKg,
+    goalBodyFatPct,
+    leanTargetKg,
+    leanStopPct,
+    minWidthPct,
+  );
   const two = levelTwo(topic);
 
   return (

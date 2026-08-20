@@ -28,9 +28,17 @@
 // ── WHICH FIGURE ─────────────────────────────────────────────────────────────
 //
 // Alpert's published 290 kJ/kg/day is ~69 kcal/kg/day (the "31 kcal per pound"
-// widely quoted). He later identified a miscalculation and proposed roughly 22
-// kcal/lb — about 48 kcal/kg — but died before republishing, so both figures
-// circulate and neither is authoritative.
+// widely quoted). A lower figure of roughly 22 kcal/lb (~48 kcal/kg) also
+// circulates, usually attributed to Alpert himself having spotted a
+// miscalculation and died before republishing.
+//
+// THAT ATTRIBUTION IS FOLKLORE — an independent review on 18 Aug 2026 traced it
+// and found it only on calculator and blog pages, with no erratum, letter,
+// archival record or any primary source behind it. It is repeated confidently
+// everywhere and originates nowhere.
+//
+// The lower number is KEPT anyway, and the reason is the direction of error
+// rather than the citation. See below.
 //
 // This file uses the CORRECTED, lower figure. The direction of error decides
 // it: offering a rate that is too fast costs lean tissue the user came here to
@@ -49,14 +57,24 @@
 // It does not ask for a RECOMP either: weight is held, so there is no rate of
 // loss to pick.
 
-import type { GoalsProfile, DerivedPhase } from './goalsProfile';
+import type { GoalsProfile, DerivedPhase, CutPace } from './goalsProfile';
 import { FAT_LOSS_FRACTION_BW_PER_WEEK } from './roadmap';
 
 /**
  * [B] Energy the fat store can release per kg of fat per day, kcal.
  *
- * Alpert's corrected figure (~22 kcal/lb → 48.5 kcal/kg) rather than his
- * published 290 kJ/kg/day (~69 kcal/kg). See the header for why the lower one.
+ * 48.5 kcal/kg rather than Alpert's published ~69. NOT because a correction
+ * exists — see the header, it does not — but because the direction of error
+ * decides it: too fast a rate costs lean tissue the user came here to keep,
+ * while too slow costs them time they can choose to spend. The model is
+ * theoretical and, as far as the same review could establish, has never been
+ * tested as a fat-loss speed limit in a controlled trial, which is a second
+ * reason to sit under it rather than on it.
+ *
+ * So this is a DELIBERATELY CONSERVATIVE CHOICE labelled as one, not a measured
+ * value. Do not "correct" it upward to 69 on the grounds that 69 is the
+ * published number: 69 is published, and the gate matters most for the leanest
+ * users, where being wrong costs muscle.
  */
 export const FAT_ENERGY_RELEASE_KCAL_PER_KG_PER_DAY = 48.5;
 
@@ -217,4 +235,48 @@ export function rateOptionsFor(
     constrained: affordable.length < CANDIDATE_RATES.length,
     options: affordable.map((rate, i) => build(rate, i === 0)),
   };
+}
+
+/**
+ * The actual rate to use for this user, right now, given their stored
+ * preference.
+ *
+ * THE POINT OF THIS FUNCTION. `rateOptionsFor` decides what a body can
+ * currently supply; the preference says which end of that the user wants. Kept
+ * apart because the first changes as they lean out and the second does not.
+ *
+ * Resolved fresh every time rather than read from a stored number, so a
+ * 'faster' choice made at 25% body fat cannot hand someone at 14% a rate their
+ * fat store cannot supply. If only one rate is available, both preferences
+ * return it — which is correct rather than a degradation: there is one honest
+ * answer and the user gets it either way.
+ *
+ * Returns null for phases that have no rate to pick.
+ */
+export function resolveCutRate(
+  profile: GoalsProfile,
+  phase: DerivedPhase,
+  pace: CutPace = 'steady',
+): number | null {
+  const result = rateOptionsFor(profile, phase);
+  if (!result.applicable || result.options.length === 0) return null;
+
+  if (pace === 'faster') {
+    return result.options[result.options.length - 1].rate;
+  }
+  // 'steady' is the recommended option, which rateOptionsFor always places
+  // first and always marks — the slowest available. Garthe's slow group gained
+  // lean mass while losing fat; the fast group merely held it.
+  const recommended = result.options.find((o) => o.recommended);
+  return (recommended ?? result.options[0]).rate;
+}
+
+/** The same as a percentage, for storing in `targetRatePercentage`. */
+export function resolveCutRatePct(
+  profile: GoalsProfile,
+  phase: DerivedPhase,
+  pace: CutPace = 'steady',
+): number | null {
+  const rate = resolveCutRate(profile, phase, pace);
+  return rate == null ? null : Number((rate * 100).toFixed(2));
 }

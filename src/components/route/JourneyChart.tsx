@@ -20,7 +20,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
-import Svg, { Path, Rect, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Rect, Circle, Line, Text as SvgText } from 'react-native-svg';
 import type { GoalsProfile } from '../../utils/goalsProfile';
 import type { Roadmap } from '../../utils/roadmap';
 
@@ -43,6 +43,9 @@ function buildChartTarget(
   profile: GoalsProfile,
   roadmap: Roadmap,
   sparkline = false,
+  compact = false,
+  bandOnly = false,
+  leanStopPct?: number,
 ): ChartTarget {
   const { X0, X1, Y0, Y1, N } = CHART;
   const start = profile.currentBodyFatPct ?? roadmap.band.ceiling + 2;
@@ -54,17 +57,45 @@ function buildChartTarget(
   // on. In sparkline mode that padding is dead space: the axis ran 20 to 10
   // while the line only ever occupied 18 to 13, leaving a third of the chart
   // empty with a stray "10%" floating in it.
-  const hi = sparkline
-    ? Math.max(start, ceiling) + 0.6
-    : Math.ceil((Math.max(start, ceiling) + 2) / 2) * 2;
-  const lo = sparkline
-    ? Math.min(goal, floor) - 0.6
-    : Math.floor((Math.min(goal, floor) - 2) / 2) * 2;
+  //
+  // Compact mode takes the same tightening for the same reason: it has no
+  // ticks either, so rounding out to whole multiples of 2 would spend a third
+  // of a 60pt canvas on empty space. Both bounds still include the band edges,
+  // so the band rect can never be drawn outside the canvas.
+  const tight = sparkline || compact;
+  /**
+   * THE CANVAS MUST CONTAIN ITS OWN LINE.
+   *
+   * This used to size the vertical range from start, ceiling, goal and floor
+   * only — never from the phases actually being drawn. That held while
+   * FAT_PER_LEAN_KG was 0.2, because body fat then asymptotes at 16.7% and a
+   * build could not climb past an 18% ceiling. At 0.5 the asymptote is 33%, and
+   * a user who is ALREADY AT the ceiling and picks "start growing first" has
+   * nowhere to go but up: the roadmap correctly returns `build->21.5%` and the
+   * line left the top of the canvas.
+   *
+   * The ceiling rail cannot prevent that — it exists to stop a build CROSSING
+   * the ceiling, and these users start standing on it. So the line is legitimate
+   * and the domain was wrong. Taking the extremes from the phase exits makes
+   * this correct for any future constant rather than for one value of it.
+   */
+  //
+  // BAND-ONLY MODE TAKES ITS DOMAIN FROM THE MARKS, NOT THE PHASES. There is no
+  // line on that screen — no plan has been chosen yet — so sizing to phase exits
+  // would make the frame jump as the user moves the range, and the range is the
+  // one thing that must sit still while they set it. Today, the goal, both band
+  // edges and the lean stop are what has to fit.
+  const exits = bandOnly ? [] : roadmap.phases.map((ph) => ph.exitBodyFatPct);
+  const marks = leanStopPct != null ? [leanStopPct] : [];
+  const lineHi = Math.max(start, ...exits, ...marks, ceiling);
+  const lineLo = Math.min(goal, ...exits, ...marks, floor);
+  const hi = tight ? lineHi + 0.6 : Math.ceil((lineHi + 2) / 2) * 2;
+  const lo = tight ? lineLo - 0.6 : Math.floor((lineLo - 2) / 2) * 2;
   // Vertical extent, not the constant. In sparkline mode the canvas is 44 tall
   // rather than 124, so plotting against CHART.Y1 draws most of the line
   // outside the viewBox — it renders, then gets clipped.
-  const yTop = sparkline ? 6 : Y0;
-  const yBottom = sparkline ? 38 : Y1;
+  const yTop = sparkline ? 6 : compact ? 8 : Y0;
+  const yBottom = sparkline ? 38 : compact ? 62 : Y1;
   const yOf = (bf: number) => yTop + ((hi - bf) / (hi - lo)) * (yBottom - yTop);
 
   const mid = (m: [number, number]) => (m[0] + m[1]) / 2;
@@ -81,25 +112,26 @@ function buildChartTarget(
   const phases = roadmap.phases;
   const hasReveal = phases.length > 1 && phases[phases.length - 1].kind === 'reveal';
 
+  /**
+   * Every phase occurrence, in order.
+   *
+   * REWRITTEN 17 Aug 2026. This used to hard-code the old four-slot shape —
+   * opener, then phases[1] and phases[2] alternated blockA.repeats times, then
+   * a reveal — which silently dropped everything after the opener whenever a
+   * roadmap had fewer than three phases. deriveRoadmap now emits a variable
+   * number of phases, all with repeats 1 in the common case, so the chart has
+   * to walk them rather than assume positions.
+   *
+   * Reading `repeats` per phase keeps any future repeated phase working, and
+   * for a single-phase roadmap it collapses to the one segment on its own.
+   */
   const way: Array<[number, number]> = [];
-  if (phases.length === 1) {
-    way.push([mid(phases[0].estMonths), goal]);
-  } else {
-    const opener = phases[0];
-    const blockA = phases[1];
-    const blockB = phases[2];
-    way.push([mid(opener.estMonths), opener.exitBodyFatPct]);
-    if (blockA && blockB) {
-      for (let i = 0; i < blockA.repeats; i++) {
-        way.push([mid(blockA.estMonths), blockA.exitBodyFatPct]);
-        way.push([mid(blockB.estMonths), blockB.exitBodyFatPct]);
-      }
+  phases.forEach((ph) => {
+    for (let i = 0; i < Math.max(1, ph.repeats); i++) {
+      way.push([mid(ph.estMonths), ph.exitBodyFatPct]);
     }
-    if (hasReveal) {
-      const reveal = phases[phases.length - 1];
-      way.push([mid(reveal.estMonths), reveal.exitBodyFatPct]);
-    }
-  }
+  });
+  if (way.length === 0) way.push([1, goal]);
 
   const total = way.reduce((a, w) => a + w[0], 0);
 
@@ -108,17 +140,24 @@ function buildChartTarget(
   if (phases.length > 1) {
     const opener = phases[0];
     const openerShare = mid(opener.estMonths) / total;
-    // No reveal means the cycles run to the end of the chart, so the third
+    // No reveal means the middle runs to the end of the chart, so the third
     // segment has zero width and no label rather than an empty box marked
     // "Reveal".
     const revealShare = hasReveal ? mid(phases[phases.length - 1].estMonths) / total : 0;
     stripB = [X0 + openerShare * (X1 - X0), X0 + (1 - revealShare) * (X1 - X0)];
-    const a = phases[1];
-    const b = phases[2];
     const cap = (k: string) => k.charAt(0).toUpperCase() + k.slice(1);
+    // The middle is however many phases sit between the opener and the reveal,
+    // which is now usually ONE (a single build) rather than an alternating
+    // pair. Naming them beats the old "Trim and build xN", which described a
+    // cycle count the roadmap no longer produces in the common case.
+    const middle = phases.slice(1, hasReveal ? phases.length - 1 : phases.length);
     stripLabels = [
       cap(opener.kind),
-      a && b ? `${cap(a.kind)} and ${b.kind} \u00d7${a.repeats}` : '',
+      middle.length === 0
+        ? ''
+        : middle.length === 1
+          ? cap(middle[0].kind)
+          : `${cap(middle[0].kind)} and ${middle[1].kind}`,
       hasReveal ? 'Reveal' : '',
     ];
   }
@@ -159,6 +198,11 @@ export default function JourneyChart({
   bare = false,
   strip,
   sparkline = false,
+  compact = false,
+  bandOnly = false,
+  leanStopPct,
+  frame = false,
+  muscleKg,
 }: {
   profile: GoalsProfile;
   roadmap: Roadmap;
@@ -183,11 +227,74 @@ export default function JourneyChart({
    * data.
    */
   sparkline?: boolean;
+  /**
+   * Half height, no axis ticks, no endpoint dots, and a domain tightened to
+   * the line — but the band and the muscle bracket both survive, which is what
+   * separates it from `sparkline`.
+   *
+   * For the run-it sheet on beat 9, where the chart is a PREVIEW of a choice
+   * being made a few pixels below it. The bracket is the reason it exists: its
+   * position is the only thing that shows WHEN you grow, so a picker without
+   * it in view asks the user to choose blind.
+   */
+  compact?: boolean;
+  /**
+   * THE FRAME WITHOUT THE PLAN: axis labels, the band, and the marks it sits
+   * against — today, the goal and the lean stop — with NO line, no dots, no
+   * bracket and no strip.
+   *
+   * For the range screen, which asks the user to set the band BEFORE any plan
+   * exists. Drawing a journey there would show a plan they have not chosen yet,
+   * and the next screen would then have to redraw the band in a different place.
+   * Same component and same geometry on both screens, so the band does not move
+   * between them and the line simply arrives.
+   */
+  bandOnly?: boolean;
+  /**
+   * Body fat at the lean stop, drawn as a solid amber rule. Comes from
+   * `leanStopFor(sex)` — the caller passes it rather than this file importing
+   * operatingBands, because the chart should draw what it is told and not hold
+   * an opinion about where the stop is.
+   */
+  leanStopPct?: number;
+  /** The Ledger treatment's L: a hairline down the axis and along the base.
+   *  Opt-in, so the charts that predate it are untouched. */
+  frame?: boolean;
+  /**
+   * Kilograms of lean mass the plan builds. When present, a bracket is drawn
+   * under the stretch of line where the building happens and labelled with it.
+   *
+   * It exists because the corrected roadmap draws a nearly FLAT line through
+   * the build — at 0.2 kg of fat per kg of lean, body fat barely moves — and a
+   * flat line reads as nothing happening when it is in fact the part where all
+   * the muscle goes on. The bracket's POSITION is also the only thing on the
+   * screen that shows WHEN you grow, which is what separates the two orders.
+   */
+  muscleKg?: number;
 }) {
   const target = React.useMemo(
-    () => buildChartTarget(profile, roadmap, sparkline),
-    [profile, roadmap, sparkline],
+    () => buildChartTarget(profile, roadmap, sparkline, compact, bandOnly, leanStopPct),
+    [profile, roadmap, sparkline, compact, bandOnly, leanStopPct],
   );
+
+  /** The build's span as a fraction of the timeline, for the bracket. */
+  const buildSpan = React.useMemo(() => {
+    const mid = (m: [number, number]) => (m[0] + m[1]) / 2;
+    const total = roadmap.phases.reduce((a, ph) => a + mid(ph.estMonths) * ph.repeats, 0);
+    if (total <= 0) return null;
+    let at = 0;
+    let lo: number | null = null;
+    let hi = 0;
+    roadmap.phases.forEach((ph) => {
+      const w = (mid(ph.estMonths) * ph.repeats) / total;
+      if (ph.kind === 'build') {
+        if (lo == null) lo = at;
+        hi = at + w;
+      }
+      at += w;
+    });
+    return lo == null ? null : { lo: lo as number, hi };
+  }, [roadmap]);
 
   const shown = useRef<ChartTarget>({ ...target, ys: target.ys.slice() });
   const anim = useRef(new Animated.Value(1)).current;
@@ -242,6 +349,14 @@ export default function JourneyChart({
 
   const startBf = profile.currentBodyFatPct;
   const goalBf = roadmap.phases[roadmap.phases.length - 1].exitBodyFatPct;
+
+  // The render's own copy of buildChartTarget's yOf, for the marks drawn in
+  // band-only mode. It reads `target.domain` rather than re-deriving the bounds,
+  // so a rule can never land on a different pixel from the band beside it.
+  const yAt = (bf: number) => {
+    const [lo, hi] = target.domain;
+    return Y0 + ((hi - bf) / (hi - lo)) * (Y1 - Y0);
+  };
   const { floor, ceiling } = roadmap.band;
 
   // One source of truth for whether the phase strip is drawn, used for the
@@ -249,8 +364,24 @@ export default function JourneyChart({
   // while the strip keyed off `strip ?? !bare`, so a caller passing
   // strip={false} with labels on reserved 36pt for a strip it never drew —
   // the dead space under the route card on Create.
-  const showStrip = sparkline ? false : strip ?? !bare;
-  const svgHeight = sparkline ? 44 : showStrip ? 160 : 124;
+  const showStrip = bandOnly ? false : sparkline || compact ? false : strip ?? !bare;
+  // The line's own bottom edge, which the bracket hangs off. It is Y1 in the
+  // full size chart and the compact canvas is shorter, so hard-coding Y1 here
+  // drew the bracket below the viewBox and it silently vanished.
+  const lineBottom = compact ? 62 : Y1;
+  // +34 in bare mode for the muscle bracket and its label, which sit below Y1
+  // where the phase strip would otherwise be.
+  const svgHeight = bandOnly
+    ? 132
+    : sparkline
+    ? 44
+    : compact
+      ? muscleKg != null ? 96 : 72
+      : showStrip
+        ? 160
+        : muscleKg != null
+          ? 158
+          : 124;
 
   const stripY = Y1 + 18;
   const stripLabelY = stripY + 18;
@@ -270,9 +401,65 @@ export default function JourneyChart({
           fill={`${color}1a`}
         />
       )}
+      {/* THE MARKS THE RANGE SITS AGAINST. Dashed for today and the goal because
+          neither is a decision — they are where the user already is and where
+          they already said they wanted to be — and solid amber for the stop,
+          which IS a limit. Drawn under the band so a range overlapping one of
+          them reads as the band covering it rather than as a broken rule. */}
+      {bandOnly ? (
+        <>
+          {leanStopPct != null ? (
+            <Line
+              x1={X0}
+              y1={yAt(leanStopPct)}
+              x2={X1}
+              y2={yAt(leanStopPct)}
+              stroke="#8a6b28"
+              strokeWidth={1}
+            />
+          ) : null}
+          {[
+            { v: startBf, label: 'TODAY' },
+            { v: goalBf, label: 'GOAL' },
+          ].map((m) =>
+            m.v == null ? null : (
+              <React.Fragment key={m.label}>
+                <Line
+                  x1={X0}
+                  y1={yAt(m.v)}
+                  x2={X1}
+                  y2={yAt(m.v)}
+                  stroke="#2c2c31"
+                  strokeWidth={1}
+                  strokeDasharray="2 5"
+                />
+                <SvgText
+                  x={X0 + 4}
+                  y={yAt(m.v) - 5}
+                  fontSize={7.6}
+                  fill="#4b4b52"
+                  letterSpacing={1.15}
+                >
+                  {`${m.label} ${Math.round(m.v)}%`}
+                </SvgText>
+              </React.Fragment>
+            ),
+          )}
+        </>
+      ) : null}
+
+      {/* The Ledger L. A hairline down the axis and along the base, so the
+          numbers read as a scale rather than as text floating beside a shape. */}
+      {frame ? (
+        <>
+          <Line x1={X0} y1={Y0} x2={X0} y2={Y1} stroke="#232328" strokeWidth={1} />
+          <Line x1={X0} y1={Y1} x2={X1} y2={Y1} stroke="#232328" strokeWidth={1} />
+        </>
+      ) : null}
+
       {/* Without ticks the space above the band reads as a gap rather than as
           scale, which is why the chart looked emptier than the mockup. */}
-      {bare && !sparkline
+      {(bare || bandOnly) && !sparkline && !compact
         ? [0, 1, 2, 3].map((i) => {
             const [lo, hi] = target.domain;
             const pct = hi - ((hi - lo) * i) / 3;
@@ -285,7 +472,7 @@ export default function JourneyChart({
           })
         : null}
 
-      {bare || sparkline ? null : (
+      {bare || sparkline || compact ? null : (
         <>
           <SvgText x={X1 + 2} y={cur.bandTop + 4} fontSize={9} fill="#5c5c62">
             {`${ceiling}%`}
@@ -295,23 +482,43 @@ export default function JourneyChart({
           </SvgText>
         </>
       )}
+      {bandOnly ? null : (
       <Path
         d={d}
         fill="none"
         stroke={color}
-        strokeWidth={sparkline ? 1.8 : 2.5}
+        strokeWidth={sparkline ? 1.8 : compact ? 2.2 : 2.5}
         strokeOpacity={sparkline ? 0.55 : 1}
         strokeLinejoin="round"
         strokeLinecap="round"
       />
-      {sparkline ? null : (
+      )}
+      {sparkline || compact || bandOnly ? null : (
         <>
           <Circle cx={X0} cy={cur.startY} r={8} fill={`${color}2e`} />
           <Circle cx={X0} cy={cur.startY} r={4.5} fill={color} />
           <Circle cx={X1} cy={cur.ys[N - 1]} r={3.5} fill="#131316" stroke="#8e8e93" strokeWidth={1.5} />
         </>
       )}
-      {bare || sparkline ? null : (
+      {muscleKg != null && buildSpan && !sparkline
+        ? (() => {
+            const x1 = X0 + buildSpan.lo * (X1 - X0);
+            const x2 = X0 + buildSpan.hi * (X1 - X0);
+            const y = lineBottom + 12;
+            return (
+              <>
+                <Line x1={x1} y1={y} x2={x2} y2={y} stroke={color} strokeWidth={1} strokeOpacity={0.38} />
+                <Line x1={x1} y1={y - 4} x2={x1} y2={y + 4} stroke={color} strokeWidth={1} strokeOpacity={0.38} />
+                <Line x1={x2} y1={y - 4} x2={x2} y2={y + 4} stroke={color} strokeWidth={1} strokeOpacity={0.38} />
+                <SvgText x={(x1 + x2) / 2} y={y + 16} fontSize={11} fill={color} textAnchor="middle">
+                  {`+${muscleKg} kg muscle`}
+                </SvgText>
+              </>
+            );
+          })()
+        : null}
+
+      {bare || sparkline || compact ? null : (
         <>
           <SvgText x={X0 + 14} y={Math.max(11, cur.startY - 9)} fontSize={11} fill={color}>
             {startBf != null ? `You \u00b7 ${Math.round(startBf)}%` : 'You'}

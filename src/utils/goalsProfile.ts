@@ -60,7 +60,71 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'heavy' | 'extr
  *   visual   — chosen from the descriptive tier picker (±3-5 points)
  *   tape     — computed from circumference measurements (±3-4 points)
  */
-export type BodyFatSource = 'reported' | 'visual' | 'tape';
+export type BodyFatSource = 'dxa' | 'scale' | 'calipers' | 'reported' | 'visual' | 'tape';
+
+/**
+ * Sources precise enough for a body-fat reading to END A PHASE.
+ *
+ * ── WHY 'reported' HAD TO BE SPLIT, 19 Aug 2026 ────────────────────────────
+ *
+ * 'reported' meant "the user typed a number from their own scan, scale or
+ * calipers", which put a DXA result and a bathroom scale in the same bucket —
+ * so the app could not tell a ±1-2 point measurement from a ±4-8 point one.
+ * That is the difference between a reading that can end a phase and one that
+ * cannot, and it was invisible.
+ *
+ * ONLY DXA QUALIFIES. Consumer foot-to-foot BIA has limits of agreement against
+ * DXA of roughly ±4-8 percentage points and is worst exactly where change
+ * detection matters; tape carries ±3-4; an untrained self-estimate from a
+ * picture chart is worse still. A phase moving someone 18% to 15% is about
+ * 2.4 kg of fat, which sits at the edge of DXA's own least significant change
+ * (1.0-1.5 kg consecutive-day) and entirely below everything else's noise
+ * floor.
+ *
+ * 'reported' SURVIVES as the legacy value and is deliberately NOT treated as
+ * precise. Every profile written before this split used it, and there is no way
+ * to know retrospectively which device produced those numbers — so they keep
+ * being displayed and stop being trusted, which is the safe direction.
+ */
+export const PRECISE_BODY_FAT_SOURCES: readonly BodyFatSource[] = ['dxa'];
+
+/** Whether a reading from this source may contribute to ending a phase. */
+export const isPreciseBodyFatSource = (source?: BodyFatSource): boolean =>
+  source != null && PRECISE_BODY_FAT_SOURCES.includes(source);
+
+/**
+ * How hard a user wants to push a fat-loss phase.
+ *
+ * Two values rather than three rates, because the third rate is not always
+ * offered — a lean user may only have one option, and a preference has to mean
+ * something in that case too. 'faster' then simply resolves to the fastest
+ * thing available, which may be the same as 'steady'.
+ */
+export type CutPace = 'steady' | 'faster';
+
+/**
+ * Which half of the journey the user wants to do FIRST, when they need both.
+ *
+ * A genuine preference rather than a performance setting. Modelled both ways
+ * across three starting points and the totals differ by about half a month:
+ * 90 kg @25% to 90 @14% is 31.1 months cutting first against 30.5 building
+ * first; 80 kg @18% to 85 @14% is 15.2 against 15.1. Same muscle, same
+ * finish. What differs is the two years in between — building first parks a
+ * 25% starter at roughly 24% for the whole build and leaves one short cut at
+ * the end, cutting first has them lean inside five months and never dieting
+ * again.
+ *
+ * The choice only EXISTS when the user is above their goal body fat AND needs
+ * muscle. Leaner than goal means there is nothing to cut; no lean gap means a
+ * single cut (isRevealOnly). Callers should hide the picker in both cases.
+ *
+ * Two weak thumbs on the scale for cut_first, which is why it is the default
+ * where a choice exists: Galgani 2025 found a surplus started fatter deposits
+ * more fat per unit of surplus, and cutting first puts the diet at the start
+ * rather than two years in when motivation is lowest.
+ */
+export type PhaseOrder = 'cut_first' | 'build_first';
+
 
 export interface GoalsProfile {
   currentWeightKg: number;
@@ -84,10 +148,111 @@ export interface GoalsProfile {
   /** How lean they were at that peak — see PeakLeanness. */
   peakLeanness?: PeakLeanness;
 
+  /**
+   * How fast this user likes to cut. A PREFERENCE, deliberately, not a rate.
+   *
+   * Storing a rate froze it. Someone who picked 1%/wk at 25% body fat and comes
+   * back to a cut at 14% has a much smaller fat store, and Alpert's limit on
+   * how fast that store can release energy scales with fat mass — so the rate
+   * they chose may be one their body can no longer supply without taking the
+   * difference from muscle.
+   *
+   * A preference survives that. `resolveCutRate` turns it into an actual rate
+   * against whatever ceiling they have at the time, so "faster" means the
+   * fastest still available to them rather than a number set once.
+   */
+  cutPace?: CutPace;
+
   /** Chosen route through the body-fat band. See RoutePreference. */
   routePreference?: RoutePreference;
 
-  /** Provenance of currentBodyFatPct. See BodyFatSource. */
+  /**
+   * Cut first or build first. See PhaseOrder. Absent means "not asked", and
+   * deriveRoadmap falls back to defaultPhaseOrder rather than assuming.
+   *
+   * NARROWED, 20 Aug 2026, and then RESTORED as a real input the same day. For
+   * a few hours preBuildBf did both jobs — the bottom of the range and the
+   * depth of the opening cut — and build-first was expressed by parking the
+   * bottom at current body fat. That cannot survive the range screen: someone
+   * who sets 13 to 16 and then chooses to build first must keep 13 as the depth
+   * their mid-build trims return to, not have it dragged up to 20.
+   *
+   * So the two are orthogonal now. This owns ONE thing: whether there is an
+   * opening cut before the build. The range owns everything else, including
+   * where the rail returns them to.
+   */
+  phaseOrder?: PhaseOrder;
+
+  /**
+   * THE DIAL: body fat percentage at the bottom of the opening cut, i.e. how
+   * much of the cutting the user wants done BEFORE they start building.
+   *
+   * ── WHY THIS IS ONE NUMBER AND NOT A RANGE, 20 Aug 2026 ──────────────────
+   *
+   * The screen used to ask for a band, a floor and a ceiling to cycle between.
+   * They are not two choices. Total lean gain is fixed by the goal and the fat
+   * a build adds is fixed by FAT_PER_LEAN_KG, so
+   *
+   *     fat at the peak = fat at the trough + FAT_PER_LEAN × leanGap
+   *
+   * Move the trough a kilo and the peak moves a kilo. One degree of freedom,
+   * two readouts. deriveRoadmap already encoded this as
+   * `preBuildFat = goalFat − fatFromBuild`; the only thing the user was really
+   * setting was the clamp underneath it.
+   *
+   * The duration does not move either, which is why the screen can show a
+   * fixed timeline while the shape changes: opening cut plus terminal cut
+   * comes to (nowFat + fatAdded − goalFat) / rate, and the trough cancels out.
+   *
+   * PHASE ORDER IS THE TWO ENDS OF THIS DIAL. At currentBodyFatPct there is no
+   * opening cut, which is build_first; at the band floor the whole cut happens
+   * up front, which is cut_first. Everything between was unreachable before
+   * this field existed, and "cut to 16% first rather than 12%" is the most
+   * commonly wanted plan in that gap.
+   *
+   * Bounds and default come from `preBuildBfRange` in roadmap.ts, which is the
+   * single definition so the screen and the engine cannot drift. Out-of-range
+   * values are clamped rather than rejected, because the range moves whenever
+   * the user edits their weight, body fat or goal, and a stale dial must
+   * degrade instead of blocking a plan.
+   */
+  preBuildBf?: number;
+
+  /**
+   * THE TOP OF THAT RANGE: the body fat the plan will not let a build drift
+   * past before it stops to trim back to `preBuildBf`.
+   *
+   * ── WHY THIS EXISTS, 20 Aug 2026 ─────────────────────────────────────────
+   *
+   * It was already being chosen, just not by the user. The ceiling came from
+   * `bandFor(routePreference, sex)`, and the route picker was removed from the
+   * UI on 17 Aug when the three bands stopped producing different plans — so
+   * whether someone was held inside a range or left to drift was decided by a
+   * field they had no way to set, and most profiles silently carried the
+   * balanced 18.
+   *
+   * It is a REAL second choice, not a readout. An earlier version of this
+   * design argued floor and ceiling were one degree of freedom, which holds
+   * only while nothing interrupts the build. Once the rail exists, the ceiling
+   * converts drift into cuts: the same person at the same floor gets one long
+   * build and one cut, or several shorter builds and several cuts, and neither
+   * is faster. That is a preference with a cost on both sides.
+   *
+   * Bounds come from `operatingRangeFor` in roadmap.ts, which is the single
+   * definition. The only hard rule is width: see MIN_RANGE_WIDTH_PCT. There is
+   * deliberately NO upper clamp — a ceiling above where the build tops out
+   * simply never fires, and the honest answer is to allow it and say so rather
+   * than refuse a number the user asked for.
+   *
+   * Named `ceilingBf` while the floor is still `preBuildBf`, which is
+   * inconsistent and deliberate: preBuildBf is already persisted on real
+   * profiles, and renaming it buys a migration and nothing else.
+   */
+  ceilingBf?: number;
+
+
+  /** Provenance of currentBodyFatPct. See BodyFatSource. Decides whether the
+   *  reading can end a phase, not just how it is displayed. */
   bodyFatSource?: BodyFatSource;
 
   /** Day-to-day activity outside training. See ActivityLevel. */
@@ -110,6 +275,14 @@ import { bandFor, recompEntryBfFor } from './operatingBands';
 // a meaningful leanness target rather than noise / rounding.
 const BF_GOAL_MARGIN = 3;
 
+/**
+ * Matches roadmap.ts's private `round1` exactly. Duplicated rather than
+ * imported ON PURPOSE: roadmap.ts imports this file, so importing back would
+ * be a runtime cycle under Metro — the same reason the bands live in their own
+ * leaf module. It is three characters of arithmetic; the cycle is not worth it.
+ */
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
 type Direction = 'gain' | 'lose' | 'maintain' | 'unknown';
 
 function deriveDirection(profile: GoalsProfile): Direction {
@@ -118,6 +291,50 @@ function deriveDirection(profile: GoalsProfile): Direction {
   if (diff > 1) return 'gain';
   if (diff < -1) return 'lose';
   return 'maintain';
+}
+
+/**
+ * lean-mass-targets.md HARD RULE 4, as a predicate: the user already has the
+ * lean mass their goal implies, and only fat stands between them and it.
+ *
+ * THE SINGLE DEFINITION of that test, and the reason it is exported.
+ * deriveRoadmap used to make the same call inline and return BEFORE it ever
+ * consulted derivePhase, so for any goal weight at or under
+ * leanNow / (1 − goalBF) the roadmap card said "reveal" while both prompt
+ * builders, reading derivePhase, said "recomp". Same profile, same moment —
+ * the D0 failure at a second site. Two callers, one definition, no drift.
+ *
+ * WHY THIS BEATS THE OTHER FIX. The alternative was to let rule 1 win and give
+ * these users a recomp, on the grounds that a novice at elevated body fat is
+ * the population recomp suits best. That is true about the POPULATION and
+ * wrong about the REQUEST: a recomp is weight-neutral by construction, so it
+ * cannot deliver a goal weight below the one the user is standing on. Someone
+ * at 80 kg and 20% asking for 74.4 kg at 14% needs 64 kg of lean and already
+ * has 64 kg. Handing them a recomp holds them at 80 kg and misses the target
+ * they actually set.
+ *
+ * The "no cut-first mandate" rule is untouched by this. That rule forbids
+ * requiring a cut BEFORE a build; here there is no build to gate, so nothing
+ * is being made a prerequisite for anything.
+ *
+ * Worth knowing rather than correcting: a novice will very likely add lean
+ * DURING this cut anyway (the roadmap's own partition loop credits it), so
+ * they tend to finish slightly leaner and slightly heavier than the arithmetic
+ * promised. That is a better outcome than planned, not a defect.
+ *
+ * The rounding is deliberately identical to deriveRoadmap's — round1 on each
+ * lean figure and again on the difference — so the two cannot disagree at the
+ * boundary over a few grams.
+ */
+export function isRevealOnly(profile: GoalsProfile): boolean {
+  const { currentBodyFatPct, goalBodyFatPct } = profile;
+  if (currentBodyFatPct == null || goalBodyFatPct == null) return false;
+
+  const target = computeTargetLeanMass(profile);
+  const current = computeCurrentLeanMass(profile);
+  if (target == null || current == null) return false;
+
+  return round1(round1(target) - round1(current)) <= 0 && currentBodyFatPct > goalBodyFatPct;
 }
 
 /**
@@ -138,6 +355,14 @@ function deriveDirection(profile: GoalsProfile): Direction {
  * that runs before the direction check is rule 1, the newbie-gains window.
  *
  * Rules (in priority order):
+ * 0. The muscle is already built and only fat is in the way → cut.
+ *    lean-mass-targets.md HARD RULE 4, shared with deriveRoadmap through
+ *    isRevealOnly. It runs FIRST because deriveRoadmap's copy of it returns
+ *    before that function reaches its derivePhase call, so any rule sitting
+ *    above it here would produce an answer the roadmap has already ignored.
+ *    This is the only rule that can return 'cut' for a user rule 1 would
+ *    otherwise claim, and it is bounded to people whose own goal asks for no
+ *    additional lean mass at all.
  * 1. New or returning trainee + elevated BF → recomp.
  *    Muscle-memory / newbie-gains window enables simultaneous fat loss and
  *    muscle gain. This is the "no cut-first mandate" rule. It runs BEFORE any
@@ -188,6 +413,13 @@ export function derivePhase(profile: GoalsProfile): DerivedPhase {
     goalBodyFatPct != null &&
     goalBodyFatPct < currentBodyFatPct! - BF_GOAL_MARGIN;
 
+  // Rule 0 — the muscle is already built; only fat is in the way.
+  // Narrow by construction: it needs BOTH goal fields, a known current body
+  // fat, a lean target at or under current lean, and a body fat above goal.
+  // Nobody GAINING can satisfy it — a heavier goal at a lower body fat always
+  // implies MORE lean, never less — so it cannot swallow rule 3.
+  if (isRevealOnly(profile)) return 'cut';
+
   // Rule 1 — newbie/returner recomp window (no cut-first mandate)
   if (isNewOrReturning && hasElevatedBF) return 'recomp';
 
@@ -218,6 +450,20 @@ export function derivePhase(profile: GoalsProfile): DerivedPhase {
  * target. To end at goalWeight + goalBodyFatPct, a bulk must overshoot goalWeight
  * (accumulating fat alongside muscle), then a cut strips the fat back down.
  */
+/**
+ * The order to use when the user has not chosen one.
+ *
+ * Cut first whenever there is meaningfully more fat on them than the goal
+ * allows — see PhaseOrder for the two reasons. BF_GOAL_MARGIN is reused so
+ * that "barely above goal" is not treated as a fat-loss problem, matching how
+ * rule 4 already decides what counts as a leanness target.
+ */
+export function defaultPhaseOrder(profile: GoalsProfile): PhaseOrder {
+  const { currentBodyFatPct, goalBodyFatPct } = profile;
+  if (currentBodyFatPct == null || goalBodyFatPct == null) return 'cut_first';
+  return currentBodyFatPct > goalBodyFatPct + BF_GOAL_MARGIN ? 'cut_first' : 'build_first';
+}
+
 export function computeTargetLeanMass(profile: GoalsProfile): number | undefined {
   const { goalWeightKg, goalBodyFatPct } = profile;
   if (goalWeightKg == null || goalBodyFatPct == null) return undefined;

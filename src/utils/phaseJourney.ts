@@ -24,7 +24,7 @@
 // from the middle — which would silently eat journey history.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Roadmap } from './roadmap';
+import type { Roadmap, RoadmapPhaseKind } from './roadmap';
 
 const KEY = '@phase_journey';
 
@@ -142,8 +142,20 @@ export async function clearPhaseJourney(): Promise<void> {
 // ------------------------------------------------------------------ position
 
 export interface ExpandedPhase {
-  kind: string;
+  /** Was `string`, which quietly widened everything downstream — phaseTransition
+   *  had to re-narrow it and could not, producing three tsc errors that predate
+   *  the 18 Aug work. */
+  kind: RoadmapPhaseKind;
   exitBodyFatPct: number;
+  /** Scale weight this occurrence ends at. Carried through because transition
+   *  detection reads it: consumer body fat cannot resolve the changes a phase
+   *  targets, so exits are detected on a weight trend. See RoadmapPhase. */
+  exitWeightKg?: number;
+  /** Prescribed %BW/week. Detection compares the measured slope against it, so
+   *  hitting the weight by crash dieting is not reported as finishing. */
+  targetRatePctPerWeek?: number;
+  /** Too short for its own outcome to be measurable. Detection declines. */
+  belowDetectionThreshold?: boolean;
   estMonths: [number, number];
 }
 
@@ -172,31 +184,29 @@ export function expandPhases(roadmap: Roadmap): ExpandedPhase[] {
   const asPhase = (p: Roadmap['phases'][number]): ExpandedPhase => ({
     kind: p.kind,
     exitBodyFatPct: p.exitBodyFatPct,
+    exitWeightKg: p.exitWeightKg,
+    targetRatePctPerWeek: p.targetRatePctPerWeek,
+    belowDetectionThreshold: p.belowDetectionThreshold,
     estMonths: p.estMonths,
   });
 
-  if (roadmap.phases.length === 1) return [asPhase(roadmap.phases[0])];
-
-  // The reveal is CONDITIONAL. When the band floor already sits below the
-  // user's goal body fat, the cycles leave them leaner than they asked and
-  // deriveRoadmap omits a terminal cut that would otherwise run upward — so
-  // a roadmap can be three phases, not four. Destructuring four positionally
-  // pushed an undefined onto this list, which then reached the phase counter,
-  // the check-in and the PDF export.
-  const phases = roadmap.phases;
-  const opener = phases[0];
-  const blockA = phases[1];
-  const blockB = phases[2];
-  const hasReveal = phases[phases.length - 1].kind === 'reveal' && phases.length > 3;
-
-  const out: ExpandedPhase[] = [asPhase(opener)];
-  if (blockA && blockB) {
-    for (let i = 0; i < (blockA.repeats ?? 1); i++) {
-      out.push(asPhase(blockA));
-      out.push(asPhase(blockB));
-    }
-  }
-  if (hasReveal) out.push(asPhase(phases[phases.length - 1]));
+  // REWRITTEN 18 Aug 2026. This used to hard-code the collapsed four-slot shape
+  // — opener, then phases[1] and phases[2] alternated blockA.repeats times,
+  // then a conditional reveal — and it required BOTH middle slots to exist.
+  //
+  // deriveRoadmap now emits a VARIABLE number of phases, all with repeats 1 in
+  // the common case, so a TWO-PHASE plan (trim then build) lost its build
+  // entirely: this returned one occurrence, the counter read "phase 1 of 1",
+  // and phasesAt could never hand the user their build — they would have been
+  // stuck in the trim forever. Verified against the live roadmap before fixing.
+  //
+  // Walking the list and honouring each phase's own repeats is correct for the
+  // old shape, the new one, and anything either grows into. The identical
+  // hard-coded assumption existed in JourneyChart and was fixed there first.
+  const out: ExpandedPhase[] = [];
+  roadmap.phases.forEach((p) => {
+    for (let i = 0; i < Math.max(1, p.repeats ?? 1); i++) out.push(asPhase(p));
+  });
   return out;
 }
 

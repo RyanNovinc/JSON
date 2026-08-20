@@ -33,6 +33,8 @@ import {
   WEIGHT_KG_MIN,
   WEIGHT_KG_MAX,
 } from '../utils/goalsProfileStorage';
+import { recordWeightEntry } from '../utils/weightHistory';
+import { useWeightUnit } from '../contexts/WeightUnitContext';
 
 // ── Input validation ────────────────────────────────────────────────────────
 // Ranges come from goalsProfileStorage so the screen and the storage sanitiser
@@ -222,6 +224,8 @@ const LEANNESS_OPTIONS: Array<{
 ];
 
 export default function GoalsStatsScreen() {
+  // The unit the entry is STORED in, so the chart shows what the user typed.
+  const { globalUnit } = useWeightUnit();
   const navigation = useNavigation<Nav>();
   const { themeColor } = useTheme();
   const insets = useSafeAreaInsets();
@@ -338,7 +342,38 @@ export default function GoalsStatsScreen() {
       // write path into GoalsProfile — rather than assembling a whole
       // object and calling saveGoalsProfile directly.
       await updateGoalsProfileField('trainingState', trainingState);
-      await updateGoalsProfileField('currentWeightKg', currentWeightKg);
+      // ── THE WEIGHT IS A WEIGH-IN, NOT JUST A FIELD, 19 Aug 2026 ──────────
+      //
+      // Every other field here is profile-only and rightly written through
+      // updateGoalsProfileField. Weight is different: it also belongs to
+      // `weight_tracking_history`, the dated series the charts and the
+      // phase-transition trend read. Writing only the scalar left that series
+      // missing every weight entered on this screen — and the trend that
+      // decides when a phase ends was computed from the gap.
+      //
+      // recordWeightEntry writes the entry FIRST with read-back verification
+      // and mirrors the profile after, so it replaces the field write rather
+      // than joining it. The fallback keeps the old behaviour if the history
+      // store is unreadable: a plan built on a current weight beats one built
+      // on a stale one, even at the cost of a missing row.
+      if (currentWeightKg != null && currentWeightKg > 0) {
+        const rec = await recordWeightEntry({
+          weightKg: currentWeightKg,
+          unit: globalUnit === 'lbs' ? 'lbs' : 'kg',
+          bodyFatPct: currentBFPct ?? undefined,
+          bodyFatSource: currentBFPct != null ? bodyFat.source : undefined,
+          origin: 'GoalsStatsScreen',
+        });
+        if (!rec.ok) {
+          console.error(
+            '[GoalsStats] weigh-in not recorded:',
+            'reason' in rec ? rec.reason : 'unknown',
+          );
+          await updateGoalsProfileField('currentWeightKg', currentWeightKg);
+        }
+      } else {
+        await updateGoalsProfileField('currentWeightKg', currentWeightKg);
+      }
       await updateGoalsProfileField('currentBodyFatPct', currentBFPct);
       if (currentBFPct != null) {
         await updateGoalsProfileField('bodyFatSource', bodyFat.source);

@@ -34,13 +34,40 @@ export interface SyntheticNutritionAnswers {
 /**
  * [B] Fat gained per kg of lean gained, by how deliberate the surplus is.
  *
- * Garthe 2013 puts this near 0.2 at cautious rates and around 0.5 at
- * deliberate ones. A lean bulk aims at the cautious end; a full bulk is the
- * user having accepted the faster, softer version on the roomy route.
+ * ── RAISED FROM 0.2 / 0.5 ON 18 AUG 2026, AND WHY ───────────────────────────
+ *
+ * The old lean_bulk figure of 0.2 was attributed to Garthe 2013 and that
+ * attribution was WRONG. Garthe's counselling group — the arm that actually ran
+ * a prescribed surplus (544 ± 31 kcal/day, 2.4 g/kg protein, 4 resistance
+ * sessions a week) — gained roughly +1.7 kg lean against +1.1 kg fat, which is
+ * about 0.65. The 0.17 that matched our old number belongs to the AD-LIBITUM
+ * arm, which was given no surplus at all. For a training-free floor, Bouchard's
+ * 1990 twin overfeeding ran 2:1 fat to lean.
+ *
+ * Partial defence for the old number, recorded so nobody re-derives it: the app
+ * sizes its surplus from the CAPPED lean-gain rate, which for an intermediate
+ * is roughly 200 kcal/day — about 40% of Garthe's. A smaller surplus should
+ * partition better. But no trial has measured partitioning at a surplus that
+ * small, so 0.2 was an extrapolation BELOW THE TESTED RANGE presented as a
+ * measurement.
+ *
+ * DIRECTION OF ERROR DECIDES THE NEW VALUES. Understating fat gain means users
+ * finish a build fatter than the plan promised and need a longer cut than it
+ * scheduled — the failure that costs trust. Overstating only makes the plan
+ * slightly conservative. So these sit at the measured figure rather than under
+ * it.
+ *
+ * WHAT THIS CHANGES DOWNSTREAM, measured rather than assumed: total plan length
+ * moves about 9% (a 90 kg lifter at 25% aiming for 85 kg at 14% goes 15.9 to
+ * 16.7 months). But the SHAPE changes for lean users with a large lean gap. At
+ * 0.2 body fat asymptotes at 16.7%, so an 18% ceiling could never be reached
+ * from below and deriveRoadmap's ceiling rail was effectively dead code. At 0.5
+ * the asymptote is 33%, so the rail fires and cut/build CYCLING reappears for
+ * exactly the population that does it in practice.
  */
-const FAT_PER_LEAN_KG: Record<'lean_bulk' | 'bulk', number> = {
-  lean_bulk: 0.2,
-  bulk: 0.5,
+export const FAT_PER_LEAN_KG: Record<'lean_bulk' | 'bulk', number> = {
+  lean_bulk: 0.5,
+  bulk: 0.65,
 };
 
 /**
@@ -94,6 +121,17 @@ export interface GainRateInputs {
   /** The lifter's own capped lean-gain rate, kg per week. */
   leanGainKgPerWeek?: number;
   currentWeightKg?: number;
+  /**
+   * The cut rate already resolved against this user's CURRENT fat-mass
+   * ceiling, as a percentage. Supplied by the caller because resolving it
+   * needs lossRate, and importing that here would cost this module its
+   * runtime-leaf property.
+   *
+   * When absent the fallback below applies, which is the slow bound and safe
+   * for almost everyone — the exception being a very lean user, whose ceiling
+   * the caller is expected to have checked.
+   */
+  cutRatePct?: number;
 }
 
 export function deriveSyntheticNutritionAnswers(
@@ -109,6 +147,13 @@ export function deriveSyntheticNutritionAnswers(
   }
 
   const out = { ...match };
+
+  // A CUT rate resolved against the user's current ceiling always wins over
+  // the constant. The constant is 0.5%/wk, which a lean enough user cannot
+  // sustain either — see the Alpert limit in lossRate.
+  if (phase === 'cut' && inputs?.cutRatePct != null && inputs.cutRatePct > 0) {
+    out.targetRatePercentage = inputs.cutRatePct;
+  }
 
   // Derive the gain rate from what this lifter can actually build, when the
   // caller knows it. Total weight gained is the lean they can add plus the fat

@@ -225,27 +225,39 @@ export default function RouteRevealScreen() {
               has just answered ten questions does not. */}
           <Text style={styles.chooserTitle}>Your plan is{'\n'}locked in.</Text>
 
+          {/* ── THE GAP THAT MAKES THIS WORK, 19 Aug 2026 ──────────────────
+              A flexible spacer between the title and the actions. Everything
+              used to stack from the top and the screen ran out of content
+              halfway down, so the bottom half read as missing rather than as
+              space — and "I'll do this later" sat alone at the base with
+              nothing above it.
+
+              Now the title claims the top, the actions sit in thumb reach, and
+              the emptiness lands BETWEEN them where it reads as deliberate.
+              One flex, no fixed heights, so it holds on any screen size. */}
+          <View style={styles.gap} />
+
           <View style={styles.choices}>
             <TouchableOpacity
               style={styles.choice}
               onPress={() => startWorkoutFlow(navigation)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Start with a workout plan, recommended"
+              accessibilityLabel="Build my workout plan"
             >
+              {/* TAG AND HINTS REMOVED 17 Aug 2026. START HERE plus "fewer
+                  questions" steered a choice that does not need steering: both
+                  rows lead somewhere useful and the other one is one tap away
+                  afterwards. Two lines of copy and a badge to save nobody
+                  anything.
+
+                  Phrased as an ACTION rather than a noun. "A workout plan"
+                  read like a catalogue entry and "Your workout plan" claimed
+                  ownership of something that does not exist yet — the user is
+                  seeing this before either plan is built. "Build my" says what
+                  the tap does, and the chevron already covers going somewhere. */}
               <View style={styles.choiceBody}>
-                <View style={styles.choiceTitleRow}>
-                  <Text style={styles.choiceTitle}>A workout plan</Text>
-                  <View style={[styles.tag, { borderColor: `${themeColor}4d` }]}>
-                    <Text style={[styles.tagText, { color: themeColor }]}>START HERE</Text>
-                  </View>
-                </View>
-                {/* The reason is that it is SHORTER, not that the phase calls
-                    for it. A phase-based line would be wrong the moment a Trim
-                    user is still recommended the workout plan, and the whole
-                    point of recommending the same thing every time is that the
-                    justification has to hold every time. */}
-                <Text style={styles.choiceHint}>Fewer questions. The meal plan is easy to add after.</Text>
+                <Text style={styles.choiceTitle}>Build my workout plan</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color="#3f3f46" />
             </TouchableOpacity>
@@ -255,11 +267,10 @@ export default function RouteRevealScreen() {
               onPress={() => startNutritionFlow(navigation)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Start with a meal plan"
+              accessibilityLabel="Build my meal plan"
             >
               <View style={styles.choiceBody}>
-                <Text style={styles.choiceTitle}>A meal plan</Text>
-                <Text style={styles.choiceHint}>Or start here instead</Text>
+                <Text style={styles.choiceTitle}>Build my meal plan</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color="#3f3f46" />
             </TouchableOpacity>
@@ -287,7 +298,10 @@ export default function RouteRevealScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.exit, { marginTop: 'auto', marginBottom: insets.bottom + 12 }]}
+            // marginTop 'auto' removed: the flexible gap above now does the
+            // pushing. Leaving both would fight, and 'auto' would win by
+            // dragging this button away from the group it belongs to.
+            style={[styles.exit, { marginBottom: insets.bottom + 12 }]}
             onPress={leave}
             activeOpacity={0.75}
             accessibilityRole="button"
@@ -487,7 +501,13 @@ const styles = StyleSheet.create({
   },
 
   // Mirrors CreateChooserScreen's choice rows exactly. If one moves, move both.
-  choices: { marginTop: 30 },
+  /** Takes all the leftover height, so the actions sit low and the space
+   *  lands between the title and them rather than under everything. */
+  gap: { flex: 1 },
+
+  // Was marginTop 30, which spaced this off the title. The gap above sets the
+  // distance now, so this only needs to not touch the first row's border.
+  choices: { marginTop: 4 },
   choice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,16 +517,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#232327',
   },
   choiceBody: { flex: 1 },
-  choiceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   choiceTitle: { fontSize: 22, fontWeight: '600', color: '#ffffff', letterSpacing: -0.3 },
-  choiceHint: { fontSize: 13, color: '#5b5b62', marginTop: 4 },
-  tag: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
-  },
-  tagText: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2 },
 
   pdf: {
     flexDirection: 'row',
@@ -552,7 +563,8 @@ const styles = StyleSheet.create({
     borderColor: '#1f1f23',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 'auto',
+    // marginTop 'auto' removed — see the comment at the call site.
+    marginTop: 12,
   },
   exitText: { fontSize: 13.5, fontWeight: '500', color: '#71717a' },
 });

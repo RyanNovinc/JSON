@@ -119,6 +119,9 @@ import IntentForkModal from '../onboarding/IntentForkModal';
 import OnboardingContractScreen from '../onboarding/OnboardingContractScreen';
 import N5DietTypeScreen from '../screens/nutrition/questionnaire/N5DietTypeScreen';
 import N5bAllergiesScreen from '../screens/nutrition/questionnaire/N5bAllergiesScreen';
+import N2RateScreen from '../screens/nutrition/questionnaire/N2RateScreen';
+import N4ActivityScreen from '../screens/nutrition/questionnaire/N4ActivityScreen';
+import N3AgeScreen from '../screens/nutrition/questionnaire/N3AgeScreen';
 import N5cSleepScreen from '../screens/nutrition/questionnaire/N5cSleepScreen';
 import N6MealsSnackingScreen from '../screens/nutrition/questionnaire/N6MealsSnackingScreen';
 import N6aDessertScreen from '../screens/nutrition/questionnaire/N6aDessertScreen';
@@ -386,6 +389,10 @@ export type RootStackParamList = {
   OnboardingContract: { flow?: 'meal' | 'workout' };
   // Nutrition questionnaire screens
   N5DietType: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
+  // Cut only. Renders nothing and navigates onward for any other phase.
+  N2Rate: { stepOffset?: number; next?: string } | undefined;
+  N4Activity: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
+  N3Age: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   N5bAllergies: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   N5cSleep: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
   N6MealsSnacking: { answersSoFar?: Record<string, any>; editMode?: boolean; flowStepOffset?: number } | undefined;
@@ -1627,6 +1634,57 @@ export default function AppNavigator({ isAuthenticated, appReady }: AppNavigator
                 children={() => (
                   <NutritionThemeProvider>
                     <N5DietTypeScreen />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              {/* Cut only. rateOptionsFor decides which rates this body can
+                  supply, and the screen navigates straight past itself if the
+                  phase is not a cut. */}
+              <RootStack.Screen 
+                name="N3Age" 
+                children={() => (
+                  <NutritionThemeProvider>
+                    <N3AgeScreen />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N4Activity" 
+                children={() => (
+                  <NutritionThemeProvider>
+                    <N4ActivityScreen />
+                  </NutritionThemeProvider>
+                )}
+                options={{ 
+                  headerShown: false,
+                  cardStyleInterpolator: ({ current }) => ({
+                    cardStyle: {
+                      opacity: current.progress,
+                    },
+                  }),
+                }} 
+              />
+              <RootStack.Screen 
+                name="N2Rate" 
+                children={() => (
+                  <NutritionThemeProvider>
+                    <N2RateScreen />
                   </NutritionThemeProvider>
                 )}
                 options={{ 

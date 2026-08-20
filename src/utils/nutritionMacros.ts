@@ -28,6 +28,16 @@ export interface MacroResults {
   protein: number;
   carbs: number;
   fat: number;
+  /**
+   * Set when the calorie target was RAISED to clear the energy-availability
+   * floor — the deficit the phase asked for was one the app refuses to
+   * prescribe. Surface it rather than silently showing a number that no longer
+   * matches the plan's stated rate.
+   */
+  raisedForEnergyAvailability?: boolean;
+  /** Energy availability at the returned target, kcal per kg of fat-free mass
+   *  per day. Undefined when body fat is unknown and FFM cannot be computed. */
+  energyAvailability?: number;
 }
 
 const ACTIVITY_MULTIPLIERS: Record<string, number> = {
@@ -244,7 +254,72 @@ export function phaseCaloricTarget(
   }
 }
 
-// Research-based protein targets (g/kg), biased high on cut to protect muscle.
+// ---------------------------------------------------------------------------
+// Energy availability floor
+// ---------------------------------------------------------------------------
+
+/**
+ * [B] The floor, in kcal per kg of fat-free mass per day.
+ *
+ * Loucks & Thuma 2003 (JCEM 88(1):297-311, PMID 12519869) fed 29 regularly
+ * menstruating women at controlled energy availabilities for five days and
+ * found luteinising-hormone pulsatility disrupted below roughly 30 kcal/kg
+ * FFM/day. It is a small, short, sedentary-women study — the IOC's 2023 REDs
+ * consensus (Mountjoy et al., BJSM 57:1073-1097) calls a universal cut-off
+ * "debated".
+ *
+ * So the NUMBER is [B] and the DIRECTION is [A]: nobody disputes that driving
+ * energy availability low enough suppresses reproductive, bone and metabolic
+ * function, only where the line sits. For an app prescribing deficits to the
+ * public, a debated line beats no line.
+ *
+ * APPLIED TO EVERYONE, not only to menstruating users. The evidence comes from
+ * women and the clearest endpoint is menstrual, but low energy availability
+ * harms bone and endocrine function in men too, and — the deciding argument —
+ * a safety floor that depends on a profile field being filled in is not a
+ * safety floor. Same reasoning as the 28-day decision window in
+ * phaseTransition.
+ *
+ * MEASURED BEFORE SHIPPING, because a floor that blocked ordinary dieting would
+ * be worse than none. Across a grid of weights, body fats and activity levels
+ * it raises 71% of cut targets at 10% body fat, 29% at 30%, and NONE at 40% —
+ * protecting the lean and leaving alone those with fat to draw on, which is the
+ * gradient it should have. Median correction 269 kcal.
+ */
+export const EA_FLOOR_KCAL_PER_KG_FFM = 30;
+
+/**
+ * [C] Daily energy spent on exercise, estimated from activity level.
+ *
+ * Energy availability is intake MINUS exercise expenditure, over fat-free mass.
+ * The app does not track what a session actually cost — no load data, and no
+ * way to verify a session happened — so this is a convention, not a
+ * measurement, and it is deliberately biased HIGH: overestimating exercise
+ * lowers computed availability and makes the floor bite sooner, which is the
+ * safe direction to be wrong in.
+ */
+export function estimateExerciseKcalPerDay(activityLevel?: string): number {
+  switch (activityLevel) {
+    case 'sedentary': return 100;
+    case 'light':     return 250;
+    case 'moderate':  return 400;
+    case 'heavy':     return 600;
+    case 'extreme':   return 800;
+    default:          return 400;
+  }
+}
+
+/** Energy availability in kcal per kg FFM per day, or undefined without FFM. */
+export function energyAvailability(
+  calories: number,
+  leanMassKg: number | undefined,
+  exerciseKcalPerDay: number,
+): number | undefined {
+  if (leanMassKg == null || !(leanMassKg > 0)) return undefined;
+  return (calories - exerciseKcalPerDay) / leanMassKg;
+}
+
+// Research-based protein targets (g/kg of BODYWEIGHT), biased high on cut.
 function phaseProteinPerKg(phase: DerivedPhase): number {
   switch (phase) {
     case 'cut':      return 2.2;
@@ -253,6 +328,56 @@ function phaseProteinPerKg(phase: DerivedPhase): number {
     case 'maintain': return 1.8;
     case 'bulk':     return 1.6;
   }
+}
+
+/**
+ * Daily protein floor in grams.
+ *
+ * ── WHY A CUT DOES NOT USE THE BODYWEIGHT RULE, 18 Aug 2026 ─────────────────
+ *
+ * Morton et al. 2018 (Br J Sports Med 52(6):376-384, PMID 28698222) puts the
+ * breakpoint at 1.62 g/kg with a CI to 2.20 — but that is for BUILDING. During
+ * an energy deficit the requirement rises, and Helms, Aragon & Fitschen 2014
+ * (J Int Soc Sports Nutr 11:20, PMID 24864135) recommend 2.3-3.1 g/kg of LEAN
+ * BODY MASS for losses of 0.5-1%/week.
+ *
+ * THE BASIS IS THE POINT, not the number. Checked against Helms, the old
+ * 2.2 g/kg of BODYWEIGHT already landed inside 2.3-3.1 g/kg of lean mass for
+ * every profile tested — so "raise the protein floor" was largely already done.
+ * What it got WRONG was the direction of the scaling:
+ *
+ *   90 kg at 25%  ->  198 g  =  2.93 g/kg lean   (near the TOP of Helms)
+ *   77 kg at 12%  ->  169 g  =  2.49 g/kg lean   (near the BOTTOM)
+ *
+ * Backwards. Protein is used by lean tissue, not by fat, and leaner dieters
+ * need MORE per kilo of lean mass, not less — they have less fat to fuel the
+ * deficit, so the pressure on lean tissue is higher. Scaling off bodyweight
+ * gave the fat dieter the generous end and the lean one the stingy end.
+ *
+ * So a cut scales off LEAN MASS and rises as body fat falls: 2.4 g/kg at 20%
+ * or above, up to 3.0 at 10% or below, linear between. Both ends sit inside
+ * Helms' range.
+ *
+ * NOBODY'S PROTEIN GOES DOWN. The result is the MAX of the two rules, because
+ * the bodyweight figure was never dangerous and cutting someone's protein on a
+ * deficit is the one direction of error worth avoiding. In practice this leaves
+ * fat dieters untouched and raises lean ones — 77 kg at 12% goes 169 to 195 g.
+ *
+ * Falls back to the bodyweight rule when body fat is unknown, since lean mass
+ * cannot be estimated from weight alone.
+ */
+export function phaseProteinGrams(
+  phase: DerivedPhase,
+  weightKg: number,
+  bodyFatPct?: number,
+): number {
+  const byWeight = weightKg * phaseProteinPerKg(phase);
+  if (phase !== 'cut' || bodyFatPct == null) return Math.round(byWeight);
+
+  const leanKg = weightKg * (1 - bodyFatPct / 100);
+  const t = Math.min(1, Math.max(0, (20 - bodyFatPct) / 10));
+  const perKgLean = 2.4 + t * 0.6;
+  return Math.round(Math.max(byWeight, leanKg * perKgLean));
 }
 
 // Phase-aware macro computation. Uses GoalsProfile weight (authoritative) and
@@ -296,10 +421,31 @@ export function computeMacrosPhaseAware(
 
   const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[activityLevel] ?? 1.55));
   const phase = derivePhase(profile);
-  const calories = phaseCaloricTarget(tdee, phase, weight, profile.currentBodyFatPct, profile.trainingState);
+  const asked = phaseCaloricTarget(tdee, phase, weight, profile.currentBodyFatPct, profile.trainingState);
+
+  // ── ENERGY AVAILABILITY FLOOR ────────────────────────────────────────────
+  //
+  // The last gate before a number reaches a user. Everything upstream reasons
+  // about rate and partitioning; this asks a different question — whether
+  // enough energy is left, after training, to run a body on.
+  //
+  // RAISES rather than refuses. Refusing leaves the user with no target at all,
+  // which is worse than a slower plan; raising keeps them moving at a rate the
+  // floor allows and flags that it happened.
+  const leanKg =
+    profile.currentBodyFatPct != null
+      ? weight * (1 - profile.currentBodyFatPct / 100)
+      : undefined;
+  const exerciseKcal = estimateExerciseKcalPerDay(activityLevel);
+  const floorCalories =
+    leanKg != null ? Math.round(EA_FLOOR_KCAL_PER_KG_FFM * leanKg + exerciseKcal) : null;
+
+  const calories = floorCalories != null && asked < floorCalories ? floorCalories : asked;
+  const raisedForEnergyAvailability =
+    floorCalories != null && asked < floorCalories ? true : undefined;
 
   // Protein: research-based floor; bumped above the split-derived amount if needed.
-  const pFloor = Math.round(weight * phaseProteinPerKg(phase));
+  const pFloor = phaseProteinGrams(phase, weight, profile.currentBodyFatPct);
   const split =
     answers.dietType === 'custom' && answers.customMacros
       ? { p: answers.customMacros.protein, c: answers.customMacros.carbs, f: answers.customMacros.fat }
@@ -315,5 +461,16 @@ export function computeMacrosPhaseAware(
   const fat = Math.round((remaining * fatRatio) / 9);
   const carbs = Math.round((calories - proteinKcal - fat * 9) / 4);
 
-  return { bmr: Math.round(bmr), tdee, calories, protein, carbs, fat };
+  const ea = energyAvailability(calories, leanKg, exerciseKcal);
+
+  return {
+    bmr: Math.round(bmr),
+    tdee,
+    calories,
+    protein,
+    carbs,
+    fat,
+    raisedForEnergyAvailability,
+    energyAvailability: ea == null ? undefined : Math.round(ea),
+  };
 }
