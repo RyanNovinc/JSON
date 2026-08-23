@@ -27,8 +27,15 @@
 //
 // Current order:
 //   1 weight · 2 sex · 3 body fat · 4 height · 5 training state
-//   6 previous peak (returning lifters only) · 7 goal weight
-//   8 goal body fat · 9 route · 10 summary
+//   7 goal weight · 8 goal body fat · 9 route · 10 summary
+//
+// BEAT 6 IS A DELIBERATE GAP, 24 Aug 2026. It asked a returning lifter for
+// their previous training peak, which fed the regain credit that has now been
+// removed (see roadmap.ts). The remaining beats keep their numbers rather than
+// closing up, because 9 and 10 are referenced as literals in RouteScreen's
+// write gates and in helpFor(9). Renumbering would touch every one of those for
+// a cosmetic gain and is exactly the kind of change the note above records
+// going wrong on 13 Aug.
 
 import type { GoalsProfile } from './goalsProfile';
 
@@ -52,18 +59,12 @@ export function missingRouteFields(profile: GoalsProfile | null): string[] {
   if (profile.sex == null) missing.push('sex');
   if (profile.currentBodyFatPct == null) missing.push('body fat');
   if (profile.heightCm == null) missing.push('height');
-  // The previous peak is NOT a completeness requirement, and the reason is the
-  // skip. A returning lifter who does not remember their peak can clear both
-  // fields deliberately — that is the honest answer, and splitGap handles it by
-  // treating the whole gap as novel tissue.
-  //
-  // Requiring peakLeanness here meant using the skip guaranteed the route was
-  // never complete, which is the exact opposite of what a skip is for: it
-  // locked those users out of creating a plan, permanently and silently.
-  //
-  // Unanswered and answered-as-unknown are indistinguishable on the profile,
-  // so this cannot be checked here at all — the same reason trainingState is
-  // absent from this list.
+  // The previous-peak beat was removed on 24 Aug 2026 along with the regain
+  // credit it fed, so there is nothing to check between height and goal weight.
+  // Worth keeping the lesson it left: the peak was never a completeness
+  // requirement, because a returning lifter who did not remember it could clear
+  // both fields deliberately, and requiring them meant using the skip locked
+  // those users out of a plan permanently and silently.
   if (profile.goalWeightKg == null) missing.push('goal weight');
   if (profile.goalBodyFatPct == null) missing.push('goal body fat');
   if (profile.routePreference == null) missing.push('route');
@@ -85,18 +86,8 @@ export function firstUnansweredBeat(profile: GoalsProfile | null): number {
   if (profile.sex == null) return 2;
   if (profile.currentBodyFatPct == null) return 3;
   if (profile.heightCm == null) return 4;
-  // Resume AT the peak beat for a returning lifter who has not answered it, so
-  // an interrupted user lands on the question rather than past it — but it is
-  // not a completeness requirement (see missingRouteFields), so someone who
-  // skipped it deliberately is not sent back here by isRouteComplete.
-  if (
-    profile.trainingState === 'returning' &&
-    profile.peakWeightKg == null &&
-    profile.peakLeanness == null &&
-    profile.goalWeightKg == null
-  ) {
-    return 6;
-  }
+  // 5 (training state) cannot be checked — see missingRouteFields. 6 no longer
+  // exists; the numbering skips it deliberately rather than closing up.
   if (profile.goalWeightKg == null) return 7;
   if (profile.goalBodyFatPct == null) return 8;
   if (profile.routePreference == null) return 9;

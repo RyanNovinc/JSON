@@ -17,14 +17,31 @@
 //
 // Note the y axis direction: yOf puts HIGH body fat at the TOP, so the line
 // descending means getting leaner. Anything drawn alongside this must match.
+//
+// ── THE LINE IS SAMPLED, NOT INTERPOLATED (21 Aug 2026) ─────────────────────
+//
+// Until today this walked straight from one phase exit to the next, which is
+// wrong in both directions and visibly so. A cut is a fixed fraction of a
+// FALLING weight, so body fat drops faster as it runs; a build accrues lean
+// toward a ceiling, so it flattens. `planCurve` supplies the path between the
+// endpoints the roadmap already fixed — it takes no rate constants of its own,
+// so the curve cannot disagree with the plan it is drawing.
+//
+// The straight walk survives as the fallback for a profile with no measured
+// body fat, where there is no lean mass and therefore no trajectory to compute.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import Svg, { Path, Rect, Circle, Line, Text as SvgText } from 'react-native-svg';
 import type { GoalsProfile } from '../../utils/goalsProfile';
 import type { Roadmap } from '../../utils/roadmap';
+import { planCurve } from '../../utils/planCurve';
 
-const CHART = { X0: 30, X1: 308, Y0: 14, Y1: 104, N: 48 } as const;
+// N RAISED 48 -> 96 with the sampled line. At 48 a two month cut inside a four
+// year plan got two samples, and the Q smoothing below then rounded its corner
+// into the build beside it. The array is still fixed length, which is what lets
+// two plans morph into each other.
+const CHART = { X0: 30, X1: 308, Y0: 14, Y1: 104, N: 96 } as const;
 
 type ChartTarget = {
   ys: number[];
@@ -37,6 +54,13 @@ type ChartTarget = {
   stripLabels: [string, string, string];
   /** The vertical domain in body fat percent, so an axis can be drawn. */
   domain: [number, number];
+  /**
+   * Phase boundaries: where the line changes direction, and the only points
+   * worth making tappable. Every reading a user takes off this chart is at one.
+   */
+  nodes: Array<{ x: number; y: number; month: number; bodyFatPct: number; weightKg: number; when: string }>;
+  /** Whole-plan length in months, for the year lines. */
+  months: number;
 };
 
 function buildChartTarget(
@@ -46,6 +70,7 @@ function buildChartTarget(
   compact = false,
   bandOnly = false,
   leanStopPct?: number,
+  band = true,
 ): ChartTarget {
   const { X0, X1, Y0, Y1, N } = CHART;
   const start = profile.currentBodyFatPct ?? roadmap.band.ceiling + 2;
@@ -87,8 +112,18 @@ function buildChartTarget(
   // edges and the lean stop are what has to fit.
   const exits = bandOnly ? [] : roadmap.phases.map((ph) => ph.exitBodyFatPct);
   const marks = leanStopPct != null ? [leanStopPct] : [];
-  const lineHi = Math.max(start, ...exits, ...marks, ceiling);
-  const lineLo = Math.min(goal, ...exits, ...marks, floor);
+  /**
+   * THE BAND ONLY SIZES THE CANVAS WHEN THERE IS A BAND.
+   *
+   * A plan built with no range carries a sentinel ceiling — a number nobody
+   * could reach, which is exactly how "no ceiling" is expressed — and feeding
+   * that into the domain crushed the whole line into the bottom of the canvas
+   * under a shaded rectangle covering everything above it. The user sees a
+   * range on the one option that does not have one.
+   */
+  const edges = band ? [ceiling, floor] : [];
+  const lineHi = Math.max(start, ...exits, ...marks, ...edges);
+  const lineLo = Math.min(goal, ...exits, ...marks, ...edges);
   const hi = tight ? lineHi + 0.6 : Math.ceil((lineHi + 2) / 2) * 2;
   const lo = tight ? lineLo - 0.6 : Math.floor((lineLo - 2) / 2) * 2;
   // Vertical extent, not the constant. In sparkline mode the canvas is 44 tall
@@ -169,16 +204,51 @@ function buildChartTarget(
     nodes.push([t, w[1]]);
   });
 
+  // ── THE PATH ────────────────────────────────────────────────────────────
+  //
+  // planCurve returns the weekly trajectory anchored to these same phase exits
+  // and durations. Sampling it at N fixed time positions keeps `ys` a fixed
+  // length array, which is what the morph between two plans interpolates.
+  const curve = planCurve(profile, roadmap);
   const ys: number[] = [];
-  for (let i = 0; i < N; i++) {
-    const ti = i / (N - 1);
+
+  if (curve && curve.points.length > 1 && curve.totalMonths > 0) {
+    const pts = curve.points;
     let k = 1;
-    while (k < nodes.length - 1 && nodes[k][0] < ti) k++;
-    const [t0, b0] = nodes[k - 1];
-    const [t1, b1] = nodes[k];
-    const f = t1 === t0 ? 0 : (ti - t0) / (t1 - t0);
-    ys.push(yOf(b0 + (b1 - b0) * f));
+    for (let i = 0; i < N; i++) {
+      const at = (i / (N - 1)) * curve.totalMonths;
+      while (k < pts.length - 1 && pts[k].month < at) k++;
+      const a = pts[k - 1];
+      const b = pts[k];
+      const f = b.month === a.month ? 0 : (at - a.month) / (b.month - a.month);
+      ys.push(yOf(a.bodyFatPct + (b.bodyFatPct - a.bodyFatPct) * f));
+    }
+  } else {
+    // No measured body fat: no lean mass, no trajectory. Straight between the
+    // exits, which is what this always did.
+    for (let i = 0; i < N; i++) {
+      const ti = i / (N - 1);
+      let k = 1;
+      while (k < nodes.length - 1 && nodes[k][0] < ti) k++;
+      const [t0, b0] = nodes[k - 1];
+      const [t1, b1] = nodes[k];
+      const f = t1 === t0 ? 0 : (ti - t0) / (t1 - t0);
+      ys.push(yOf(b0 + (b1 - b0) * f));
+    }
   }
+
+  const months = curve?.totalMonths ?? total;
+  const nodePts =
+    curve && months > 0
+      ? curve.nodes.map((nd) => ({
+          x: X0 + (nd.month / months) * (X1 - X0),
+          y: yOf(nd.bodyFatPct),
+          month: nd.month,
+          bodyFatPct: nd.bodyFatPct,
+          weightKg: nd.weightKg,
+          when: nd.when,
+        }))
+      : [];
 
   return {
     ys,
@@ -188,6 +258,8 @@ function buildChartTarget(
     stripB,
     stripLabels,
     domain: [lo, hi],
+    nodes: nodePts,
+    months,
   };
 }
 
@@ -203,6 +275,11 @@ export default function JourneyChart({
   leanStopPct,
   frame = false,
   muscleKg,
+  band = true,
+  yearLines = false,
+  targetPct,
+  onSelectNode,
+  selectedNode,
 }: {
   profile: GoalsProfile;
   roadmap: Roadmap;
@@ -271,10 +348,42 @@ export default function JourneyChart({
    * screen that shows WHEN you grow, which is what separates the two orders.
    */
   muscleKg?: number;
+  /**
+   * Draw the band at all. FALSE for a plan built with no range — "grow now, cut
+   * at the end" has no ceiling, so `roadmap.band` carries a fallback the user
+   * never chose, and shading it would show them a rule they did not set.
+   */
+  band?: boolean;
+  /**
+   * Faint vertical rules at each year. Without them the chart says what happens
+   * and in what order and nothing about WHEN — a dip could be month three or
+   * month thirty and it reads the same. They also make the model's own headline
+   * visible: the first build is enormous and the cuts are slivers.
+   */
+  yearLines?: boolean;
+  /**
+   * A solid rule at a single body fat, with NOTHING shaded under it. For the
+   * "bulk up to" screen, where the number is a TARGET rather than a region —
+   * the range screens shade because a range is a region, and this one must not,
+   * or the two screens claim the same thing about different questions.
+   */
+  targetPct?: number;
+  /**
+   * Makes every phase boundary tappable. The readout that receives this lives
+   * outside the chart, because the numbers a user wants at a point — weight and
+   * body fat — do not fit beside the point at this size without covering the
+   * neighbouring ones.
+   */
+  onSelectNode?: (
+    node: { month: number; bodyFatPct: number; weightKg: number; when: string },
+    index: number,
+  ) => void;
+  /** Index of the lit node, or null. */
+  selectedNode?: number | null;
 }) {
   const target = React.useMemo(
-    () => buildChartTarget(profile, roadmap, sparkline, compact, bandOnly, leanStopPct),
-    [profile, roadmap, sparkline, compact, bandOnly, leanStopPct],
+    () => buildChartTarget(profile, roadmap, sparkline, compact, bandOnly, leanStopPct, band),
+    [profile, roadmap, sparkline, compact, bandOnly, leanStopPct, band],
   );
 
   /** The build's span as a fraction of the timeline, for the bracket. */
@@ -319,6 +428,8 @@ export default function JourneyChart({
           from.stripB[1] + (target.stripB[1] - from.stripB[1]) * value,
         ],
         stripLabels: target.stripLabels,
+        nodes: target.nodes,
+        months: target.months,
         // Was omitted, which is the tsc error on this object: the axis ticks
         // read target.domain directly so nothing broke visually, but the frame
         // object was not a ChartTarget.
@@ -391,7 +502,7 @@ export default function JourneyChart({
 
   return (
     <Svg width="100%" height={svgHeight} viewBox={`0 0 320 ${svgHeight}`}>
-      {sparkline ? null : (
+      {sparkline || !band ? null : (
         <Rect
           x={X0}
           y={cur.bandTop}
@@ -401,6 +512,31 @@ export default function JourneyChart({
           fill={`${color}1a`}
         />
       )}
+
+      {/* Drawn first so everything else sits over them. */}
+      {yearLines && target.months > 12 && !sparkline
+        ? Array.from({ length: Math.floor(target.months / 12) }, (_, i) => i + 1).map((yr) => {
+            const x = X0 + ((yr * 12) / target.months) * (X1 - X0);
+            return (
+              <React.Fragment key={`yr${yr}`}>
+                <Line x1={x} y1={Y0} x2={x} y2={Y1} stroke="#1e1e24" strokeWidth={1} />
+                <SvgText x={x + 3} y={Y1 - 4} fontSize={8} fill="#3f3f46">
+                  {`${yr}y`}
+                </SvgText>
+              </React.Fragment>
+            );
+          })
+        : null}
+
+      {/* THE TARGET, not a region: one rule, nothing under it. */}
+      {targetPct != null ? (
+        <>
+          <Line x1={X0} y1={yAt(targetPct)} x2={X1} y2={yAt(targetPct)} stroke={color} strokeWidth={1.5} />
+          <SvgText x={X1 - 2} y={yAt(targetPct) - 5} fontSize={8.5} fill={color} textAnchor="end">
+            {`${targetPct}%`}
+          </SvgText>
+        </>
+      ) : null}
       {/* THE MARKS THE RANGE SITS AGAINST. Dashed for today and the goal because
           neither is a decision — they are where the user already is and where
           they already said they wanted to be — and solid amber for the stop,
@@ -500,6 +636,48 @@ export default function JourneyChart({
           <Circle cx={X1} cy={cur.ys[N - 1]} r={3.5} fill="#131316" stroke="#8e8e93" strokeWidth={1.5} />
         </>
       )}
+      {/* ── THE TAPPABLE POINTS ───────────────────────────────────────────
+          A visible dot on every boundary, because a tap target nobody can see
+          is a feature nobody finds, and a generous invisible circle over it —
+          at four years across 278pt the boundaries sit about 30pt apart and a
+          fingertip is wider than that.
+
+          Drawn from `target` rather than the animating copy on purpose: the
+          number of phases changes between plans, and two arrays of different
+          lengths have no meaningful interpolation. The line morphs, the dots
+          arrive. */}
+      {onSelectNode && !sparkline && !bandOnly
+        ? target.nodes.map((nd, i) => (
+            <React.Fragment key={`nd${i}`}>
+              <Circle
+                cx={nd.x}
+                cy={nd.y}
+                r={selectedNode === i ? 5 : 3.2}
+                fill={selectedNode === i ? color : '#0a0a0b'}
+                stroke={color}
+                strokeWidth={selectedNode === i ? 0 : 1.6}
+              />
+              <Circle
+                cx={nd.x}
+                cy={nd.y}
+                r={17}
+                fill="transparent"
+                onPress={() =>
+                  onSelectNode(
+                    {
+                      month: nd.month,
+                      bodyFatPct: nd.bodyFatPct,
+                      weightKg: nd.weightKg,
+                      when: nd.when,
+                    },
+                    i,
+                  )
+                }
+              />
+            </React.Fragment>
+          ))
+        : null}
+
       {muscleKg != null && buildSpan && !sparkline
         ? (() => {
             const x1 = X0 + buildSpan.lo * (X1 - X0);

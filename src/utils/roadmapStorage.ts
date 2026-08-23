@@ -34,7 +34,19 @@ const KEY = '@roadmap_snapshots';
  * silently — that would attribute a change in our own model to the user's
  * progress.
  */
-export const ROADMAP_MODEL_VERSION = 1;
+export const ROADMAP_MODEL_VERSION = 2;
+
+// v1 -> v2, 24 Aug 2026. BOTH triggers above fired at once. The snapshot SHAPE
+// changed (peakWeightKg and peakLeanness left SnapshotInputs; regainKg and
+// novelKg left Roadmap), and the derivation moved far enough that old and new
+// snapshots are not comparable: removing the regain credit took a returning
+// lifter with an 11.5 kg gap from roughly 6-11 months to roughly 25.
+//
+// Comparing across that boundary would read our own model change as the user
+// falling behind, which is the exact failure this field exists to prevent.
+// v1 snapshots are KEPT — readAll does not filter on version — and they still
+// carry the removed keys in their stored JSON, which is inert. shouldSnapshot's
+// version check means the first read after upgrade records a fresh v2 baseline.
 
 /** The inputs, frozen. Not a reference to the live profile, a copy. */
 export interface SnapshotInputs {
@@ -46,8 +58,6 @@ export interface SnapshotInputs {
   sex?: GoalsProfile['sex'];
   ageYears?: number;
   heightCm?: number;
-  peakWeightKg?: number;
-  peakLeanness?: GoalsProfile['peakLeanness'];
 }
 
 export interface RoadmapSnapshot {
@@ -82,8 +92,6 @@ function toInputs(p: GoalsProfile): SnapshotInputs {
     sex: p.sex,
     ageYears: p.ageYears,
     heightCm: p.heightCm,
-    peakWeightKg: p.peakWeightKg,
-    peakLeanness: p.peakLeanness,
   };
 }
 

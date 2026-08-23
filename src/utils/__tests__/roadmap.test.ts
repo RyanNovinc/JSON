@@ -23,7 +23,6 @@ import {
   muscleBuiltKg,
   yearsToBuild,
   leanAtNormalisedFfmi,
-  splitGap,
   deriveRoadmap,
   simulateLoss,
   monthsToCut,
@@ -364,34 +363,12 @@ describe('yearsToBuild', () => {
   });
 });
 
-describe('splitGap', () => {
-  it('treats the whole gap as new muscle when no peak is known', () => {
-    expect(splitGap(REAL, 16.8)).toEqual({ regainKg: 0, novelKg: 16.8 });
-  });
-
-  it('splits out regain when a previous peak is known', () => {
-    const withPeak: GoalsProfile = { ...REAL, peakWeightKg: 85 };
-    const { regainKg, novelKg } = splitGap(withPeak, 16.8);
-    expect(regainKg).toBeGreaterThan(5);
-    expect(regainKg).toBeLessThan(8);
-    expect(regainKg + novelKg).toBeCloseTo(16.8, 1);
-  });
-
-  it('credits more regain to someone who was leaner at their peak', () => {
-    const lean = splitGap({ ...REAL, peakWeightKg: 85, peakLeanness: 'lean' }, 16.8);
-    const soft = splitGap({ ...REAL, peakWeightKg: 85, peakLeanness: 'soft' }, 16.8);
-    expect(lean.regainKg).toBeGreaterThan(soft.regainKg);
-  });
-
-  it('never credits more regain than the gap itself', () => {
-    const { regainKg } = splitGap({ ...REAL, peakWeightKg: 120 }, 16.8);
-    expect(regainKg).toBeLessThanOrEqual(16.8);
-  });
-
-  it('ignores a peak lighter than current weight', () => {
-    expect(splitGap({ ...REAL, peakWeightKg: 70 }, 16.8).regainKg).toBe(0);
-  });
-});
+// The splitGap suite was DELETED on 24 Aug 2026 with the function it tested.
+// See the regain-removal note in roadmap.ts: the multiplier was applied after
+// curveGainKgPerYear's cap, so it drove the effective regain rate to 0.458
+// kg/week against MAX_LEAN_GAIN_KG_PER_WEEK = 0.23. The whole lean gap is now
+// novel tissue at the one capped rate. The replacement invariant lives in the
+// leanGainKgPerYear suite: returning and consistent must now agree.
 
 // ── The partition loop ─────────────────────────────────────────────────────
 //
@@ -537,11 +514,17 @@ describe('the trainingState cap', () => {
     expect(muscular[1] / muscular[0]).toBeGreaterThan(matched[1] / matched[0]);
   });
 
-  // The regain exemption tripwire. Same body, returning-with-peak must beat
-  // consistent: both cap the NOVEL portion at the same 0.28 × L, so any
-  // difference is the muscle-memory credit surviving the cap. If the state
-  // cap ever leaks into the regain rate, this is the assertion that trips.
-  it('keeps the regain credit outside the cap: returning with a peak beats consistent', () => {
+  // ── THE REGAIN-REMOVAL TRIPWIRE, 24 Aug 2026 ─────────────────────────────
+  //
+  // This assertion is the INVERSE of the one it replaces. It used to require
+  // returning-with-a-peak to BEAT consistent, which was the muscle-memory
+  // credit surviving the state cap. That credit is gone, so the two states
+  // share the same 0.28 × L cap and the same base spread, and the same body
+  // must now produce the same estimate under either label.
+  //
+  // If anyone reintroduces a rate pathway that exempts a training state from
+  // the cap, this is the assertion that trips.
+  it('gives returning and consistent the same estimate for the same body', () => {
     const consistentP: GoalsProfile = {
       currentWeightKg: 85,
       currentBodyFatPct: 20,
@@ -551,16 +534,8 @@ describe('the trainingState cap', () => {
       heightCm: 185,
       trainingState: 'consistent',
     };
-    const returningP: GoalsProfile = {
-      ...consistentP,
-      trainingState: 'returning',
-      peakWeightKg: 88,
-      peakLeanness: 'average',
-    };
-    const consistent = deriveRoadmap(consistentP)!.estYears;
-    const returning = deriveRoadmap(returningP)!.estYears;
-    expect(returning[0]).toBeLessThan(consistent[0]);
-    expect(returning[1]).toBeLessThan(consistent[1]);
+    const returningP: GoalsProfile = { ...consistentP, trainingState: 'returning' };
+    expect(deriveRoadmap(returningP)!.estYears).toEqual(deriveRoadmap(consistentP)!.estYears);
   });
 });
 
@@ -770,13 +745,6 @@ describe('deriveRoadmap', () => {
     expect(hi).toBeGreaterThan(lo);
   });
 
-  it('shortens the estimate when regain is available', () => {
-    const without = deriveRoadmap(REAL)!.estYears;
-    const with_ = deriveRoadmap({ ...REAL, peakWeightKg: 85 })!.estYears;
-    expect(with_[0]).toBeLessThan(without[0]);
-    expect(with_[1]).toBeLessThan(without[1]);
-  });
-
   // WAS 'gives the lean route more cycles than the roomy one'. Cycle count no
   // longer comes from band width, which is the whole 17 Aug correction, so
   // that assertion tested the defect rather than the behaviour.
@@ -825,5 +793,139 @@ describe('deriveRoadmap', () => {
     const r = deriveRoadmap(noHeight as GoalsProfile)!;
     expect(r.plausibility).toBeUndefined();
     expect(r.ffmi).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE OPENING BULK (21 Aug 2026)
+//
+// `bulkToBf` is the mirror of the opening cut: the body fat a user wants to grow
+// UP TO before anything comes off. It governs the FIRST leg only — everything
+// after the first cut runs against the range they set on the next screen.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('bulkToBf, the opening bulk', () => {
+  // Above where this profile's own build would top out, so the number cannot
+  // fire and the plan must be indistinguishable from one without it. This is
+  // the case the SCREEN warns about; the engine simply has to not break.
+  const inert: GoalsProfile = { ...REAL, preBuildBf: 13, ceilingBf: 16, bulkToBf: 40 };
+
+  it('opens with a build that stops at the number, not at the range top', () => {
+    const withBulk = deriveRoadmap(
+      { ...REAL, phaseOrder: 'build_first', preBuildBf: 13, ceilingBf: 16, bulkToBf: 22 },
+      'balanced',
+    )!;
+    const first = withBulk.phases[0];
+    expect(first.kind).toBe('build');
+    // Lands ON the chosen peak rather than the 16 ceiling, which is the whole
+    // point: the ceiling is the question they answered SECOND.
+    expect(first.exitBodyFatPct).toBeGreaterThan(16);
+    expect(first.exitBodyFatPct).toBeLessThanOrEqual(22.05);
+  });
+
+  it('hands the rest of the plan back to the range', () => {
+    const rm = deriveRoadmap(
+      { ...REAL, phaseOrder: 'build_first', preBuildBf: 13, ceilingBf: 16, bulkToBf: 22 },
+      'balanced',
+    )!;
+    // Nothing after the opening leg may exceed the range top: the peak was for
+    // the first leg only.
+    rm.phases.slice(1).forEach((ph) => {
+      if (ph.kind === 'build') expect(ph.exitBodyFatPct).toBeLessThanOrEqual(16.05);
+    });
+  });
+
+  it('is ignored when it sits at or below where they stand today', () => {
+    const below = deriveRoadmap(
+      { ...REAL, phaseOrder: 'build_first', preBuildBf: 13, ceilingBf: 16, bulkToBf: 15 },
+      'balanced',
+    )!;
+    const without = deriveRoadmap(
+      { ...REAL, phaseOrder: 'build_first', preBuildBf: 13, ceilingBf: 16 },
+      'balanced',
+    )!;
+    expect(below.phases.map((p) => `${p.kind}:${p.exitBodyFatPct}`)).toEqual(
+      without.phases.map((p) => `${p.kind}:${p.exitBodyFatPct}`),
+    );
+  });
+
+  it('is ignored when an opening cut is happening, because the two contradict', () => {
+    const cutFirst = deriveRoadmap(
+      { ...REAL, phaseOrder: 'cut_first', preBuildBf: 13, ceilingBf: 16, bulkToBf: 22 },
+      'balanced',
+    )!;
+    expect(cutFirst.phases[0].kind).toBe('trim');
+  });
+
+  it('does not blow up on a peak nobody could reach', () => {
+    const rm = deriveRoadmap({ ...inert, phaseOrder: 'build_first' }, 'balanced')!;
+    expect(rm.phases.length).toBeGreaterThan(0);
+    rm.phases.forEach((ph) => {
+      expect(Number.isFinite(ph.exitBodyFatPct)).toBe(true);
+      expect(ph.exitBodyFatPct).toBeLessThan(60);
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE RAIL STANDS DOWN ON DURATION, NOT WIDTH
+//
+// It used to test `ceiling - trimTo >= MIN_RANGE_WIDTH_PCT`, which is a proxy
+// for the thing the app can now measure directly. Band width and phase length
+// are not proportional.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('the ceiling rail', () => {
+  it('never inserts a trim too short to verify on a scale', () => {
+    // A range narrow enough that any trim inside it is a matter of days.
+    const tight = deriveRoadmap(
+      { ...REAL, phaseOrder: 'build_first', preBuildBf: 15.5, ceilingBf: 16 },
+      'balanced',
+    )!;
+    tight.phases.forEach((ph) => {
+      if (ph.kind !== 'trim') return;
+      const months = (ph.estMonths[0] + ph.estMonths[1]) / 2;
+      expect(months).toBeGreaterThanOrEqual(0.5);
+    });
+  });
+
+  it('still cycles when the trim is long enough to be a phase', () => {
+    // CUT FIRST, not build first. REAL stands at 20.4% and a 15% ceiling sits
+    // BENEATH them, so a build_first plan can never cross it and there is
+    // nothing for the rail to do — the first version of this test asserted a
+    // trim that no correct engine would produce.
+    const wide = deriveRoadmap(
+      { ...REAL, phaseOrder: 'cut_first', preBuildBf: 12, ceilingBf: 15 },
+      'balanced',
+    )!;
+    expect(wide.phases.some((ph) => ph.kind === 'trim')).toBe(true);
+    // The width rule survives as a fallback and as a control constraint, so the
+    // constant is still exported and still 2.
+    expect(MIN_RANGE_WIDTH_PCT).toBe(2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A GOAL PAST THE FRAME
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('feasibleGoalWeightKg', () => {
+  it('is set only when the goal is beyond the ceiling, and is lighter than it', () => {
+    // 60 kg wanting 100 kg needs 88 kg of lean, which is FFMI 27 at 1.80 m.
+    const wild: GoalsProfile = {
+      currentWeightKg: 60,
+      currentBodyFatPct: 12,
+      goalWeightKg: 100,
+      goalBodyFatPct: 13,
+      trainingState: 'consistent',
+      sex: 'male',
+      heightCm: 180,
+    };
+    const rm = deriveRoadmap(wild, 'balanced')!;
+    expect(rm.plausibility).toBe('beyond');
+    expect(rm.feasibleGoalWeightKg).toBeDefined();
+    expect(rm.feasibleGoalWeightKg!).toBeLessThan(100);
+    // And nothing is claimed for a goal that is merely ambitious.
+    expect(deriveRoadmap(REAL, 'balanced')!.feasibleGoalWeightKg).toBeUndefined();
   });
 });

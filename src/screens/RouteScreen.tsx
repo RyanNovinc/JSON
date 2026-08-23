@@ -77,18 +77,24 @@ import { frameZoneFor, evidenceTopicFor, type EvidenceTopic } from '../utils/rou
 import type {
   PhaseOrder,
   GoalsProfile,
-  PeakLeanness,
   RoutePreference,
   Sex,
   TrainingState,
 } from '../utils/goalsProfile';
-// A VALUE, not a type — it is called at load time to pick the order for a user
-// who has never been asked. goalsProfile was previously imported type-only here,
-// so this is a second, separate import line rather than a widened one.
-import { defaultPhaseOrder } from '../utils/goalsProfile';
 
 type Nav = StackNavigationProp<RootStackParamList>;
-type Beat = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+// 6 IS A DELIBERATE GAP, 24 Aug 2026. It asked a returning lifter for their
+// previous training peak, which fed the regain credit removed from roadmap.ts.
+// The later beats keep their numbers rather than closing up, because 9 and 10
+// are referenced as literals in the write gates in advance(), in helpFor(9),
+// and in routeCompletion.ts's resume map. Renumbering would touch every one of
+// those, and routeCompletion already records what happened the last time this
+// screen's beat order moved without its consumers.
+//
+// 6 is excluded from the union rather than left unused, so a stale
+// `startBeat: 6` from another screen is a compile error instead of a beat that
+// renders nothing.
+type Beat = 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10;
 
 /**
  * The three routes.
@@ -137,20 +143,95 @@ export const ORDER_OPTIONS: Array<{
   {
     id: 'cut_first',
     name: 'Get lean first',
-    // The two thumbs on the scale, and both are weak on purpose. Galgani 2025
-    // found a surplus started fatter deposits more fat per unit of surplus
-    // (sedentary, no exercise prescribed, [B]); and ICECAP found shorter diets
-    // easier to adhere to. Neither is a performance claim.
     gain: 'Lean in 5 months, and the cut is behind you.',
     cost: 'Not growing until it is done.',
   },
   {
     id: 'build_first',
     name: 'Start growing first',
-    // Deliberately the weaker case, stated as weakly as it deserves. Muscle IS
-    // the slow half — years against months — and that is the whole argument.
     gain: 'Growing from day one.',
     cost: 'Soft for most of it, and the cut waits until the end.',
+  },
+];
+
+/**
+ * THE ONE QUESTION BEAT 9 ASKS, 20 Aug 2026.
+ *
+ * It replaces the cut-first / build-first picker, which asked the user to
+ * order two halves of a plan they had not been shown yet. The question people
+ * actually have an answer to is whether they mind being soft on the way, and
+ * everything else falls out of it: staying lean means a range, and an opening
+ * cut if they stand above it today; not staying lean means no range at all,
+ * one build and one cut at the end, at any starting body fat.
+ *
+ * WHY THESE CARRY COPY WHEN THE PICKERS DELIBERATELY DO NOT. The rule on this
+ * screen has been "let the graph do the talking" since 18 Aug, and it held
+ * while the difference between the options WAS a shape. It is not any more:
+ * the difference people are choosing between is how they look for the next two
+ * years, and no chart draws a jawline or a shirt. One line each, a gain and a
+ * cost in the same breath, so it is a choice rather than a pitch.
+ */
+export type RouteId = 'lean' | 'bulk' | 'capped';
+
+/**
+ * THE ONE QUESTION BEAT 9 ASKS, and the three answers it takes.
+ *
+ * Two levers make every plan in this app: whether there is a CUT before the
+ * building starts, and whether there is a CEILING that interrupts it.
+ *
+ *   lean    both        cut into the range first, then live in it
+ *   bulk    neither     one build, one cut at the end, at any body fat
+ *   capped  ceiling     no opening cut, but a first leg run to a chosen peak
+ *
+ * The fourth corner — cut first, no ceiling — is incoherent: you would get lean
+ * and then drift upward forever.
+ *
+ * ORDER, deliberate: the two plain answers first, then the one that asks for a
+ * number. It costs the leanest-to-softest reading of the list and buys a list
+ * where the only option with a follow-on screen comes after the two that have
+ * none.
+ *
+ * WHY THESE CARRY COPY WHEN THE PICKERS DELIBERATELY DO NOT. "Let the graph do
+ * the talking" held while the difference between the options WAS a shape. It is
+ * not any more: what people are choosing between is how they look for the next
+ * two years, and no chart draws a jawline or a shirt. One line each, a gain and
+ * a cost in the same breath, so it is a choice rather than a pitch.
+ */
+export const ROUTE_CHOICES: Array<{
+  id: RouteId;
+  name: string;
+  line: (openingCut: boolean) => string;
+  gain: string;
+  cost: string;
+}> = [
+  {
+    id: 'lean',
+    name: 'Stay lean the whole way',
+    // Two versions, because someone already inside their range does not lose
+    // weight to get into it and the smaller-frame cost is not theirs.
+    line: (openingCut) =>
+      openingCut
+        ? 'More defined and a sharper jawline, but a smaller frame while you get there.'
+        : 'More defined the whole way, and never a long stretch of being soft.',
+    gain: 'Defined the whole way, and it shows in your face first.',
+    cost: 'A smaller frame while you get there, and more cuts to hold it.',
+  },
+  {
+    id: 'bulk',
+    name: 'Grow now, cut at the end',
+    line: () => 'Bigger sooner and filling out shirts, but softer the whole way.',
+    gain: 'Bigger sooner, filling out shirts, nothing interrupting the growing.',
+    cost: 'Softer the whole way through, and one long cut at the end.',
+  },
+  {
+    id: 'capped',
+    name: 'Grow now, up to a limit',
+    // Was "You set how big it gets and how far each cut takes you back", which
+    // describes the CONTROLS rather than the experience — the other two say what
+    // it is like to live on that route, and this one read like a settings menu.
+    line: () => 'Bigger sooner without going past a number you pick, but cutting back each time you get there.',
+    gain: 'Bigger sooner, without going past a number you choose.',
+    cost: 'Cutting back each time you reach it, and softer than lean the whole way.',
   },
 ];
 
@@ -312,72 +393,62 @@ function helpFor(beat: number, sex?: Sex): BeatHelp | null {
   }
   if (beat === 9) {
     /**
-     * CUT TO BULLETS, 18 Aug 2026. This was two paragraphs of prose plus five
-     * groups, 258 words, and it scrolled. Ryan's note: a user should not have
-     * to read an essay to understand two toggles.
+     * REWRITTEN 20 Aug 2026, when the beat stopped asking about ORDER and
+     * started asking whether the user wants to stay lean at all.
      *
-     * It matters more than it used to. The pickers themselves now carry no
-     * copy at all, so this sheet is the only place on beat 9 with words in it
-     * — which is an argument for it being SHARP, not for it being long.
+     * The screen carries one line per option now, which is a change from the
+     * wordless pickers this sheet used to be the only text for. That line is
+     * short on purpose and this is where the rest of it lives: what each
+     * choice looks like in the mirror, what it costs, and what nobody knows.
      *
-     * Three lines went for reasons worth keeping:
-     *  - the paragraph describing the muscle bracket, which explained the
-     *    chart to someone looking at the chart
-     *  - the "What decides the length" group, already answered by the
-     *    "why the range?" sheet, and contradicted here by the first line
-     *  - "cutting is easier now than two years in", a motivational hunch
-     *    sitting in a list of claims with papers behind them
+     * SAME LENGTH AS THE VERSION IT REPLACES. It was cut from 258 words to 93
+     * on 18 Aug because a user should not have to read an essay to understand
+     * two options, and that is still true.
      *
-     * The word "diet" appeared twice in the old version ("a clean end to the
-     * dieting", "short diets beat one long diet"). It is banned across this
-     * journey because a bulk is a diet too. Both now say cut.
+     * "diet" stays banned across this journey, because a bulk is a diet too.
      */
     return {
       title: 'Same finish either way',
-      // The dial cannot change the total. Opening cut plus final cut comes to
-      // the same fat whichever depth is chosen, because the fat the building
-      // adds is fixed by the surplus — so the trough cancels out of the sum.
-      // Stated first because a user assumes a faster setting exists.
+      // Stated first because a user assumes a faster option exists. Muscle is
+      // capped and the fat to shed is fixed, so both answers land in the same
+      // place in about the same time. What differs is the two years between.
       body:
-        'Same muscle, same total time at every setting. What you are choosing is when the hard part happens.',
+        'Same muscle, same total time either way. What you are choosing is how you look while you get there.',
       groups: [
         {
-          title: 'Take it off first',
+          title: 'Stay lean the whole way',
           points: [
-            'Lean in months, not years',
+            'Defined the whole way, and it shows in your face first',
             // Galgani 2025 measured a surplus started fatter depositing more
             // fat per unit of surplus (sedentary men, no exercise prescribed).
-            // Stated as a fat claim, never as a muscle one.
+            // A fat claim, never a muscle one.
             'A surplus started leaner adds less fat',
-            'Cost: the lowest weight you will see',
+            'Cost: a smaller frame while you get there, and more cuts to hold it',
           ],
         },
         {
-          title: 'Leave it for later',
+          title: 'Grow now, cut at the end',
           points: [
-            'Growing from day one, nothing to shed first',
+            'Bigger sooner, and never smaller than you are today',
             // Was "fall off partway", which assumed quitting. "Stop early"
             // also covers deciding you are big enough.
             'Stop early and you finish bigger, not just leaner',
-            'Cost: softer for longer, and one long cut at the end',
+            'Cost: softer the whole way through, and one long cut at the end',
           ],
         },
         {
-          // Its own group ON PURPOSE, and more so now that the pickers are
-          // wordless: this is the only text left on the screen, so the
+          // Its own group ON PURPOSE: the options each state a benefit, so the
           // uncertainty has to be as visible as the claims it qualifies.
           title: 'What is not known',
           points: [
-            'No trial has compared where to start',
+            'No trial has compared the two',
+            'Growing lean and growing soft have not been shown to build different amounts of muscle',
             'Reasoned defaults, not proven ones',
           ],
         },
       ],
-      // Trimmed to author and year. The journals were four lines of grey text
-      // in a box nobody reads at 10.5pt, and the names are what a curious user
-      // searches for anyway.
       sources:
-        'Helms 2023 \u00b7 Garthe 2013 \u00b7 Murphy and Koehler 2022 \u00b7 Galgani 2025'
+        'Helms 2023 \u00b7 Garthe 2013 \u00b7 Murphy and Koehler 2022 \u00b7 Galgani 2025',
     };
   }
   if (beat === 8) {
@@ -434,6 +505,50 @@ function useCountUp(target: number, run: boolean, ms = 750): number {
   return Math.round(value);
 }
 
+/**
+ * "GROW NOW, CUT AT THE END", expressed in the fields that exist.
+ *
+ * The engine has no concept of "no range". It does not need one: a top above
+ * where the build would drift to on its own never fires, which is exactly what
+ * not having a range means. So the answer is stored as a ceiling nobody could
+ * reach rather than as a fourth field, and `lean` is read back off it.
+ *
+ * TWO THINGS TO WATCH, both outside this file:
+ *  1. `operatingRangeFor` has to pass a CHOSEN top through unclamped, which is
+ *     what scoping the width and goal rules to chosen tops was for. If a plan
+ *     built this way still shows interruptions, that assumption is where to
+ *     look first.
+ *  2. `roadmap.band` now means the user's range, and JourneyChart draws it as a
+ *     shaded rect. A plan carrying this ceiling has a band running to the top
+ *     of the frame, so the plan chart for this answer needs the band suppressed
+ *     rather than drawn. That is a JourneyChart prop, not a change here.
+ */
+const NO_CEILING_BF = 99;
+
+/**
+ * WHICH STEPS EXIST FOR WHICH ANSWER.
+ *
+ *   0 the route  ·  1 the first question it opens  ·  2 the second  ·  3 the plan
+ *
+ * A screen that would have one possible answer is stepped over in BOTH
+ * directions rather than shown. Growing now with no limit opens nothing; the
+ * lean route opens the range; the capped route opens its peak and then the
+ * range, one question per screen.
+ */
+const STEPS: Record<RouteId, Array<0 | 1 | 2 | 3>> = {
+  lean: [0, 1, 3],
+  bulk: [0, 3],
+  capped: [0, 1, 2, 3],
+};
+const nextStep = (at: 0 | 1 | 2 | 3, r: RouteId) => {
+  const seq = STEPS[r];
+  return seq[Math.min(seq.indexOf(at) + 1, seq.length - 1)] ?? 3;
+};
+const prevStep = (at: 0 | 1 | 2 | 3, r: RouteId) => {
+  const seq = STEPS[r];
+  return seq[Math.max(seq.indexOf(at) - 1, 0)] ?? 0;
+};
+
 /** Wide enough that the falloff never shows an edge on any phone. */
 const GLOW = 760;
 
@@ -485,7 +600,7 @@ const PHASE_LABEL: Record<string, string> = {
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const SECTIONS: Array<{ label: string; beats: Beat[]; quiet?: boolean }> = [
-  { label: 'ABOUT YOU', beats: [1, 2, 3, 4, 5, 6] },
+  { label: 'ABOUT YOU', beats: [1, 2, 3, 4, 5] },
   { label: 'YOUR GOAL', beats: [7, 8] },
   { label: 'HOW YOU GET THERE', beats: [9] },
   // quiet: the summary names itself on the screen, so repeating it in the top
@@ -514,7 +629,23 @@ export default function RouteScreen() {
 
   const [profile, setProfile] = useState<GoalsProfile | null>(null);
   const [preference, setPreference] = useState<RoutePreference>('balanced');
-  const [order, setOrder] = useState<PhaseOrder>('cut_first');
+  /**
+   * THE BEAT 9 ANSWER. True means a range and the cuts that keep them inside
+   * it; false means one build and one cut at the end. `phaseOrder` is derived
+   * from this rather than asked, because "cut first" is only ever the answer
+   * of someone who wants to be lean and is not yet.
+   */
+  const [routeId, setRouteId] = useState<RouteId>('lean');
+  /** The capped route's first answer: the body fat they bulk UP TO. */
+  const [bulkTo, setBulkTo] = useState<number | null>(null);
+  /** The lit point on the plan chart, and its numbers. Opens on today. */
+  const [tapped, setTapped] = useState<{
+    i: number;
+    month: number;
+    bodyFatPct: number;
+    weightKg: number;
+    when: string;
+  } | null>(null);
   /**
    * THE RANGE, both edges. Null means untouched, so `operatingRangeFor`'s
    * default stands and the screen shows what the plan would do anyway.
@@ -530,7 +661,12 @@ export default function RouteScreen() {
    * intercept this before they touch `beat`, so the rest of the flow is
    * unaware of it.
    */
-  const [rangeStep, setRangeStep] = useState<0 | 1 | 2>(0);
+  /**
+   * 0 the route, 1 the first question that route opens, 2 the second (capped
+   * only), 3 the plan. Steps nobody asked for are stepped over in both
+   * directions rather than shown with one answer.
+   */
+  const [rangeStep, setRangeStep] = useState<0 | 1 | 2 | 3>(0);
   /**
    * A short settle on the number that just changed.
    *
@@ -635,9 +771,29 @@ export default function RouteScreen() {
         if (p?.routePreference) setPreference(p.routePreference);
         // No stored answer means not asked yet, so fall to the arithmetic
         // default rather than assuming a choice the user never made.
-        if (p) setOrder(p.phaseOrder ?? defaultPhaseOrder(p));
+        // Read back off the ceiling, since that is where the answer lives.
+        // A profile that has never been asked defaults to staying lean.
+        // The route is read back off the fields it wrote, so nothing has to be
+        // stored twice and an older profile lands somewhere sane.
+        if (p) {
+          setRouteId(
+            (p.ceilingBf ?? 0) >= NO_CEILING_BF
+              ? 'bulk'
+              : p.bulkToBf != null
+                ? 'capped'
+                : 'lean',
+          );
+          setBulkTo(p.bulkToBf ?? null);
+        }
         setBottom(p?.preBuildBf ?? null);
-        setTop(p?.ceilingBf ?? null);
+        // ── THE SENTINEL IS NOT A CEILING ─────────────────────────────────
+        //
+        // `ceilingBf` carries NO_CEILING_BF for the no-range route, which is how
+        // "no ceiling" is expressed. Loading that into `top` made it the user's
+        // CHOSEN top on every other route as well, so their band became 12 to 99
+        // and both range-carrying options drew a shaded block covering the whole
+        // canvas. Null here means "not chosen", which is what it actually is.
+        setTop(p?.ceilingBf != null && p.ceilingBf < NO_CEILING_BF ? p.ceilingBf : null);
         setBodyFat(emptyBodyFatValue(p?.currentBodyFatPct));
         setLoading(false);
       });
@@ -664,22 +820,119 @@ export default function RouteScreen() {
     return Math.round(((baseW + okW) / 2) * 2) / 2;
   }, [profile, provisionalGoalBf]);
 
-  const effProfile: GoalsProfile | null = profile
-    ? {
-        ...profile,
-        goalWeightKg: provisionalGoalW ?? undefined,
-        goalBodyFatPct: provisionalGoalBf,
-        phaseOrder: order,
-        preBuildBf: bottom ?? undefined,
-        ceilingBf: top ?? undefined,
-      }
-    : null;
+  /**
+   * The profile a plan is built from, for either answer.
+   *
+   * `phaseOrder: 'cut_first'` on the lean side is not a second question. The
+   * engine only opens with a cut when the user is actually above the bottom
+   * (`needsCut`), so someone already inside their range gets no opening phase
+   * from it — which is why the order does not have to be asked separately.
+   */
+  const planProfileFor = (r: RouteId): GoalsProfile | null => {
+    if (!profile) return null;
+    const base: GoalsProfile = {
+      ...profile,
+      goalWeightKg: provisionalGoalW ?? undefined,
+      goalBodyFatPct: provisionalGoalBf,
+      // cut_first is not a second question. The engine only opens with a cut
+      // when the user is actually ABOVE the bottom (`needsCut`), so someone
+      // already inside their range gets no opening phase from it.
+      phaseOrder: r === 'lean' ? 'cut_first' : 'build_first',
+      preBuildBf: bottom ?? undefined,
+      ceilingBf: undefined,
+    };
+
+    // Belt and braces on the sentinel trap: even a poisoned `top` cannot reach
+    // the engine as a chosen ceiling.
+    const chosen = top != null && top < NO_CEILING_BF ? top : null;
+
+    /**
+     * ── AN UNCHOSEN TOP DEFAULTS TO THE SUGGESTION, NOT THE OLD BAND ────────
+     *
+     * The fallback used to be the legacy route ceiling, which for the balanced
+     * band is 18. That is wide enough that a build never reaches it, so "stay
+     * lean the whole way" drew a single long climb with no cycling — the one
+     * option whose entire point is living inside a range showed a user never
+     * touching one. It also contradicted the very next screen, which recommends
+     * bottom + 3 in so many words.
+     *
+     * The measured objection to this change was that it re-plans about a
+     * quarter of EXISTING profiles onto a tighter band nobody asked for. That
+     * held when the range was invisible; it does not now, because every lean
+     * user passes through the screen that states this number and offers the
+     * link to it. A chosen top still wins over it in every case.
+     */
+    const suggested =
+      chosen == null ? (operatingRangeFor(base, preference)?.suggestedTop ?? null) : null;
+
+    return {
+      ...base,
+      ceilingBf: r === 'bulk' ? NO_CEILING_BF : (chosen ?? suggested ?? undefined),
+      bulkToBf: r === 'capped' ? (bulkTo ?? undefined) : undefined,
+    };
+  };
+
+  const effProfile: GoalsProfile | null = planProfileFor('lean');
+  const planProfile: GoalsProfile | null = planProfileFor(routeId);
+
+  // ── HOOKS LIVE ABOVE THE EARLY RETURNS ──────────────────────────────────
+  //
+  // These three sat further down beside the values they feed, which reads
+  // better and is illegal: this component returns null while the profile is
+  // loading, so a hook after that point runs on some renders and not others and
+  // React throws "Rendered more hooks than during the previous render". They
+  // read `profile?.` rather than the narrowed `currentBf` for the same reason.
+  /**
+   * Where a build with NO ceiling tops out on its own.
+   *
+   * Everything about the capped route depends on this number: a peak above it
+   * never fires, and the option silently becomes "grow now, cut at the end".
+   */
+  const driftTopBf = React.useMemo(() => {
+    const p = planProfileFor('bulk');
+    const rm = p ? deriveRoadmap(p, preference) : null;
+    if (!rm) return null;
+    return Math.round(
+      Math.max(profile?.currentBodyFatPct ?? 0, ...rm.phases.map((ph) => ph.exitBodyFatPct)) * 10,
+    ) / 10;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.currentWeightKg, profile?.currentBodyFatPct, provisionalGoalW, provisionalGoalBf, preference]);
+
+  /**
+   * NEVER DEFAULT A CONTROL TO A VALUE WHERE IT DOES NOTHING. Four points above
+   * today reads like a sensible bulk, and for a user with a small lean gap it
+   * sits ABOVE where their build tops out — so the third option would open as a
+   * copy of the second, with a number that can never fire.
+   */
+  const defaultBulkTo = React.useMemo(() => {
+    const now = profile?.currentBodyFatPct ?? 20;
+    const cap = driftTopBf != null ? driftTopBf - 0.5 : now + 4;
+    return Math.max(now + 2, Math.min(now + 4, Math.round(cap * 2) / 2));
+  }, [profile?.currentBodyFatPct, driftTopBf]);
+
+  const bulkAt = bulkTo ?? defaultBulkTo;
+  /** True while the number they set can never come into play. */
+  const bulkInert = driftTopBf != null && bulkAt >= driftTopBf;
+  /**
+   * The readout opens on TODAY rather than empty. It teaches the interaction by
+   * example, costs no words, and where they are standing right now is the first
+   * thing anyone wants off this chart.
+   */
+  React.useEffect(() => {
+    if (beat !== 9 || rangeStep !== 3 || tapped != null) return;
+    const w = profile?.currentWeightKg;
+    const bf = profile?.currentBodyFatPct;
+    if (w == null || bf == null) return;
+    setTapped({ i: 0, month: 0, bodyFatPct: bf, weightKg: w, when: 'today' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beat, rangeStep]);
+
 
   // deriveRoadmap walks the whole phase sequence, and this used to run on every
   // render, which meant every frame of a drag. Keyed on the scalars it actually
   // reads rather than on effProfile, which is a fresh object each render.
   const roadmap: Roadmap | null = React.useMemo(
-    () => (effProfile ? deriveRoadmap(effProfile, preference) : null),
+    () => (planProfile ? deriveRoadmap(planProfile, preference) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       profile?.currentWeightKg,
@@ -689,7 +942,8 @@ export default function RouteScreen() {
       provisionalGoalW,
       provisionalGoalBf,
       preference,
-      order,
+      routeId,
+      bulkTo,
       bottom,
       top,
     ],
@@ -732,21 +986,35 @@ export default function RouteScreen() {
    * eight roadmap derivations rather than one per frame.
    */
   /**
-   * The route into the range. A REAL input again since 20 Aug: it owns whether
-   * there is an opening cut and nothing else, so choosing it cannot disturb the
-   * range set on the previous screen.
+   * The beat 9 answer, written the moment it is tapped.
+   *
+   * Both fields move together on purpose: the ceiling IS the answer, and a
+   * phaseOrder left saying cut_first beside a ceiling of 99 would describe a
+   * plan nobody chose. Returning to lean restores whatever range they had
+   * already set, or the resolved default if they never touched it.
    */
-  const chooseOrder = async (next: PhaseOrder) => {
-    setOrder(next);
-    await updateGoalsProfileField('phaseOrder', next);
+  const chooseRoute = async (next: RouteId) => {
+    setRouteId(next);
+    await updateGoalsProfileField('phaseOrder', next === 'lean' ? 'cut_first' : 'build_first');
+    if (next === 'bulk') {
+      // The ceiling IS the answer here, so both fields move together: a
+      // phaseOrder saying build_first beside a real ceiling would describe the
+      // capped plan rather than this one.
+      await updateGoalsProfileField('ceilingBf', NO_CEILING_BF);
+      await updateGoalsProfileField('bulkToBf', undefined);
+      return;
+    }
+    const base = planProfileFor('lean');
+    const r = base ? operatingRangeFor(base, preference) : null;
+    if (r) await updateGoalsProfileField('ceilingBf', top ?? r.top);
+    if (next === 'capped') {
+      const start = bulkTo ?? defaultBulkTo;
+      setBulkTo(start);
+      await updateGoalsProfileField('bulkToBf', start);
+    } else {
+      await updateGoalsProfileField('bulkToBf', undefined);
+    }
   };
-
-  /**
-   * Beat 5 (the training peak) exists only for a returning lifter, so it is
-   * stepped over in BOTH directions. Skipping forward only would trap anyone
-   * who reached beat 6 and pressed back.
-   */
-  const skipsPeakBeat = profile?.trainingState !== 'returning';
 
   const back = () => {
     // In single beat mode there is no previous beat to return to: the user
@@ -759,10 +1027,12 @@ export default function RouteScreen() {
     // is stepped over in BOTH directions when it does not apply — skipping it
     // forward only would trap someone who reached the plan and pressed back.
     if (beat === 9 && rangeStep > 0) {
-      setRangeStep(rangeStep === 2 && !routeMatters ? 0 : ((rangeStep - 1) as 0 | 1 | 2));
+      setRangeStep(prevStep(rangeStep, routeId));
       return;
     }
-    const prev = beat === 7 && skipsPeakBeat ? 5 : beat - 1;
+    // 5 -> 7 in both directions: 6 no longer exists. This was a conditional
+    // skip for non-returning lifters until the peak beat was removed.
+    const prev = beat === 7 ? 5 : beat - 1;
     goToBeat(prev as Beat, -1);
   };
 
@@ -791,16 +1061,24 @@ export default function RouteScreen() {
     // closure must not depend on having reached them.
     if (beat === 9 && profile != null && effProfile != null) {
       const r = operatingRangeFor(effProfile, preference);
-      if (r) {
+      // The answer is written whether or not it was tapped, because it opens on
+      // a default and accepting a default is still a choice. The ceiling is
+      // written unconditionally on the no-range side: leaving a stale one there
+      // is the difference between one cut and five.
+      await patch('phaseOrder', routeId === 'lean' ? 'cut_first' : 'build_first');
+      await patch('bulkToBf', routeId === 'capped' ? (bulkTo ?? defaultBulkTo) : undefined);
+      if (routeId === 'bulk') await patch('ceilingBf', NO_CEILING_BF);
+      else if (r) {
         if (profile.preBuildBf == null) await patch('preBuildBf', r.bottom);
-        if (profile.ceilingBf == null) await patch('ceilingBf', r.top);
-        if (profile.phaseOrder == null) await patch('phaseOrder', order);
+        if (profile.ceilingBf == null || profile.ceilingBf >= NO_CEILING_BF) {
+          await patch('ceilingBf', top ?? r.top);
+        }
       }
     }
 
     // Beat 9's sub-steps advance before the beat does.
-    if (beat === 9 && rangeStep < 2) {
-      setRangeStep(rangeStep === 0 && !routeMatters ? 2 : ((rangeStep + 1) as 0 | 1 | 2));
+    if (beat === 9 && rangeStep < 3) {
+      setRangeStep(nextStep(rangeStep, routeId));
       return;
     }
     if (beat === 8) {
@@ -822,7 +1100,7 @@ export default function RouteScreen() {
       return;
     }
     if (beat < 10) {
-      const next = beat === 5 && skipsPeakBeat ? 7 : beat + 1;
+      const next = beat === 5 ? 7 : beat + 1;
       goToBeat(next as Beat, 1);
     } else setConfirming(true);
   };
@@ -911,9 +1189,6 @@ export default function RouteScreen() {
   if (!profile) return null;
 
   const currentWeight = profile.currentWeightKg ?? 77;
-  /** Defaults to their current weight: a returning lifter's peak is usually
-   *  near it, and starting the ruler somewhere arbitrary costs them a drag. */
-  const peakWeight = profile.peakWeightKg ?? currentWeight;
   const currentHeight = profile.heightCm ?? 175;
   const imperial = globalUnit === 'lbs';
   const currentBf = profile.currentBodyFatPct;
@@ -934,12 +1209,29 @@ export default function RouteScreen() {
   const rangeMatters = range != null;
   const leanStop = leanStopFor(profile.sex);
   /**
-   * THE ROUTE QUESTION ONLY EXISTS WHEN THEY START OUTSIDE THEIR RANGE. Someone
-   * already inside it has nothing to get into, so the screen is skipped rather
-   * than shown with one answer — the same rule that hid the order picker.
+   * Whether staying lean starts with a cut. It decides one line of copy on the
+   * option and nothing else — the engine makes the same call itself through
+   * `needsCut`, so this can neither put an opening phase on a plan nor take
+   * one off it.
    */
-  const routeMatters =
-    range != null && currentBf != null && currentBf > range.top + 0.2;
+  /**
+   * The peak, in half points. Floored two above where they stand, because a
+   * peak at today's body fat is not a bulk, and unbounded above — a number
+   * above the drift top is allowed and the screen says it will not fire rather
+   * than refusing it.
+   */
+  const nudgeBulk = (delta: number) => {
+    const now = currentBf ?? 0;
+    const next = Math.max(now + 2, Math.round((bulkAt + delta) * 2) / 2);
+    if (next === bulkAt) return;
+    setBulkTo(next);
+    void updateGoalsProfileField('bulkToBf', next);
+  };
+
+  const routeName = (ROUTE_CHOICES.find((o) => o.id === routeId) ?? ROUTE_CHOICES[0]).name;
+
+  const openingCut =
+    range != null && currentBf != null && currentBf > range.bottom + 0.2;
   const noCutNeeded = (roadmap?.gapKg ?? 0) > 0;
   const exits = roadmap?.phases.map((ph) => ph.exitBodyFatPct) ?? [];
 
@@ -983,21 +1275,6 @@ export default function RouteScreen() {
         );
   const cutCount = roadmap?.phases.filter((ph) => ph.kind === 'trim' || ph.kind === 'reveal').length ?? 0;
   const fmtKg = (kg: number) => (imperial ? `${Math.round(kgToLb(kg))} lbs` : `${kg.toFixed(1)} kg`);
-  /**
-   * The summary row's value line, and the reason hiding the pickers is not the
-   * same as hiding the choice: whatever the defaults resolved to is stated on
-   * the screen in words before it is ever persisted.
-   *
-   * Built from whichever axes actually apply. With both hidden this string is
-   * never rendered — the forced-plan sentence takes its place.
-   */
-  // Was the order's name ("Get lean first") until the dial replaced the order
-  // picker on 20 Aug. It states the number the user is about to accept, in the
-  // unit they set it in, because the row exists to make the default visible
-  // before `advance` writes it.
-  const runSummary =
-    opener?.kind === 'trim' ? `Down to ${fmtKg(lowestKg)} first` : 'Straight into growing';
-
   /**
    * Both edges as the user is currently setting them. `range` has already
    * clamped whatever is in state, so these are what the plan is actually built
@@ -1068,10 +1345,7 @@ export default function RouteScreen() {
     (beat === 2 && profile.sex == null) ||
     // Same rule as the sex beat: an unanswered single-choice question must not
     // be walkable past, or the create-path default becomes the answer.
-    (beat === 5 && !trainingStateAnswered) ||
-    // The skip link below advances on its own, so this only gates the case
-    // where the user is still deciding.
-    (beat === 6 && profile.peakLeanness == null);
+    (beat === 5 && !trainingStateAnswered);
   const beatHelp = helpFor(beat, profile.sex);
   const section = sectionFor(beat);
 
@@ -1099,7 +1373,6 @@ export default function RouteScreen() {
     3: 'Continue',
     4: 'Continue',
     5: 'Continue',
-    6: 'Continue',
     7: 'Continue',
     8: 'Continue',
     9: 'See the whole plan',
@@ -1110,7 +1383,7 @@ export default function RouteScreen() {
   // "See the whole plan" under a range that has not been turned into a plan yet
   // promises the next tap does something it does not.
   const ctaLabel =
-    beat === 9 && rangeMatters && rangeStep < 2 ? 'Continue' : CTA[beat];
+    beat === 9 && rangeMatters && rangeStep < 3 ? 'Continue' : CTA[beat];
 
   // Only shown when there is something to warn about. Printing "in range for a
   // drug-free lifter" under every ordinary choice is the app congratulating the
@@ -1412,107 +1685,25 @@ export default function RouteScreen() {
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
-        {/* Conditional: only a returning lifter has a peak to describe. These
-            two fields feed splitGap and the regain credit, and on a traced
-            profile crediting regain moved the estimate from 2.5-5.3 years to
-            1.7-3.4 — the difference between a plan someone starts and one they
-            don't. Leanness is three coarse choices because nobody remembers
-            their body fat from four years ago. */}
-        {beat === 6 ? (
-          <View style={styles.beat1Body}>
-            <Text style={styles.beatLabel}>WHAT YOU PEAKED AT</Text>
-            <View style={styles.bigNum}>
-              <Text style={styles.bigValue}>
-                {Math.round(imperial ? kgToLb(peakWeight) : peakWeight)}
-              </Text>
-              <Text style={styles.bigUnit}>{imperial ? 'lbs' : 'kg'}</Text>
-            </View>
-            <ScaleRuler
-              value={imperial ? Math.round(kgToLb(peakWeight)) : Math.round(peakWeight * 10) / 10}
-              min={imperial ? 77 : 35}
-              max={imperial ? 440 : 200}
-              step={imperial ? 1 : 0.5}
-              pxPerUnit={imperial ? 6 : 13}
-              // The fractional-value guard is not optional at step 0.5:
-              // Math.round(69.5) is 70, so without it every multiple of five is
-              // major twice and formatLabel prints the same number half a unit
-              // apart. Same condition the current-weight beat uses.
-              isMajor={(v) =>
-                Math.round(v) % (imperial ? 10 : 5) === 0 && Math.abs(v - Math.round(v)) < 0.01
-              }
-              formatLabel={(v) => String(Math.round(v))}
-              onChange={(next) => patch('peakWeightKg', imperial ? lbToKg(next) : next)}
-              themeColor={themeColor}
-            />
+        {/* BEAT 6 WAS HERE. It asked a returning lifter for their peak weight
+            and how lean they were at it, the two inputs to splitGap and the
+            regain credit. Both were removed on 24 Aug 2026 — see the
+            regain-removal note in roadmap.ts.
 
-            <Text style={[styles.beatLabel, styles.peakLeanLabel]}>AND HOW YOU LOOKED THERE</Text>
-            <View style={styles.leanRow}>
-              {([
-                ['lean', 'Lean', 'Abs visible'],
-                ['average', 'Average', 'Solid, soft'],
-                ['soft', 'Soft', 'Carrying it'],
-              ] as Array<[PeakLeanness, string, string]>).map(([value, label, hint]) => {
-                const active = profile.peakLeanness === value;
-                return (
-                  <TouchableOpacity
-                    key={value}
-                    style={[
-                      styles.leanPick,
-                      active && { borderColor: themeColor, backgroundColor: '#101a1d' },
-                    ]}
-                    onPress={() => patch('peakLeanness', value)}
-                    activeOpacity={0.85}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                  >
-                    <Text style={[styles.leanName, active && { color: themeColor }]}>{label}</Text>
-                    <Text style={styles.leanHint}>{hint}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            The number quoted here for years was the case FOR the feature: on a
+            traced profile crediting regain moved the estimate from 2.5-5.3
+            years to 1.7-3.4. That is exactly the size of what the removal gives
+            back, and it is the reason to be honest about the cost rather than
+            to restore it: the multiplier producing that shortening ran the
+            effective regain rate to 0.458 kg/week against
+            MAX_LEAN_GAIN_KG_PER_WEEK = 0.23, the one constant here graded [A].
 
-            {/* A LINK, not a fourth option in the row above. That row answers
-                "how did you look"; this answers "do you know". Inline it and
-                not knowing reads as a way of having looked.
-
-                Clears BOTH peak fields. A dragged weight with no leanness is
-                the half-answer that produces a wrong regain credit, which is
-                the external review's specific warning about reconstructing
-                prior lean mass from a remembered number. */}
-            <TouchableOpacity
-              style={styles.notSure}
-              onPress={async () => {
-                // Clears BOTH fields and moves on. A dragged weight with no
-                // leanness is the half-answer that produces a wrong regain
-                // credit, and unset fields are already exactly how splitGap
-                // reads "no previous peak" — so the estimate degrades to the
-                // conservative case rather than resting on a remembered guess.
-                //
-                // AWAITED IN SEQUENCE, and that is not stylistic.
-                // updateGoalsProfileField is read-modify-write: it loads the
-                // whole profile, sets one field and saves it back. Firing both
-                // without awaiting lets the second load happen before the first
-                // save lands, so the second write restores the peak weight the
-                // first just cleared. splitGap only bails on a MISSING WEIGHT,
-                // so the survivor would produce a regain credit from a number
-                // the user just told us they do not remember.
-                await patch('peakWeightKg', undefined);
-                await patch('peakLeanness', undefined);
-                advance();
-              }}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
-              accessibilityRole="button"
-              accessibilityLabel="Do not remember, skip this question"
-            >
-              <Text style={styles.notSureText}>
-                {'Don\u2019t remember? '}
-                <Text style={[styles.notSureLink, { color: themeColor }]}>Skip this</Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
+            The skip link this beat carried is worth remembering separately. It
+            cleared BOTH fields and awaited them in sequence, because
+            updateGoalsProfileField is read-modify-write and firing the two
+            without awaiting let the second load beat the first save, restoring
+            the weight the user had just said they did not remember. Any future
+            beat that clears more than one field at once has the same hazard. */}
 
         {/* ---------------------------------------------------------------- */}
         {beat === 3 ? (
@@ -1652,28 +1843,171 @@ export default function RouteScreen() {
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
-        {/* ── BEAT 9, SCREEN 1 OF 3: THE RANGE ────────────────────────────
-            Set before any plan is drawn, because no plan has been chosen yet.
-            The chart is the same component and the same geometry as screens 2
-            and 3, in `bandOnly` mode, so the band does not move between them
-            and the line simply arrives on the next screen. */}
-        {beat === 9 && roadmap && rangeStep === 0 && rangeMatters && range ? (
+        {/* ── BEAT 9, SCREEN 1 OF 3: STAY LEAN, OR NOT ─────────────────────
+            This was asked second, and asked as an ORDER: "you are above that
+            today, get in now or later". Wrong question, wrong place. The user
+            was made to set a body fat range before anything had told them that
+            growing from where they are was allowed, so the range read as a
+            rule they had to obey rather than as a setting.
+
+            Asked this way it decides everything after it. Staying lean means
+            there is a range, and an opening cut if they stand above it today.
+            Not staying lean means there is no range at all: one build, one cut
+            at the end, whatever body fat they start from — the same answer at
+            20% and at 15%, where the old model quietly gave two different ones
+            depending on whether the ceiling happened to sit above or below
+            where the user was standing. */}
+        {beat === 9 && roadmap && rangeStep === 0 && rangeMatters ? (
           <>
             <View style={styles.beat1Body}>
-              {/* SAYS BODY FAT. "What range" named no unit at all, on a screen
-                  whose only other numbers are percentages beside the word TOP,
-                  so the thing being set was left to be inferred. */}
-              <Text style={styles.rangeQ}>
-                Where should your body fat sit while you grow?
-              </Text>
-              {/* TELLS THEM THE NEXT QUESTION EXISTS. This is the first screen
-                  of the three, so a band with no context reads as a rule they
-                  have to obey — that they must get inside some percentage
-                  before they are allowed to build. The choice to grow from
-                  where they are is on the very next screen, and one line here
-                  is the difference between a constraint and a setting. */}
+              <Text style={styles.rangeQ}>Do you want to stay lean while you grow?</Text>
               <Text style={styles.rangeSub}>
-                Next: cut into it first, or grow from where you are.
+                {`You are at ${Math.round(currentBf ?? 0)}% body fat today. Both finish at ${Math.round(provisionalGoalBf)}%.`}
+              </Text>
+
+              <View style={styles.edgeRows}>
+                {ROUTE_CHOICES.map((opt) => {
+                  const on = routeId === opt.id;
+                  // Each option previews ITS OWN plan, through the same
+                  // function that builds the real one. The miniature is the
+                  // shape; the count underneath is what that shape costs.
+                  const pp = planProfileFor(opt.id);
+                  const preview = pp ? deriveRoadmap(pp, preference) : null;
+                  const n =
+                    preview?.phases.filter((ph) => ph.kind === 'trim' || ph.kind === 'reveal')
+                      .length ?? 0;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={styles.optRow}
+                      onPress={() => chooseRoute(opt.id)}
+                      activeOpacity={0.85}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: on }}
+                      accessibilityLabel={`${opt.name}. ${opt.gain} ${opt.cost}`}
+                    >
+                      {preview ? (
+                        <View style={styles.optMini}>
+                          <JourneyChart
+                            profile={profile}
+                            roadmap={preview}
+                            color={on ? themeColor : '#54545e'}
+                            compact
+                            // No band on the route that has no range. It is the
+                            // one option where a shaded region is a claim about
+                            // a question the user was never asked.
+                            band={opt.id !== 'bulk'}
+                          />
+                        </View>
+                      ) : null}
+                      <View style={styles.optMain}>
+                        <Text style={[styles.optName, on && styles.optNameOn]}>{opt.name}</Text>
+                        <Text style={styles.optWhy}>{opt.line(openingCut)}</Text>
+                        <Text style={styles.optMeta}>{CUT_WORDS[n] ?? `${n} cuts`}</Text>
+                      </View>
+                      <View style={[styles.optDot, on && { backgroundColor: themeColor }]} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        ) : null}
+
+        {/* ── BEAT 9, SCREEN 2 OF 3: THE RANGE ────────────────────────────
+            Only reachable for someone who said they want to stay lean, because
+            it is the question that answer opens. Choosing to grow instead is
+            not a control being hidden: it removes a question with no meaning
+            for a plan that has no ceiling, and the way back to it is the
+            answer that removed it, through the row on the plan screen. */}
+        {/* ── BEAT 9, THE CAPPED ROUTE'S FIRST QUESTION ────────────────────
+            The mirror of the opening cut, and the reason `bulkToBf` exists. It
+            is a TARGET, not a region, so the chart draws one solid rule and
+            shades nothing — the range screens shade, because a range is a
+            region, and the two must not look like the same claim. */}
+        {beat === 9 && roadmap && rangeMatters && rangeStep === 1 && routeId === 'capped' ? (
+          <>
+            <View style={styles.beat1Body}>
+              <Text style={styles.rangeQ}>How big do you get before your first cut?</Text>
+              <Text style={styles.rangeSub}>
+                You grow from where you are today up to this point, then cut back.
+              </Text>
+              <JourneyChart
+                profile={profile}
+                roadmap={roadmap}
+                color={themeColor}
+                bare
+                bandOnly
+                frame
+                targetPct={bulkAt}
+              />
+
+              <View style={styles.edgeRows}>
+                <View style={styles.edgeRow}>
+                  <Text style={styles.edgeKey}>BULK UP TO</Text>
+                  <View style={styles.edgeCtl}>
+                    <TouchableOpacity
+                      style={[styles.stepBtn, bulkAt <= (currentBf ?? 0) + 2 && styles.stepBtnOff]}
+                      onPress={() => nudgeBulk(-0.5)}
+                      disabled={bulkAt <= (currentBf ?? 0) + 2}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Lower the body fat you bulk up to"
+                    >
+                      <Text style={styles.stepGlyph}>{'\u2212'}</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.edgeVal}>{bulkAt}%</Text>
+                    <TouchableOpacity
+                      style={styles.stepBtn}
+                      onPress={() => nudgeBulk(0.5)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Raise the body fat you bulk up to"
+                    >
+                      <Text style={styles.stepGlyph}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              {/* A limit explains itself only while you are standing on it. Above
+                  the drift top the answer does nothing at all, and saying so is
+                  better than drawing a plan identical to the option above. */}
+              {bulkInert ? (
+                <View style={styles.rangeLimitRow}>
+                  <View style={styles.rangeLimitDot} />
+                  <Text style={styles.rangeLimitText}>
+                    {`Your build tops out at ${driftTopBf}%, so anything above that never comes into play.`}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </>
+        ) : null}
+
+        {beat === 9 &&
+        roadmap &&
+        rangeMatters &&
+        range &&
+        rangeStep === (routeId === 'capped' ? 2 : 1) &&
+        routeId !== 'bulk' ? (
+          <>
+            <View style={styles.beat1Body}>
+              <Text style={styles.rangeQ}>
+                {routeId === 'capped'
+                  ? 'Where do you sit after that cut?'
+                  : 'Where should your body fat sit while you grow?'}
+              </Text>
+              {/* THE RECOMMENDATION, STATED UP FRONT. This line used to
+                  describe the mechanism ("a build that reaches the top is
+                  interrupted for a cut"), which explains the machine to
+                  someone who only wants to know what to pick. The suggestion
+                  is a convention three points wide, and it says so by being
+                  offered rather than defended. */}
+              <Text style={styles.rangeSub}>
+                {routeId === 'capped'
+                  ? `You stay in this range while you finish growing. The last cut is the one that takes you to ${Math.round(provisionalGoalBf)}%.`
+                  : `We recommend ${range.suggestedBottom} to ${range.suggestedTop}%.`}
               </Text>
               <JourneyChart
                 profile={profile}
@@ -1685,13 +2019,9 @@ export default function RouteScreen() {
                 leanStopPct={leanStop}
               />
 
-              {/* Hairline rows rather than cards. Four boxed surfaces on beat 9
-                  was the thing that got it called messy on 18 Aug, and a range
-                  is one setting with two ends, not two objects. */}
-              {/* TOP ABOVE BOTTOM, matching the chart directly above them. The
-                  first pass had them the other way round and the rows argued
-                  with the picture: the value labelled BOTTOM sat higher on the
-                  screen than the one labelled TOP. */}
+              {/* Hairline rows rather than cards, and TOP above BOTTOM so they
+                  match the chart directly above them. The first pass had them
+                  the other way round and the rows argued with the picture. */}
               <View style={styles.edgeRows}>
                 {([
                   { key: 'hi' as const, label: 'TOP', v: bandHi, dis: atMinWidth, a: hiPulse },
@@ -1730,7 +2060,7 @@ export default function RouteScreen() {
               </View>
 
               {/* Each limit explains itself ONLY while someone is standing on
-                  it. A screen that carries both warnings permanently teaches
+                  it. A screen carrying both warnings permanently teaches
                   people to stop reading them. */}
               {atLeanStop ? (
                 <TouchableOpacity
@@ -1761,8 +2091,8 @@ export default function RouteScreen() {
                 </TouchableOpacity>
               ) : null}
 
-              {/* A link, never a mode. The suggestion is three points wide, a
-                  convention rather than a finding, so it sits out of the way. */}
+              {/* A link, never a mode, and now a restatement of the line at the
+                  top rather than an introduction of it. */}
               {bandLo !== range.suggestedBottom || bandHi !== range.suggestedTop ? (
                 <TouchableOpacity onPress={useSuggested} activeOpacity={0.7}>
                   <Text style={styles.suggestLink}>
@@ -1774,93 +2104,12 @@ export default function RouteScreen() {
           </>
         ) : null}
 
-        {/* ── BEAT 9, SCREEN 2 OF 3: GETTING INTO IT ──────────────────────
-            Only reachable when they start ABOVE their range, which is the only
-            case where there is a question. Each option carries a miniature of
-            its own shape, because the difference between them is a shape. */}
-        {beat === 9 && roadmap && rangeStep === 1 && routeMatters ? (
-          <>
-            <View style={styles.beat1Body}>
-              <Text style={styles.rangeQ}>
-                You are above that today. Get in now, or later?
-              </Text>
-              <Text style={styles.rangeSub}>
-                {`Either way you finish at ${Math.round(provisionalGoalBf)}%. This is when the cutting happens.`}
-              </Text>
-              <JourneyChart
-                profile={profile}
-                roadmap={roadmap}
-                color={themeColor}
-                bare
-                frame
-                muscleKg={
-                  roadmap.gapKg != null && roadmap.gapKg > 0 ? Math.round(roadmap.gapKg) : undefined
-                }
-              />
-
-              <View style={styles.edgeRows}>
-                {ORDER_OPTIONS.map((opt) => {
-                  const on = order === opt.id;
-                  const preview = effProfile
-                    ? deriveRoadmap({ ...effProfile, phaseOrder: opt.id }, preference)
-                    : null;
-                  const n =
-                    preview?.phases.filter((ph) => ph.kind === 'trim' || ph.kind === 'reveal')
-                      .length ?? 0;
-                  return (
-                    <TouchableOpacity
-                      key={opt.id}
-                      style={styles.optRow}
-                      onPress={() => chooseOrder(opt.id)}
-                      activeOpacity={0.85}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: on }}
-                      accessibilityLabel={`${opt.name}. ${opt.gain} ${opt.cost}`}
-                    >
-                      {preview ? (
-                        <View style={styles.optMini}>
-                          <JourneyChart
-                            profile={profile}
-                            roadmap={preview}
-                            color={on ? themeColor : '#54545e'}
-                            sparkline
-                          />
-                        </View>
-                      ) : null}
-                      <View style={styles.optMain}>
-                        <Text style={[styles.optName, on && styles.optNameOn]}>{opt.name}</Text>
-                        <Text style={styles.optMeta}>
-                          {CUT_WORDS[n] ?? `${n} cuts`}
-                        </Text>
-                      </View>
-                      <View style={[styles.optDot, on && { backgroundColor: themeColor }]} />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={styles.edgeRows}>
-                <View style={styles.edgeRow}>
-                  <Text style={styles.edgeKey}>LOWEST</Text>
-                  <Text style={styles.edgeVal}>{fmtKg(lowestKg)}</Text>
-                </View>
-                <View style={styles.edgeRow}>
-                  <Text style={styles.edgeKey}>SOFTEST</Text>
-                  <Text style={styles.edgeVal}>
-                    {softestKg != null ? fmtKg(softestKg) : '\u2014'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </>
-        ) : null}
-
         {/* ── BEAT 9, SCREEN 3 OF 3: THE PLAN ─────────────────────────────
             The summary, unchanged in structure from what it was before the
             range existed: it is the confidence moment, and it now has no
             controls on it at all. The two rows state what was chosen and jump
             back to the screen that owns each. */}
-        {beat === 9 && roadmap && (rangeStep === 2 || !rangeMatters) ? (
+        {beat === 9 && roadmap && (rangeStep === 3 || !rangeMatters) ? (
           <>
             <View style={styles.beat1Body}>
               {/* ── The destination, stated plainly ──────────────────────
@@ -1896,6 +2145,12 @@ export default function RouteScreen() {
                 color={themeColor}
                 bare
                 frame
+                yearLines
+                // A plan with no range carries a fallback ceiling nobody chose,
+                // and shading it would show a rule the user never set.
+                band={routeId !== 'bulk'}
+                onSelectNode={(nd, i) => setTapped(tapped?.i === i ? null : { ...nd, i })}
+                selectedNode={tapped?.i ?? null}
                 muscleKg={roadmap.gapKg != null && roadmap.gapKg > 0 ? Math.round(roadmap.gapKg) : undefined}
               />
               <View style={styles.chartEnds}>
@@ -1916,37 +2171,98 @@ export default function RouteScreen() {
                 <Text style={[styles.whyRange, { color: themeColor }]}>why the range?</Text>
               </TouchableOpacity>
 
+              {/* ── WHAT YOU WEIGH ALONG THE WAY ────────────────────────────
+                  Body fat percent is abstract and the scale is not: someone at
+                  82 kg who already feels small reads "a cut" as nothing until it
+                  says 78 kg. Every point carries its OWN weight, because lean
+                  mass grows across the plan and the same body fat is a different
+                  number depending on when you stand on it.
+
+                  A readout rather than a bubble over the point: at four years
+                  the boundaries sit about thirty points apart, and a callout
+                  covers the neighbours you are comparing against. It opens on
+                  today so the tap teaches itself. */}
+              <View style={styles.readout}>
+                {tapped ? (
+                  <>
+                    <View style={styles.readCell}>
+                      <Text style={styles.readKey}>WEIGHT</Text>
+                      <Text style={styles.readVal}>{tapped.weightKg.toFixed(1)} kg</Text>
+                    </View>
+                    <View style={styles.readCell}>
+                      <Text style={styles.readKey}>BODY FAT</Text>
+                      <Text style={styles.readVal}>{tapped.bodyFatPct.toFixed(1)}%</Text>
+                    </View>
+                    <View style={[styles.readCell, { flex: 1.3 }]}>
+                      <Text style={styles.readKey}>WHEN</Text>
+                      <Text style={styles.readVal}>
+                        {tapped.month < 0.5 ? 'Now' : `Month ${Math.round(tapped.month)}`}
+                      </Text>
+                      <Text style={styles.readSub}>{tapped.when}</Text>
+                    </View>
+                  </>
+                ) : (
+                  <Text style={styles.readHint}>Tap any point on the line.</Text>
+                )}
+              </View>
+
               {/* NO CONTROLS HERE. Each row states a choice and jumps back to
                   the screen that owns it, which is also the revisit path — the
                   choice is never buried behind a settings menu. */}
-              {rangeMatters && range ? (
+              {rangeMatters ? (
                 <View style={styles.edgeRows}>
                   <TouchableOpacity
                     style={styles.edgeRow}
                     onPress={() => setRangeStep(0)}
                     activeOpacity={0.7}
                     accessibilityRole="button"
-                    accessibilityLabel={`Your range, ${bandLo} to ${bandHi} percent. Tap to change.`}
+                    accessibilityLabel={`${routeName}, ${
+                      CUT_WORDS[cutCount] ?? `${cutCount} cuts`
+                    }. Tap to change.`}
                   >
                     <View>
-                      <Text style={styles.edgeKey}>YOUR RANGE</Text>
-                      <Text style={styles.edgeLine}>{`${bandLo} to ${bandHi}%`}</Text>
+                      <Text style={styles.edgeKey}>HOW YOU GROW</Text>
+                      <Text style={styles.edgeLine}>
+                        {`${routeName} \u00b7 ${(
+                          CUT_WORDS[cutCount] ?? `${cutCount} cuts`
+                        ).toLowerCase()}`}
+                      </Text>
                     </View>
                     <Text style={[styles.edgeChange, { color: themeColor }]}>Change</Text>
                   </TouchableOpacity>
-                  {routeMatters ? (
+                  {/* NO ROW FOR A QUESTION THAT WAS NOT ASKED. Someone who
+                      chose to grow now was never shown a range, so there is
+                      nothing here to state and nothing to explain about its
+                      absence. The way back is the row above. */}
+                  {/* NO ROW FOR A QUESTION THAT WAS NOT ASKED. */}
+                  {routeId === 'capped' ? (
                     <TouchableOpacity
                       style={styles.edgeRow}
                       onPress={() => setRangeStep(1)}
                       activeOpacity={0.7}
                       accessibilityRole="button"
-                      accessibilityLabel={`${runSummary}. Tap to change.`}
+                      accessibilityLabel={`Bulk up to ${bulkAt} percent. Tap to change.`}
                     >
                       <View>
-                        <Text style={styles.edgeKey}>GETTING IN</Text>
-                        <Text style={styles.edgeLine}>
-                          {`${runSummary} \u00b7 ${CUT_WORDS[cutCount] ?? `${cutCount} cuts`}`}
+                        <Text style={styles.edgeKey}>BULK UP TO</Text>
+                        <Text style={styles.edgeLine}>{`${bulkAt}%`}</Text>
+                      </View>
+                      <Text style={[styles.edgeChange, { color: themeColor }]}>Change</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {routeId !== 'bulk' && range ? (
+                    <TouchableOpacity
+                      style={styles.edgeRow}
+                      onPress={() => setRangeStep(routeId === 'capped' ? 2 : 1)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Your range, ${bandLo} to ${bandHi} percent. Tap to change.`}
+                    >
+                      <View>
+                        <Text style={styles.edgeKey}>
+                          {routeId === 'capped' ? 'THEN YOU SIT IN' : 'YOUR RANGE'}
                         </Text>
+                        <Text style={styles.edgeLine}>{`${bandLo} to ${bandHi}%`}</Text>
                       </View>
                       <Text style={[styles.edgeChange, { color: themeColor }]}>Change</Text>
                     </TouchableOpacity>
@@ -2513,11 +2829,30 @@ const styles = StyleSheet.create({
   rangeLimitDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#d1a44a', marginTop: 6 },
   rangeLimitText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: '#8e8e93' },
   suggestLink: { fontSize: 12.5, color: '#8e8e93', marginTop: 16 },
+  /**
+   * The tap readout. A row rather than a callout over the point: at four years
+   * across the canvas the phase boundaries sit about thirty points apart, and a
+   * bubble covers the neighbours the user is comparing against.
+   */
+  readout: {
+    flexDirection: 'row',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#232328',
+    minHeight: 62,
+  },
+  readCell: { flex: 1 },
+  readKey: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, color: '#4b4b52' },
+  readVal: { fontSize: 20, fontWeight: '700', color: '#fff', marginTop: 6, letterSpacing: -0.3 },
+  readSub: { fontSize: 11.5, color: '#8e8e93', marginTop: 3 },
+  readHint: { fontSize: 12.5, color: '#4b4b52', paddingTop: 4 },
   optRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    minHeight: 74,
+    // Was 74, before the options carried a line of copy under the name.
+    minHeight: 104,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#232328',
   },
@@ -2527,7 +2862,14 @@ const styles = StyleSheet.create({
   optMain: { flex: 1 },
   optName: { fontSize: 15, fontWeight: '600', color: '#8e8e93' },
   optNameOn: { color: '#ffffff' },
-  optMeta: { fontSize: 10, fontWeight: '700', letterSpacing: 1.3, color: '#4b4b52', marginTop: 7 },
+  optMeta: { fontSize: 10, fontWeight: '700', letterSpacing: 1.3, color: '#4b4b52', marginTop: 8 },
+  /**
+   * The one line of option copy on this screen, and the exception to the rule
+   * that the graph does the talking. The graph can show WHEN the cutting
+   * happens; it cannot show a jawline or how a shirt fits, and that is what
+   * the user is actually choosing between.
+   */
+  optWhy: { fontSize: 12.5, lineHeight: 17, color: '#8e8e93', marginTop: 5 },
   optDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'transparent' },
   orderNone: { fontSize: 13, lineHeight: 20, color: '#8e8e93', marginBottom: 4 },
   // Only when it stands in for the summary row on the screen itself. Inside the
@@ -2625,21 +2967,6 @@ const styles = StyleSheet.create({
   },
   stateName: { fontSize: 17, fontWeight: '600', color: '#ffffff' },
   stateHint: { fontSize: 13.5, lineHeight: 19, color: '#71717a', marginTop: 4 },
-
-  peakLeanLabel: { marginTop: 40 },
-  leanRow: { flexDirection: 'row', gap: 8 },
-  leanPick: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#27272a',
-    backgroundColor: '#131316',
-    borderRadius: 13,
-    paddingVertical: 13,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-  },
-  leanName: { fontSize: 14.5, fontWeight: '600', color: '#8e8e93' },
-  leanHint: { fontSize: 11.5, color: '#5b5b62', marginTop: 3 },
 
   notSureText: { fontSize: 14.5, lineHeight: NOT_SURE_LINE, fontWeight: '500', color: '#71717a' },
   // Underlined because "Not sure?" on its own reads as a statement about the

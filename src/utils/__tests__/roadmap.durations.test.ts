@@ -230,23 +230,13 @@ describe('deriveRoadmap regressions', () => {
   });
 
   /**
-   * Crediting a returning lifter's training history has to shorten the
-   * estimate, or REGAIN_MULTIPLIER is decorative. An earlier version of
-   * estYears took max(summed phases, gap) and silently stopped doing this.
+   * DELETED 24 Aug 2026 with the regain credit. The assertion it made — that a
+   * supplied training peak must shorten the estimate — was true only while
+   * REGAIN_MULTIPLIER existed, and its own comment said as much: "or
+   * REGAIN_MULTIPLIER is decorative". There is nothing left to assert here,
+   * because a training peak is no longer an input. The invariant that replaced
+   * it is in roadmap.test.ts: returning and consistent must now agree.
    */
-  it('shortens the estimate when a training peak is supplied', () => {
-    const base = p({
-      trainingState: 'returning',
-      currentBodyFatPct: 16,
-      goalWeightKg: 90,
-      goalBodyFatPct: 13,
-    });
-    const without = deriveRoadmap(base)!;
-    const with_ = deriveRoadmap({ ...base, peakWeightKg: 88, peakLeanness: 'average' })!;
-
-    expect(with_.estYears[0]).toBeLessThan(without.estYears[0]);
-    expect(with_.estYears[1]).toBeLessThan(without.estYears[1]);
-  });
 
   /**
    * A build whose start equals the band ceiling has nowhere to go. The opener
@@ -263,12 +253,29 @@ describe('deriveRoadmap regressions', () => {
    * The band floor can sit BELOW the user's goal body fat, in which case the
    * cycles already leave them leaner than they asked and a terminal "cut"
    * upward is a rounding artifact, not a phase.
+   *
+   * ── REPOINTED 21 Aug 2026 ────────────────────────────────────────────────
+   *
+   * This used to run a new lifter at 16% aiming for 90 kg at 13%, and it had
+   * stopped exercising the branch it was written for: that build ends at 15.8%
+   * against a 13% goal, so a terminal reveal is genuinely REQUIRED and no
+   * correct engine would omit it. The test was asserting its own premise away.
+   *
+   * Confirmed pre-existing by running the same profile through the engine
+   * before and after the opening-bulk work, sweeping band ceiling 15 to 18
+   * against both partitioning values: identical phase sequences every time.
+   *
+   * The profile below actually meets the premise — a goal SOFTER than where the
+   * cycles leave you. The build finishes near 16% against a 17% goal, so there
+   * is nothing left to cut and the reveal must not appear.
    */
   it('omits the reveal when the cycles already end leaner than the goal', () => {
     const map = deriveRoadmap(
-      p({ trainingState: 'new', currentBodyFatPct: 16, goalWeightKg: 90, goalBodyFatPct: 13 }),
+      p({ trainingState: 'new', currentBodyFatPct: 14, goalWeightKg: 90, goalBodyFatPct: 17 }),
     )!;
     const last = map.phases[map.phases.length - 1];
     expect(last.kind).not.toBe('reveal');
+    // And the premise itself, pinned: they really do end leaner than they asked.
+    expect(last.exitBodyFatPct).toBeLessThanOrEqual(17);
   });
 });

@@ -967,26 +967,6 @@ export function yearsToBuild(gapKg: number, profile: GoalsProfile): [number, num
 }
 
 /**
- * PRE-CAP curve rate, [lo, hi] kg/yr, exactly as the model computed it before
- * the trainingState cap existed: base spread, DEXA-capped upper bound, no
- * state involvement. Internal, with ONE deliberate consumer besides the
- * capped function below: the muscle-memory regain rate in deriveRoadmap,
- * which is exempt from the state cap (see the comment there). Everything
- * novel reads leanGainKgPerYear instead.
- */
-function curveGainKgPerYear(profile: GoalsProfile): [number, number] | null {
-  const { heightCm, sex } = profile;
-  if (heightCm == null) return null;
-  const L = lifetimeHeadroomKg(heightCm, sex);
-  const t0 = positionOnCurve(profile, L);
-  const next = L * (Math.exp(-GAIN_DECAY_K * t0) - Math.exp(-GAIN_DECAY_K * (t0 + 1)));
-  // Floored to one decimal, not rounded: rounding 11.96 up to 12.0 would put
-  // the returned figure ABOVE the ceiling it exists to enforce.
-  const ceiling = Math.floor(MAX_LEAN_GAIN_KG_PER_WEEK * 52 * 10) / 10;
-  return [round1(next * (1 - RATE_SPREAD)), Math.min(round1(next * (1 + RATE_SPREAD)), ceiling)];
-}
-
-/**
  * Gain available over the next twelve months from the user's position, kg/yr.
  *
  * min(curve rate, state cap): the curve is an upper bound from how much room
@@ -1013,35 +993,42 @@ export function leanGainKgPerYear(profile: GoalsProfile): [number, number] | nul
   return [round1(mid * (1 - s)), Math.min(round1(mid * (1 + s)), ceiling)];
 }
 
-/**
- * [B] Regain runs far faster than novel tissue. The muscle-memory OBSERVATION
- * is reasonably supported (Seaborne 2018, Cumming 2024); the mechanism is
- * contested, and no study quantifies a regain multiplier — 4× is a planning
- * assumption, labelled as such.
- */
-export const REGAIN_MULTIPLIER = 4;
-
-/**
- * Splits the lean-mass gap into the portion that is regain and the portion
- * that is new tissue, using a previous training peak if one is known.
- * peakLeanness is coarse on purpose: nobody recalls their old body fat.
- */
-export function splitGap(profile: GoalsProfile, gapKg: number): {
-  regainKg: number;
-  novelKg: number;
-} {
-  const { peakWeightKg, peakLeanness, currentWeightKg, currentBodyFatPct } = profile;
-  if (!peakWeightKg || currentBodyFatPct == null) {
-    return { regainKg: 0, novelKg: gapKg };
-  }
-  // [B] Assumed body fat at their peak, relative to now.
-  const shift = peakLeanness === 'lean' ? -4 : peakLeanness === 'soft' ? +4 : 0;
-  const peakBf = Math.min(50, Math.max(4, currentBodyFatPct + shift));
-  const leanThen = leanMassKg(peakWeightKg, peakBf);
-  const leanNow = leanMassKg(currentWeightKg, currentBodyFatPct);
-  const regainKg = Math.max(0, Math.min(gapKg, round1(leanThen - leanNow)));
-  return { regainKg, novelKg: round1(gapKg - regainKg) };
-}
+// ── THE MUSCLE-MEMORY REGAIN CREDIT WAS REMOVED, 24 Aug 2026 ───────────────
+//
+// Deleted: REGAIN_MULTIPLIER, splitGap, curveGainKgPerYear, and the two peak
+// fields that fed them (peakWeightKg, peakLeanness). The whole lean gap is now
+// novel tissue and runs at the one capped rate from leanGainKgPerYear.
+//
+// THE REASON IS A CONTRADICTION, not a lack of evidence. The multiplier was
+// applied AFTER curveGainKgPerYear's cap, so the effective regain rate reached
+// 23.8 kg/yr — 0.458 kg/week — against MAX_LEAN_GAIN_KG_PER_WEEK = 0.23, the
+// one hard ceiling in the gain model and the only constant here graded [A].
+// A [C] number was doubling an [A] one.
+//
+// The evidence never supported 2 anyway. Blocquiaux 2020 (Exp Gerontol
+// 133:110860, 40 older men, 12 weeks per phase) is the nearest trial with
+// composition endpoints: strength returned fast, cross-sectional area took the
+// full twelve weeks, roughly 1.0 to 1.5x in a population that is not ours.
+// Cumming 2024 found myonuclear permanence but no significant faster regain of
+// fibre size. Nothing quantifies a multiplier.
+//
+// AND THE CURVE ALREADY CAPTURES MOST OF IT. A detrained lifter carries little
+// lean, so muscleBuiltKg is small, so positionOnCurve puts them near t0 = 0
+// where the rate is already the fastest this model produces. Multiplying that
+// again was close to a double count, and the second helping was the
+// unevidenced half.
+//
+// WHAT THIS COSTS, stated so nobody re-adds it casually: a returning lifter
+// with an 11.5 kg gap went from roughly 6-11 months to roughly 25 under the
+// 0.28 state cap. That is not a move from a measured estimate to a worse one —
+// both ends are conventions — but it IS the pessimistic end, chosen on
+// direction of error, because a plan that runs longer than promised is the
+// failure that costs trust.
+//
+// KEPT: trainingState 'returning' still routes to a recomp via derivePhase
+// rule 1 and still maps to 'intermediate' in deriveExperienceTier. Muscle
+// memory stays recognised without being quantified, which is the right
+// resolution for a phenomenon that is real and unmeasured.
 
 /**
  * [B] SUPERSEDED for duration purposes, 13 Aug 2026. Kept because other
@@ -1130,10 +1117,19 @@ export interface Roadmap {
   leanNowKg?: number;
   leanTargetKg: number;
   gapKg?: number;
-  regainKg?: number;
-  novelKg?: number;
   ffmi?: number;
   plausibility?: Plausibility;
+  /**
+   * The goal weight this frame could actually carry at the goal body fat, set
+   * ONLY when `plausibility` is 'beyond'.
+   *
+   * A 60 kg man asking for 100 kg needs 88 kg of lean, which is FFMI 27.2 at
+   * 1.80 m against a drug-free ceiling near 25. The old behaviour was to emit a
+   * plan anyway, and a fifteen year plan looks like an answer. This gives the
+   * screen the one number it needs to refuse usefully: not "impossible" but
+   * "this frame tops out around 88 kg at that body fat".
+   */
+  feasibleGoalWeightKg?: number;
   band: { floor: number; ceiling: number };
   phases: RoadmapPhase[];
   /** Whole-journey estimate in years, [lo, hi]. */
@@ -1497,6 +1493,15 @@ export function deriveRoadmap(
   const classified =
     heightCm != null ? classifyGoal(leanTargetKg, heightCm, sex) : undefined;
 
+  // See Roadmap.feasibleGoalWeightKg. Computed only for a goal past the
+  // ceiling, because for every other goal the answer is the goal itself.
+  const feasibleGoalWeightKg =
+    classified?.plausibility === 'beyond' && heightCm != null
+      ? round1(
+          weightAtBodyFat(leanAtNormalisedFfmi(ceilingFor(sex), heightCm), goalBodyFatPct),
+        )
+      : undefined;
+
   // ── lean-mass-targets.md HARD RULE 4 ─────────────────────────────────────
   // "If current lean mass is already at or above target lean mass and
   // body-fat is above goal, the correct phase is a CUT, not a bulk — the user
@@ -1542,10 +1547,9 @@ export function deriveRoadmap(
       leanNowKg,
       leanTargetKg,
       gapKg,
-      regainKg: 0,
-      novelKg: 0,
       ffmi: classified?.ffmi,
       plausibility: classified?.plausibility,
+      feasibleGoalWeightKg,
       band: { floor, ceiling },
       phases: [
         {
@@ -1570,8 +1574,8 @@ export function deriveRoadmap(
     };
   }
 
-  const { regainKg, novelKg } =
-    gapKg != null ? splitGap(profile, gapKg) : { regainKg: 0, novelKg: 0 };
+  // The whole lean gap is novel tissue. See the regain-removal note above.
+  const buildKg = gapKg ?? 0;
 
   // ── The build's fat cost comes from the SURPLUS, not the band ────────────
   //
@@ -1590,6 +1594,20 @@ export function deriveRoadmap(
   // What this does NOT claim: that one long build beats several short ones. No
   // trial has compared them. The claim is only that the fat a build adds should
   // come from what the user is told to eat.
+  // ── DO NOT MAKE THIS A FUNCTION OF STARTING BODY FAT (20 Aug 2026) ──────
+  //
+  // Asked and answered. The two best pieces of evidence point in opposite
+  // directions: Galgani/Ravussin 2025 found baseline body fat predicting fat
+  // gain (r = 0.59, 34 men, 8 weeks at 140% of maintenance, no exercise);
+  // Trexler/Nuckols' re-analysis of seven longitudinal training studies found
+  // the opposite slope (−0.095, p = 0.001). They agree on one thing only, and
+  // it is the one that matters: starting body fat does not predict LEAN gain.
+  //
+  // So this stays a function of the SURPLUS THE USER IS PRESCRIBED, which is a
+  // statement about what they are told to eat rather than a partitioning claim.
+  // The spread on the ratio itself is 0 to 2.0 — Barakat/Tinsley 2021 scored a
+  // 0.55%/wk gain as 100% fat-free mass — so 0.5 is a deliberately conservative
+  // choice inside that spread, not a central estimate.
   const phase1 = derivePhase({ ...profile, routePreference: route });
   const fatPerLean =
     phase1 === 'bulk' ? FAT_PER_LEAN_KG.bulk : FAT_PER_LEAN_KG.lean_bulk;
@@ -1614,21 +1632,48 @@ export function deriveRoadmap(
    * promise the screen makes. The floor survives as the dial's lower bound, so
    * it still binds — it just binds in one place instead of two.
    */
-  function planBuild(lean0: number, fat0: number, leanToGain: number, trimTo: number) {
+  function planBuild(
+    lean0: number,
+    fat0: number,
+    leanToGain: number,
+    trimTo: number,
+    /**
+     * The ceiling this build runs against. Defaults to the user's range top;
+     * the opening leg of a "grow now, up to a limit" plan passes their chosen
+     * bulk-to number instead, and only for that leg.
+     */
+    ceilPct: number = ceiling,
+    /** How many build legs to plan. The opening bulk takes exactly one. */
+    maxLegs: number = MAX_CYCLES,
+  ) {
     const segs: Array<{ kind: RoadmapPhaseKind; exit: number; lean: number; from: number }> = [];
     let lean = lean0;
     let fat = fat0;
     let left = leanToGain;
-    const c = ceiling / 100;
+    const c = ceilPct / 100;
     // Solving bf(lean + L, fat + fpl*L) = ceiling for L. A non-positive
     // denominator means the added tissue is leaner than the ceiling, so the
     // ceiling is never reached however much is added.
     const denom = fatPerLean - c * (1 + fatPerLean);
-    // See MIN_RANGE_WIDTH_PCT. A trim that recovers a tenth of a point is not a
-    // phase, so the rail stands down rather than shredding the build into
-    // pieces nobody could measure.
-    const railWorthIt = ceiling - trimTo >= MIN_RANGE_WIDTH_PCT;
-    for (let guard = 0; left > 1e-6 && guard < MAX_CYCLES; guard++) {
+    // ── THE RAIL STANDS DOWN ON DURATION, NOT ON WIDTH (20 Aug 2026) ──────
+    //
+    // This used to read `ceiling - trimTo >= MIN_RANGE_WIDTH_PCT`, which is a
+    // proxy for the thing we can now measure directly. Band width and phase
+    // length are not proportional: the same 3 point band produced a 22 month
+    // build and a 0.2 month terminal cut in the same plan. What makes a trim
+    // not worth inserting is that nobody could verify it on a scale, and
+    // MIN_DETECTABLE_PHASE_MONTHS is exactly that test.
+    //
+    // The width rule survives as the fallback for profiles monthsToCut cannot
+    // price, and as a constraint on the CONTROL — a range whose edges the user
+    // cannot read is a bad control for reasons that have nothing to do with the
+    // rail.
+    const railTrim = monthsToCut(lean0, ceilPct, trimTo, profile);
+    const railWorthIt =
+      railTrim != null
+        ? (railTrim[0] + railTrim[1]) / 2 >= MIN_DETECTABLE_PHASE_MONTHS
+        : ceilPct - trimTo >= MIN_RANGE_WIDTH_PCT;
+    for (let guard = 0; left > 1e-6 && guard < maxLegs; guard++) {
       const room = denom > 1e-9 && railWorthIt ? (c * (lean + fat) - fat) / denom : Infinity;
       const room2 = Math.min(left, room > 1e-6 ? room : left);
       // Take the whole remainder rather than stopping short of it, when what
@@ -1650,18 +1695,13 @@ export function deriveRoadmap(
     return { segs, lean, fat };
   }
 
-  // NOVEL only. Sizing this from the whole gap and THEN adding the regain
-  // months below charges the regained kilos twice, which made a returning
-  // lifter with a peak slower than a consistent one without — backwards, and
-  // exactly what the regain credit exists to prevent.
+  // One rate for the whole gap now that the regain credit is gone. The [4, 9]
+  // fallback is the null path: monthsToBuildLean returns null when the gap
+  // exceeds this frame's remaining headroom, which is a real answer rather
+  // than an error, and the literal keeps a plan renderable for it.
   const totalBuildMonths: [number, number] | null =
-    novelKg > 0 ? monthsToBuildLean(novelKg, profile) : [0, 0];
-  const regainRate = curveGainKgPerYear(profile);
-  const regainLo = regainRate && regainKg > 0 ? (regainKg / (regainRate[1] * REGAIN_MULTIPLIER)) * 12 : 0;
-  const regainHi = regainRate && regainKg > 0 ? (regainKg / (regainRate[0] * REGAIN_MULTIPLIER)) * 12 : 0;
-  const buildBudget: [number, number] = totalBuildMonths
-    ? [totalBuildMonths[0] + regainLo, totalBuildMonths[1] + regainHi]
-    : [4, 9];
+    buildKg > 0 ? monthsToBuildLean(buildKg, profile) : [0, 0];
+  const buildBudget: [number, number] = totalBuildMonths ?? [4, 9];
 
   const phases: RoadmapPhase[] = [];
   const WEEKS_PER_MONTH = 4.345;
@@ -1742,8 +1782,44 @@ export function deriveRoadmap(
     const order: PhaseOrder = profile.phaseOrder ?? defaultPhaseOrder(profile);
     const needsCut = order === 'cut_first' && currentBodyFatPct > floor + 0.2;
 
+    // ── THE OPENING BULK, 20 Aug 2026 ─────────────────────────────────────
+    //
+    // The mirror of the opening cut. `bulkToBf` is the number the user said
+    // they want to grow UP TO before anything comes off, and it governs the
+    // FIRST leg only — everything after the first cut runs against `ceiling`,
+    // because that is the question they answered second.
+    //
+    // Ignored where it cannot fire: at or below where they stand today there is
+    // nothing to grow up to, and when an opening cut is happening the two
+    // answers contradict each other and the cut wins.
+    const bulkTo =
+      !needsCut && profile.bulkToBf != null && profile.bulkToBf > currentBodyFatPct + 0.2
+        ? profile.bulkToBf
+        : null;
+
     if (!needsCut) {
-      const { segs, lean, fat } = planBuild(leanNowKg, nowFat, gapKg, trimTo);
+      // ONE LEG at the user's own peak, then the remainder against their range.
+      // Split this way rather than threading two ceilings through one loop, so
+      // planBuild keeps its invariant: inside it, one build has one ceiling.
+      const opening =
+        bulkTo != null ? planBuild(leanNowKg, nowFat, gapKg, trimTo, bulkTo, 1) : null;
+      const openedLean = opening ? opening.lean - leanNowKg : 0;
+      // ROUNDED ONLY WHEN THERE IS AN OPENING LEG TO SUBTRACT. Rounding an
+      // untouched gap changes it by up to 0.05 kg, and that is enough to flip
+      // whether the last build lands just above or just below the goal body
+      // fat — which is the difference between a terminal reveal and none. It
+      // cost a passing test on a profile that has nothing to do with the
+      // opening bulk. A path that adds a feature must be inert when the
+      // feature is off.
+      const rest = planBuild(
+        opening ? opening.lean : leanNowKg,
+        opening ? opening.fat : nowFat,
+        opening ? round1(gapKg - openedLean) : gapKg,
+        trimTo,
+      );
+      const segs = opening ? [...opening.segs, ...rest.segs] : rest.segs;
+      const lean = rest.lean;
+      const fat = rest.fat;
       // Walked rather than mapped, so every segment can carry the scale weight
       // it ends at — the figure transition detection actually uses.
       let wLean = leanNowKg;
@@ -1913,10 +1989,9 @@ export function deriveRoadmap(
     leanNowKg,
     leanTargetKg,
     gapKg,
-    regainKg: gapKg != null ? regainKg : undefined,
-    novelKg: gapKg != null ? novelKg : undefined,
     ffmi: classified?.ffmi,
     plausibility: classified?.plausibility,
+    feasibleGoalWeightKg,
     band: { floor, ceiling },
     phases,
     estYears,

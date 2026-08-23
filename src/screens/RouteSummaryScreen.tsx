@@ -167,10 +167,14 @@ export default function RouteSummaryScreen() {
     kg == null ? 'Not set' : imperial ? `${Math.round(kgToLb(kg))} lbs` : `${kg.toFixed(1)} kg`;
 
   // Beat numbers must match RouteScreen's order: weight 1, sex 2, body fat 3,
-  // height 4, training 5, peak 6, goal weight 7, goal body fat 8, route 9.
-  // These were stale after the beats were reordered — tapping Height opened the
-  // sex beat — so treat this list as part of that order, not as a description
-  // of it.
+  // height 4, training 5, goal weight 7, goal body fat 8, route 9. These were
+  // stale after the beats were reordered — tapping Height opened the sex beat —
+  // so treat this list as part of that order, not as a description of it.
+  //
+  // 6 IS A GAP, 24 Aug 2026. The previous-peak beat was removed with the regain
+  // credit it fed; the later beats deliberately kept their numbers, and 6 is
+  // excluded from RouteScreen's Beat union so a stale reference is a compile
+  // error rather than a door onto a blank screen.
   const about: Row[] = [
     { label: 'Weight', value: weight(profile.currentWeightKg), beat: 1 },
     {
@@ -196,15 +200,10 @@ export default function RouteSummaryScreen() {
     { label: 'Training', value: TRAINING_LABEL[profile.trainingState] ?? 'Not set', beat: 5 },
   ];
 
-  // Only a returning lifter has a peak, and it is the only beat in the flow
-  // that is conditional, so the row has to be too.
-  if (profile.trainingState === 'returning') {
-    about.push({
-      label: 'Previous peak',
-      value: profile.peakWeightKg == null ? 'Not set' : weight(profile.peakWeightKg),
-      beat: 6,
-    });
-  }
+  // The 'Previous peak' row was here, pushed conditionally for a returning
+  // lifter. It was the only conditional row in the summary, and it went with
+  // beat 6 on 24 Aug 2026. Every row is now unconditional, which is why nothing
+  // below branches on trainingState.
 
   const goal: Row[] = [
     { label: 'Goal weight', value: weight(profile.goalWeightKg), beat: 7 },

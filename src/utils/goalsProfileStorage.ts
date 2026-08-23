@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoalsProfile, TrainingState, Sex, PeakLeanness, RoutePreference, BodyFatSource, ActivityLevel } from './goalsProfile';
+import { GoalsProfile, TrainingState, Sex, RoutePreference, BodyFatSource, ActivityLevel } from './goalsProfile';
 
 const KEY = '@goals_profile';
 
@@ -36,7 +36,6 @@ export const AGE_MAX = 100;
 
 const TRAINING_STATES: TrainingState[] = ['new', 'returning', 'consistent', 'advanced'];
 const SEXES: Sex[] = ['male', 'female', 'prefer_not_to_say'];
-const PEAK_LEANNESS: PeakLeanness[] = ['lean', 'average', 'soft'];
 const ROUTE_PREFERENCES: RoutePreference[] = ['lean', 'balanced', 'roomy'];
 const BODY_FAT_SOURCES: BodyFatSource[] = ['reported', 'visual', 'tape'];
 const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'heavy', 'extreme'];
@@ -113,23 +112,12 @@ export function sanitizeGoalsProfile(
     repaired = true;
   }
 
-  if (clean.peakWeightKg != null && !inRange(clean.peakWeightKg, WEIGHT_KG_MIN, WEIGHT_KG_MAX)) {
-    delete clean.peakWeightKg;
-    repaired = true;
-  }
-
-  if (clean.peakLeanness != null && !PEAK_LEANNESS.includes(clean.peakLeanness)) {
-    delete clean.peakLeanness;
-    repaired = true;
-  }
-
-  // peakLeanness on its own describes nothing — it only means something
-  // alongside the weight it applied to. Drop the orphan rather than leave a
-  // half-answer that reads as data.
-  if (clean.peakLeanness != null && clean.peakWeightKg == null) {
-    delete clean.peakLeanness;
-    repaired = true;
-  }
+  // peakWeightKg and peakLeanness were validated here until 24 Aug 2026, when
+  // the regain credit they fed was removed. Profiles written before that still
+  // carry both keys; they are now unknown fields that no reader consults, and
+  // the spread in sanitizeGoalsProfile carries them through untouched. That is
+  // the same treatment legacy routePreference values get, and it costs nothing
+  // — deleting them would mean a migration for two fields nothing reads.
 
   if (clean.routePreference != null && !ROUTE_PREFERENCES.includes(clean.routePreference)) {
     delete clean.routePreference;
@@ -146,8 +134,8 @@ export function sanitizeGoalsProfile(
     repaired = true;
   }
 
-  // Provenance without a reading describes nothing. Same orphan rule as
-  // peakLeanness — and note the reverse is fine: a body fat from before this
+  // Provenance without a reading describes nothing. Same orphan rule the peak
+  // fields used to follow — and note the reverse is fine: a body fat from before this
   // field existed simply has no source, which readers must handle anyway.
   if (clean.bodyFatSource != null && clean.currentBodyFatPct == null) {
     delete clean.bodyFatSource;

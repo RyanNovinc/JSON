@@ -17,14 +17,13 @@ export type DerivedExperienceTier = 'beginner' | 'intermediate' | 'advanced';
  */
 export type Sex = 'male' | 'female' | 'prefer_not_to_say';
 
-/**
- * How the user looked at their previous training peak. Deliberately coarse:
- * nobody remembers their body fat from four years ago, but everyone can say
- * whether they were lean, average, or soft. Combined with peakWeightKg this
- * is enough to estimate prior lean mass, which separates fast regain from
- * slow novel growth.
- */
-export type PeakLeanness = 'lean' | 'average' | 'soft';
+// PeakLeanness was REMOVED, 24 Aug 2026, with peakWeightKg and the regain
+// credit both fed. Its job was to estimate prior lean mass so fast regain could
+// be separated from slow novel growth; the whole lean gap is now novel tissue
+// at one capped rate. See the regain-removal note in roadmap.ts for why, and
+// what it costs. trainingState 'returning' still carries the recognition:
+// derivePhase rule 1 routes it to a recomp and deriveExperienceTier maps it to
+// 'intermediate'. Muscle memory stays recognised without being quantified.
 
 /**
  * Which body-fat operating band the user wants to cycle within on the way to
@@ -143,11 +142,6 @@ export interface GoalsProfile {
   ageYears?: number;
   heightCm?: number;
 
-  /** Bodyweight at their previous training peak, if they had one. */
-  peakWeightKg?: number;
-  /** How lean they were at that peak — see PeakLeanness. */
-  peakLeanness?: PeakLeanness;
-
   /**
    * How fast this user likes to cut. A PREFERENCE, deliberately, not a rate.
    *
@@ -249,6 +243,34 @@ export interface GoalsProfile {
    * profiles, and renaming it buys a migration and nothing else.
    */
   ceilingBf?: number;
+
+  /**
+   * THE OPENING BULK: the body fat a user wants to grow UP TO before their
+   * first cut, on the "grow now, up to a limit" route.
+   *
+   * ── WHY IT IS A THIRD FIELD AND NOT A SETTING OF THE OTHER TWO ───────────
+   *
+   * `phaseOrder` owns whether there is a CUT before the building starts, and
+   * the range owns where every cut afterwards lands. Neither can express "grow
+   * from where I am up to 24%, and only then start cutting back", which is what
+   * most people mean by a bulk: no opening cut, but a first leg that runs past
+   * the top of the range they intend to live in afterwards.
+   *
+   * Two levers make every plan in this app — is there a cut first, and is there
+   * a ceiling that interrupts. Stay lean is both. Grow now and cut at the end
+   * is neither. This is the third corner: a ceiling, no opening cut, and a
+   * FIRST ceiling that differs from the one that follows it.
+   *
+   * WHAT IT IS NOT: a second ceiling. It applies to the opening leg only. Once
+   * the first cut has happened, `ceilingBf` governs, because the question the
+   * user answered second was "where do you sit after that cut".
+   *
+   * IGNORED when `phaseOrder` is cut_first and there is fat to shed, because
+   * the two answers contradict each other and the opening cut is the one the
+   * user asked for more recently in the flow. Also ignored when it sits at or
+   * below current body fat, where it can never fire.
+   */
+  bulkToBf?: number;
 
 
   /** Provenance of currentBodyFatPct. See BodyFatSource. Decides whether the
