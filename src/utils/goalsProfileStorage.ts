@@ -85,9 +85,25 @@ export function sanitizeGoalsProfile(
     repaired = true;
   }
 
+  // ── THE DEFAULT IS LOAD-BEARING, 24 Aug 2026 ─────────────────────────────
+  //
+  // 'consistent', not 'new'. NO SCREEN ASKS trainingState any more: RouteScreen
+  // beat 5 and GoalsIntakeScreen's training step were both removed with the
+  // previous-peak question they gated. So this value is not a placeholder
+  // waiting to be overwritten — it is what every user gets, and it drives four
+  // things: STATE_RATE_CAP_FRACTION_OF_HEADROOM (the cap that sets build
+  // duration), derivePhase's newbie-recomp rule, deriveExperienceTier for both
+  // prompt builders, and the surplus tier in phaseCaloricTarget.
+  //
+  // 'new' is the ONE state whose entry in STATE_RATE_CAP_FRACTION_OF_HEADROOM
+  // is null, i.e. uncapped. Defaulting to it would run every user's build at
+  // the raw curve rate — half of remaining headroom per year — which is faster
+  // than the regain credit that was deleted the same day for being too fast.
+  //
+  // RouteScreen's seedProfile() carries the same value. The two must agree.
   if (!clean.trainingState || !TRAINING_STATES.includes(clean.trainingState)) {
-    clean.trainingState = 'new';
-    if (raw.trainingState !== 'new') repaired = true;
+    clean.trainingState = 'consistent';
+    if (raw.trainingState !== 'consistent') repaired = true;
   }
 
   // ── Shared intake fields ───────────────────────────────────────────────────
@@ -191,7 +207,7 @@ export async function updateGoalsProfileField<K extends keyof GoalsProfile>(
   value: GoalsProfile[K]
 ): Promise<void> {
   const current = await loadGoalsProfile();
-  const base: GoalsProfile = current ?? { currentWeightKg: 0, trainingState: 'new' };
+  const base: GoalsProfile = current ?? { currentWeightKg: 0, trainingState: 'consistent' };
   await saveGoalsProfile({ ...base, [field]: value });
 }
 

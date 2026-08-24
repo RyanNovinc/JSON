@@ -16,7 +16,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { TrainingState, Sex, ActivityLevel } from '../utils/goalsProfile';
+import { Sex, ActivityLevel } from '../utils/goalsProfile';
 import BodyFatField, {
   emptyBodyFatValue,
   type BodyFatFieldValue,
@@ -44,37 +44,11 @@ import WeightEntrySheet from '../components/nutrition/WeightEntrySheet';
 type Nav = StackNavigationProp<RootStackParamList, 'GoalsIntake'>;
 type RouteProps = RouteProp<RootStackParamList, 'GoalsIntake'>;
 
-const TRAINING_OPTIONS: Array<{
-  value: TrainingState;
-  icon: string;
-  title: string;
-  subtitle: string;
-}> = [
-  {
-    value: 'new',
-    icon: 'sparkles-outline',
-    title: 'New to training',
-    subtitle: 'Under a year of consistent lifting.',
-  },
-  {
-    value: 'consistent',
-    icon: 'trending-up-outline',
-    title: 'Consistent',
-    subtitle: 'Training regularly for a year or more.',
-  },
-  {
-    value: 'returning',
-    icon: 'refresh-outline',
-    title: 'Returning after a break',
-    subtitle: "You've trained before but had time off. Your muscle memory is still there.",
-  },
-  {
-    value: 'advanced',
-    icon: 'barbell-outline',
-    title: 'Advanced',
-    subtitle: 'Years of structured, progressive training.',
-  },
-];
+// TRAINING_OPTIONS was here, alongside RouteScreen beat 5. Both asked
+// trainingState and both were removed on 24 Aug 2026 with the previous-peak
+// question they gated. Nothing collects the field now, so goalsProfileStorage's
+// create-path default is the value every user gets — see the note there before
+// changing it.
 
 const LEANNESS_OPTIONS: Array<{
   pct: number | undefined;
@@ -247,7 +221,6 @@ export default function GoalsIntakeScreen() {
   const [heightInput, setHeightInput] = useState('');
 
   // ── Step 2: Training state ─────────────────────────────────────────────────
-  const [trainingState, setTrainingState] = useState<TrainingState | null>(null);
   const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(null);
 
   // ── Step 3: Body composition ───────────────────────────────────────────────
@@ -324,7 +297,7 @@ export default function GoalsIntakeScreen() {
   };
 
   const handleStep2Continue = () => {
-    if (trainingState && activityLevel) setStep(3);
+    if (activityLevel) setStep(3);
   };
 
   const handleStep3Continue = () => {
@@ -332,7 +305,7 @@ export default function GoalsIntakeScreen() {
   };
 
   const handleComplete = async () => {
-    if (!currentWeightKg || !trainingState || saving) return;
+    if (!currentWeightKg || saving) return;
     setSaving(true);
     try {
       // Re-check at the save site as well as in the CTA gate. The gate is the
@@ -366,7 +339,11 @@ export default function GoalsIntakeScreen() {
         currentBodyFatPct: currentBFPct,
         goalWeightKg,
         goalBodyFatPct: goalBFPct,
-        trainingState,
+        // No longer asked. Written explicitly rather than omitted, because the
+        // field is non-optional on GoalsProfile. Must match
+        // goalsProfileStorage's create-path default and RouteScreen's
+        // seedProfile — see the note in the sanitiser before changing it.
+        trainingState: 'consistent',
         sex: sex ?? undefined,
         ageYears,
         heightCm,
@@ -464,7 +441,7 @@ export default function GoalsIntakeScreen() {
         heightInput.trim().length > 0 &&
         !ageError &&
         !heightError
-    : step === 2 ? trainingState !== null && activityLevel !== null
+    : step === 2 ? activityLevel !== null
     : step === 3 ? currentWeightKg !== null
     : !goalWeightError; // step 4 is completable with everything blank, just not with a bad number
 
@@ -575,28 +552,17 @@ export default function GoalsIntakeScreen() {
           {/* ── Step 2: Training history ─────────────────────────────────── */}
           {step === 2 && (
             <>
-              <Text style={styles.title}>What's your training history?</Text>
+              <Text style={styles.title}>How active are you day to day?</Text>
               <Text style={styles.subtitle}>
-                This shapes your starting volume and plan intensity.
+                Your activity outside the gym sets your calorie baseline.
               </Text>
-              {TRAINING_OPTIONS.map((opt) => (
-                <QuestionCard
-                  key={opt.value}
-                  icon={opt.icon as any}
-                  title={opt.title}
-                  subtitle={opt.subtitle}
-                  selected={trainingState === opt.value}
-                  onPress={() => setTrainingState(opt.value)}
-                />
-              ))}
 
-              {/* The 'returning' branch opened a previous-peak sub-question
-                  here: a rough peak weight, and a leanness picker revealed once
-                  that weight parsed. Removed 24 Aug 2026 with the regain credit
-                  it fed. The training-state cards above are unchanged, and
-                  'returning' still means something — derivePhase rule 1 routes
-                  it to a recomp and deriveExperienceTier maps it to
-                  'intermediate'. It is simply no longer quantified. */}
+              {/* The training-history cards were here, with a previous-peak
+                  sub-question opening on the 'returning' branch. Both went on
+                  24 Aug 2026 with the regain credit they fed. This step is now
+                  activity only; the heading above was rewritten to match, since
+                  "What's your training history?" over an activity picker would
+                  be a lie. */}
 
               <View style={styles.sectionDivider} />
 

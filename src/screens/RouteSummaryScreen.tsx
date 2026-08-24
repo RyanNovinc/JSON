@@ -40,7 +40,7 @@ import { deriveRoadmap, type Roadmap } from '../utils/roadmap';
 import { ROUTE_OPTIONS } from './RouteScreen';
 import { loadPhaseJourney, expandPhases } from '../utils/phaseJourney';
 import { sharePlanPdfFor } from '../utils/planPdf';
-import type { GoalsProfile, TrainingState } from '../utils/goalsProfile';
+import type { GoalsProfile } from '../utils/goalsProfile';
 
 type NavProp = StackNavigationProp<RootStackParamList>;
 
@@ -68,13 +68,9 @@ const PHASE_NAME: Record<string, string> = {
   reveal: 'The reveal',
 };
 
-/** Matches the beat 5 wording rather than the raw enum. */
-const TRAINING_LABEL: Record<TrainingState, string> = {
-  new: 'New to lifting',
-  consistent: 'Training consistently',
-  returning: 'Coming back',
-  advanced: 'Advanced',
-};
+// TRAINING_LABEL was here, mapping the enum to beat 5's wording. Beat 5 was
+// removed on 24 Aug 2026, so there is no longer a screen to send the user to
+// and the row went with it.
 
 /** The display name of whichever route the profile currently holds. */
 function currentRouteName(profile: GoalsProfile): string {
@@ -197,13 +193,13 @@ export default function RouteSummaryScreen() {
             : `${Math.round(profile.heightCm)} cm`,
       beat: 4,
     },
-    { label: 'Training', value: TRAINING_LABEL[profile.trainingState] ?? 'Not set', beat: 5 },
   ];
 
-  // The 'Previous peak' row was here, pushed conditionally for a returning
-  // lifter. It was the only conditional row in the summary, and it went with
-  // beat 6 on 24 Aug 2026. Every row is now unconditional, which is why nothing
-  // below branches on trainingState.
+  // Two rows were here and both went on 24 Aug 2026: 'Training' (beat 5) and,
+  // pushed conditionally for a returning lifter, 'Previous peak' (beat 6). The
+  // peak was the only conditional row in the summary, which is why nothing
+  // below branches. Neither field is collected any more, so neither has a beat
+  // to open.
 
   const goal: Row[] = [
     { label: 'Goal weight', value: weight(profile.goalWeightKg), beat: 7 },

@@ -26,12 +26,13 @@
 // RouteSummaryScreen's row list.
 //
 // Current order:
-//   1 weight · 2 sex · 3 body fat · 4 height · 5 training state
+//   1 weight · 2 sex · 3 body fat · 4 height
 //   7 goal weight · 8 goal body fat · 9 route · 10 summary
 //
-// BEAT 6 IS A DELIBERATE GAP, 24 Aug 2026. It asked a returning lifter for
-// their previous training peak, which fed the regain credit that has now been
-// removed (see roadmap.ts). The remaining beats keep their numbers rather than
+// BEATS 5 AND 6 ARE DELIBERATE GAPS, 24 Aug 2026. 6 asked a returning lifter
+// for their previous training peak, which fed the regain credit that has now
+// been removed (see roadmap.ts). 5 asked trainingState and existed as the gate
+// for 6, so it went too. The remaining beats keep their numbers rather than
 // closing up, because 9 and 10 are referenced as literals in RouteScreen's
 // write gates and in helpFor(9). Renumbering would touch every one of those for
 // a cosmetic gain and is exactly the kind of change the note above records
@@ -45,12 +46,10 @@ const DONE_BEAT = 10;
 /**
  * The fields the beats set, in beat order.
  *
- * trainingState is deliberately ABSENT, and it is the one gap here. The field
- * is non-optional on GoalsProfile and the storage create path defaults it to
- * 'new', so a profile cannot express "not answered yet" — an unanswered user
- * and a genuine beginner are identical on disk. RouteScreen tracks that with
- * its own in-memory flag, which cannot be recovered from the profile later.
- * Checking it here would report every beginner's route as unfinished forever.
+ * trainingState is deliberately ABSENT. It used to be absent because the field
+ * could not express "not answered yet"; since 24 Aug 2026 it is absent because
+ * NOTHING ASKS IT. Every profile carries the storage create-path default, so
+ * checking it here would be checking a constant.
  */
 export function missingRouteFields(profile: GoalsProfile | null): string[] {
   if (!profile) return ['everything'];
@@ -59,12 +58,12 @@ export function missingRouteFields(profile: GoalsProfile | null): string[] {
   if (profile.sex == null) missing.push('sex');
   if (profile.currentBodyFatPct == null) missing.push('body fat');
   if (profile.heightCm == null) missing.push('height');
-  // The previous-peak beat was removed on 24 Aug 2026 along with the regain
-  // credit it fed, so there is nothing to check between height and goal weight.
-  // Worth keeping the lesson it left: the peak was never a completeness
-  // requirement, because a returning lifter who did not remember it could clear
-  // both fields deliberately, and requiring them meant using the skip locked
-  // those users out of a plan permanently and silently.
+  // Beats 5 and 6 were removed on 24 Aug 2026, so there is nothing to check
+  // between height and goal weight. Worth keeping the lesson beat 6 left: the
+  // peak was never a completeness requirement, because a returning lifter who
+  // did not remember it could clear both fields deliberately, and requiring
+  // them meant using the skip locked those users out of a plan permanently and
+  // silently.
   if (profile.goalWeightKg == null) missing.push('goal weight');
   if (profile.goalBodyFatPct == null) missing.push('goal body fat');
   if (profile.routePreference == null) missing.push('route');
@@ -86,8 +85,8 @@ export function firstUnansweredBeat(profile: GoalsProfile | null): number {
   if (profile.sex == null) return 2;
   if (profile.currentBodyFatPct == null) return 3;
   if (profile.heightCm == null) return 4;
-  // 5 (training state) cannot be checked — see missingRouteFields. 6 no longer
-  // exists; the numbering skips it deliberately rather than closing up.
+  // 5 and 6 no longer exist; the numbering skips them deliberately rather than
+  // closing up.
   if (profile.goalWeightKg == null) return 7;
   if (profile.goalBodyFatPct == null) return 8;
   if (profile.routePreference == null) return 9;

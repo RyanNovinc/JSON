@@ -79,22 +79,26 @@ import type {
   GoalsProfile,
   RoutePreference,
   Sex,
-  TrainingState,
 } from '../utils/goalsProfile';
 
 type Nav = StackNavigationProp<RootStackParamList>;
-// 6 IS A DELIBERATE GAP, 24 Aug 2026. It asked a returning lifter for their
-// previous training peak, which fed the regain credit removed from roadmap.ts.
+// 5 AND 6 ARE DELIBERATE GAPS, 24 Aug 2026.
+//
+// 6 asked a returning lifter for their previous training peak, which fed the
+// regain credit removed from roadmap.ts. 5 asked for trainingState, and existed
+// as the gate for 6 — that was its original purpose, and with 6 gone it was
+// removed too.
+//
 // The later beats keep their numbers rather than closing up, because 9 and 10
 // are referenced as literals in the write gates in advance(), in helpFor(9),
 // and in routeCompletion.ts's resume map. Renumbering would touch every one of
 // those, and routeCompletion already records what happened the last time this
 // screen's beat order moved without its consumers.
 //
-// 6 is excluded from the union rather than left unused, so a stale
-// `startBeat: 6` from another screen is a compile error instead of a beat that
-// renders nothing.
-type Beat = 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10;
+// Both are excluded from the union rather than left unused, so a stale
+// `startBeat: 5` or `6` from another screen is a compile error instead of a
+// beat that renders nothing.
+type Beat = 1 | 2 | 3 | 4 | 7 | 8 | 9 | 10;
 
 /**
  * The three routes.
@@ -562,18 +566,20 @@ const NOT_SURE_GAP = 22;
  * about to ask for, at the values the instruments already show as defaults, so
  * the first screen renders with a sensible needle position rather than empty.
  *
- * trainingState is required by the type and has to be SOMETHING. 'new' is what
- * goalsProfileStorage's create path already defaults to, so this changes
- * nothing that was not already happening — but it is worth being loud about,
- * because that default drives derivePhase's newbie-recomp rule, the experience
- * tier and the surplus size, and no Route beat asks the question. An
- * experienced lifter onboarded through Route is currently planned for as a
- * beginner.
+ * trainingState is required by the type and has to be SOMETHING. Since beat 5
+ * was removed on 24 Aug 2026 NO screen asks the question, so this value is what
+ * every Route-onboarded user gets, permanently — it is no longer a placeholder
+ * waiting to be overwritten.
+ *
+ * 'consistent' rather than 'new', matching goalsProfileStorage's create path.
+ * The two must agree. 'new' is the one state with no entry in
+ * STATE_RATE_CAP_FRACTION_OF_HEADROOM, so defaulting to it would run every
+ * user's build at the uncapped curve rate.
  */
 const SEED_WEIGHT_KG = 77;
 
 function seedProfile(): GoalsProfile {
-  return { currentWeightKg: SEED_WEIGHT_KG, trainingState: 'new' };
+  return { currentWeightKg: SEED_WEIGHT_KG, trainingState: 'consistent' };
 }
 const NOT_SURE_LINE = 20;
 const NOT_SURE_BLOCK = NOT_SURE_GAP + NOT_SURE_LINE;
@@ -600,7 +606,7 @@ const PHASE_LABEL: Record<string, string> = {
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const SECTIONS: Array<{ label: string; beats: Beat[]; quiet?: boolean }> = [
-  { label: 'ABOUT YOU', beats: [1, 2, 3, 4, 5] },
+  { label: 'ABOUT YOU', beats: [1, 2, 3, 4] },
   { label: 'YOUR GOAL', beats: [7, 8] },
   { label: 'HOW YOU GET THERE', beats: [9] },
   // quiet: the summary names itself on the screen, so repeating it in the top
@@ -682,13 +688,6 @@ export default function RouteScreen() {
   const [loading, setLoading] = useState(true);
   /** Unset onboarding gate. Drives the beat 1 intent line and the food door. */
   const [firstRun, setFirstRun] = useState(false);
-  /**
-   * Whether trainingState is an ANSWER rather than the seed's placeholder.
-   * The field is non-optional on GoalsProfile and seedProfile has to put
-   * something in it, so 'new' is indistinguishable from a real choice. A user
-   * arriving with a stored profile has answered it before, one way or another.
-   */
-  const [trainingStateAnswered, setTrainingStateAnswered] = useState(false);
   const [beat, setBeat] = useState<Beat>(startBeat);
   const [bodyFat, setBodyFat] = useState<BodyFatFieldValue>(emptyBodyFatValue());
   const [evidence, setEvidence] = useState<EvidenceTopic | null>(null);
@@ -767,7 +766,6 @@ export default function RouteScreen() {
         // beat 1 commits the weight on Continue whether or not the ruler was
         // touched, the same way beat 6 commits untouched goal defaults.
         setProfile(p ?? seedProfile());
-        setTrainingStateAnswered(p != null);
         if (p?.routePreference) setPreference(p.routePreference);
         // No stored answer means not asked yet, so fall to the arithmetic
         // default rather than assuming a choice the user never made.
@@ -1030,9 +1028,8 @@ export default function RouteScreen() {
       setRangeStep(prevStep(rangeStep, routeId));
       return;
     }
-    // 5 -> 7 in both directions: 6 no longer exists. This was a conditional
-    // skip for non-returning lifters until the peak beat was removed.
-    const prev = beat === 7 ? 5 : beat - 1;
+    // 4 -> 7 in both directions: 5 and 6 no longer exist.
+    const prev = beat === 7 ? 4 : beat - 1;
     goToBeat(prev as Beat, -1);
   };
 
@@ -1100,7 +1097,7 @@ export default function RouteScreen() {
       return;
     }
     if (beat < 10) {
-      const next = beat === 5 ? 7 : beat + 1;
+      const next = beat === 4 ? 7 : beat + 1;
       goToBeat(next as Beat, 1);
     } else setConfirming(true);
   };
@@ -1341,11 +1338,7 @@ export default function RouteScreen() {
   // Beat 3 has to be answered: removing the opt out means an unset value
   // would silently apply the male set, which is the exact thing the opt out
   // was doing.
-  const ctaBlocked =
-    (beat === 2 && profile.sex == null) ||
-    // Same rule as the sex beat: an unanswered single-choice question must not
-    // be walkable past, or the create-path default becomes the answer.
-    (beat === 5 && !trainingStateAnswered);
+  const ctaBlocked = beat === 2 && profile.sex == null;
   const beatHelp = helpFor(beat, profile.sex);
   const section = sectionFor(beat);
 
@@ -1372,7 +1365,6 @@ export default function RouteScreen() {
     2: 'Continue',
     3: 'Continue',
     4: 'Continue',
-    5: 'Continue',
     7: 'Continue',
     8: 'Continue',
     9: 'See the whole plan',
@@ -1636,53 +1628,35 @@ export default function RouteScreen() {
         ) : null}
 
         {/* ---------------------------------------------------------------- */}
-        {/* Asked here because NOTHING else collects it. trainingState left the
-            workout questionnaire as Q2 — deriveExperienceTier is the shim that
-            replaced it — and the questionnaires now read it off the profile.
-            With GoalsIntake skipped on a first run, every Route-onboarded user
-            was silently defaulting to 'new', which drives derivePhase's
-            newbie-recomp rule, the experience tier both prompt builders key
-            off, and the surplus tier in phaseCaloricTarget. */}
-        {beat === 5 ? (
-          <View style={styles.beat1Body}>
-            <Text style={styles.beatLabel}>WHERE YOU ARE WITH TRAINING</Text>
+        {/* BEAT 5 WAS HERE. It asked trainingState with four described options
+            (new / consistent / returning / advanced), and it existed as the
+            GATE FOR BEAT 6 below: answer "Coming back" and you were asked for
+            your previous peak. Beat 6 went with the regain credit on 24 Aug
+            2026, and 5 went with it.
 
-            {/* Described, not levelled. "Intermediate" means something
-                different to everyone and people rate themselves badly against
-                it; "under a year of consistent training" is answerable without
-                judgement. Advanced is described by what it costs rather than as
-                a status, because overclaiming buys a slower plan. */}
-            <View style={styles.stateList}>
-              {([
-                ['new', 'New to lifting', 'Under a year of consistent training'],
-                ['consistent', 'Training consistently', 'Still adding reps or weight most weeks'],
-                ['returning', 'Coming back', 'Trained seriously before, had time off'],
-                ['advanced', 'Advanced', 'Progress has slowed to months, not weeks'],
-              ] as Array<[TrainingState, string, string]>).map(([value, label, hint]) => {
-                const active = profile.trainingState === value;
-                return (
-                  <TouchableOpacity
-                    key={value}
-                    style={[
-                      styles.stateCard,
-                      active && { borderColor: themeColor, backgroundColor: '#101a1d' },
-                    ]}
-                    onPress={() => {
-                      setTrainingStateAnswered(true);
-                      patch('trainingState', value);
-                    }}
-                    activeOpacity={0.85}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                  >
-                    <Text style={[styles.stateName, active && { color: themeColor }]}>{label}</Text>
-                    <Text style={styles.stateHint}>{hint}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
+            READ THIS BEFORE RESTORING IT, because it has been deleted once
+            before and caused a bug. trainingState left the workout
+            questionnaire as Q2 (deriveExperienceTier is the shim that replaced
+            it) and the questionnaires now read it off the profile. With
+            GoalsIntake skipped on a first run, every Route-onboarded user was
+            silently defaulting to 'new'.
+
+            THAT DEFAULT IS NOW LOAD-BEARING, not a placeholder. Nothing asks
+            the question, so seedProfile's value is what every user gets and it
+            drives four things: STATE_RATE_CAP_FRACTION_OF_HEADROOM (the cap
+            that sets build duration), derivePhase's newbie-recomp rule, the
+            experience tier both prompt builders key off, and the surplus tier
+            in phaseCaloricTarget.
+
+            It is 'consistent', matching goalsProfileStorage's create path — the
+            two must agree. Not 'new', which is the one state with a null cap
+            and would run every build at the uncapped curve rate.
+
+            TWO CONSEQUENCES, recorded rather than discovered later. derivePhase
+            rule 1 needs 'new' or 'returning', so the newbie-recomp window never
+            fires for a Route-onboarded user. And deriveExperienceTier returns
+            'intermediate' for everyone, so both prompt builders get the same
+            experience tier regardless of who the lifter is. */}
 
         {/* ---------------------------------------------------------------- */}
         {/* BEAT 6 WAS HERE. It asked a returning lifter for their peak weight
@@ -2955,18 +2929,6 @@ const styles = StyleSheet.create({
   },
   limitText: { flex: 1, fontSize: 14, lineHeight: 21, color: '#8e8e93' },
   limitLead: { color: '#f0b429', fontWeight: '600' },
-
-  stateList: { gap: 11 },
-  stateCard: {
-    borderWidth: 1,
-    borderColor: '#27272a',
-    backgroundColor: '#131316',
-    borderRadius: 16,
-    paddingVertical: 17,
-    paddingHorizontal: 18,
-  },
-  stateName: { fontSize: 17, fontWeight: '600', color: '#ffffff' },
-  stateHint: { fontSize: 13.5, lineHeight: 19, color: '#71717a', marginTop: 4 },
 
   notSureText: { fontSize: 14.5, lineHeight: NOT_SURE_LINE, fontWeight: '500', color: '#71717a' },
   // Underlined because "Not sure?" on its own reads as a statement about the
