@@ -992,7 +992,7 @@ export default function GroceryListScreen() {
 
                   <Text style={{ color: '#71717a', fontSize: 11 }}>
 
-                    {(() => { const s = curatedChoices.filter(c => c.altId != null && c.chosenVariantId === c.altId).length; return s > 0 ? `${curatedChoices.length} meals · ${s} from scratch` : 'all easy defaults'; })()}
+                    {(() => { const s = curatedChoices.filter(c => c.altId != null && c.chosenVariantId === c.altId).length; return s > 0 ? `${curatedChoices.length} meals · ${s} best flavour` : 'all quick versions'; })()}
 
                   </Text>
 

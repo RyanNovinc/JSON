@@ -11,6 +11,7 @@ import {
   LayoutChangeEvent,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Linking,
 } from 'react-native';
 // GestureHandlerRootView is NOT optional here, and its absence is silent on iOS.
 // RNGH gestures do not work inside a React Native <Modal> on Android by default, because
@@ -69,6 +70,41 @@ const PACE_TITLES: Record<RestPace, string> = {
   moderate: 'Balanced Rest',
   minimal: 'Quick Rest',
 };
+
+/**
+ * What the ⓘ next to "Rest pace" reveals.
+ *
+ * Each line carries ONLY what differs between the three: session length and strength.
+ * The muscle claim is common to all three, so it is stated once in the footer instead of
+ * three times — repeating it per row made every option read as a hedge.
+ *
+ * On the footer's first sentence. Most people have met Schoenfeld 2016 (1 min vs 3 min,
+ * the 3 min group grew more) and arrive believing longer rest means more growth. The
+ * reason that does not contradict this panel is that the losing arm of that study rested
+ * ONE minute, and Quick never goes near that on a compound — its shortest compound value
+ * is 2 min, and the heavy-compound hard floor is 2 min at every pace. Singer 2024's
+ * synthesis puts the hypertrophy plateau at ~90 s, which every pace clears or sits within
+ * noise of. The link is there for the people who want to check that themselves.
+ *
+ * What is deliberately NOT claimed: that Quick costs growth on isolation. It does not,
+ * or at least not detectably — Singer's effect sizes in the 60-90 s band were 0.13 and
+ * 0.17 with credible intervals crossing zero, and rest-references.md states that within
+ * ±30 s of a recommended value no published RCT shows a meaningful difference. The real
+ * cost sits below 60 s, which is why no pace goes there any more.
+ */
+const PACE_EXPLAINERS: { pace: RestPace; label: string; body: string }[] = [
+  { pace: 'optimal', label: 'Full', body: 'Best for strength. Longest sessions.' },
+  { pace: 'moderate', label: 'Balanced', body: 'Shorter sessions. Slightly less strength than Full.' },
+  { pace: 'minimal', label: 'Quick', body: 'Shortest sessions, hardest work. Least strength.' },
+];
+
+const PACE_FOOTER =
+  'All three build the same amount of muscle. How many hard sets you do matters far more than how long you rest.';
+
+/** The rendered research page, not the raw .md — json.fit/research/ fetches and
+ *  styles the same file the prompt chain reads, so there is one source of truth
+ *  and the visitor gets a page rather than a wall of plain text. */
+const REST_RESEARCH_URL = 'https://json.fit/research/?topic=rest';
 
 /** Reserves the duration line's height when there is no duration to show, so the row
  *  does not change height between a timer being live and not. */
@@ -142,6 +178,11 @@ export const TimerModal: React.FC = () => {
   // Drives the grabber's colour only. Two setStates per drag, at activation and release —
   // not per frame.
   const [isDragging, setIsDragging] = useState(false);
+
+  // The ⓘ panel under the pace row. Collapsed on every open: it answers a question the
+  // user asks once, and leaving it expanded would push the alert rows below the fold
+  // for everyone who has already read it.
+  const [paceInfoOpen, setPaceInfoOpen] = useState(false);
 
   useEffect(() => {
     hideModalRef.current = hideModal;
@@ -528,7 +569,28 @@ export const TimerModal: React.FC = () => {
             {/* Rest pace (only for countdown) */}
             {!timerSettings.countUp && (
               <View>
-                <Text style={styles.settingLabel}>Rest pace</Text>
+                <View style={styles.settingLabelRow}>
+                  <Text style={styles.settingLabel}>Rest pace</Text>
+                  <TouchableOpacity
+                    onPress={() => setPaceInfoOpen((open) => !open)}
+                    // The icon is small, so the tap target is padded out rather than the
+                    // icon grown. hitSlop keeps it reachable without moving the label.
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: paceInfoOpen }}
+                    accessibilityLabel={
+                      paceInfoOpen
+                        ? 'Hide what each rest pace changes'
+                        : 'Explain what each rest pace changes'
+                    }
+                  >
+                    <Ionicons
+                      name={paceInfoOpen ? 'information-circle' : 'information-circle-outline'}
+                      size={17}
+                      color={paceInfoOpen ? themeColor : '#888'}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <View style={styles.paceControl}>
                   {PACE_OPTIONS.map(({ pace, label }) => {
                     const isSelected = timerSettings.pace === pace;
@@ -593,6 +655,39 @@ export const TimerModal: React.FC = () => {
                     );
                   })}
                 </View>
+
+                {/* Costs and benefits of each pace. Sits between the buttons and the
+                    duration hint so the numbers stay on screen while it is being read —
+                    the whole point is comparing the wording against the seconds. Rendered
+                    inline rather than as a second Modal: this control already lives inside
+                    a Modal, and stacking one on iOS dismisses the first. */}
+                {paceInfoOpen && (
+                  <View style={styles.paceInfoPanel}>
+                    {PACE_EXPLAINERS.map(({ pace, label, body }, index) => (
+                      <View
+                        key={pace}
+                        style={[
+                          styles.paceInfoRow,
+                          index === PACE_EXPLAINERS.length - 1 && styles.paceInfoRowLast,
+                        ]}
+                      >
+                        <Text style={styles.paceInfoName}>{label}</Text>
+                        <Text style={styles.paceInfoBody}>{body}</Text>
+                      </View>
+                    ))}
+                    <Text style={styles.paceInfoFooter}>{PACE_FOOTER}</Text>
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(REST_RESEARCH_URL)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="link"
+                      accessibilityLabel="See the research behind these rest times"
+                    >
+                      <Text style={[styles.paceInfoLink, { color: themeColor }]}>
+                        See the research →
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* An empty row of buttons with no numbers under them looks broken. Say
                     why they are empty instead. Only reachable outside a workout now that
@@ -794,10 +889,60 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 4,
   },
+  settingLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
   settingLabel: {
     fontSize: 15,
     fontWeight: '500',
     color: '#ffffff',
+  },
+  paceInfoPanel: {
+    marginTop: 14,
+    padding: 15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#232323',
+    backgroundColor: '#101010',
+  },
+  paceInfoRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#1f1f1f',
+  },
+  paceInfoRowLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+  paceInfoName: {
+    width: 62,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#e4e4e7',
+  },
+  paceInfoBody: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: '#a1a1aa',
+  },
+  paceInfoFooter: {
+    marginTop: 12,
+    paddingTop: 11,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#1f1f1f',
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#71717a',
+  },
+  paceInfoLink: {
+    marginTop: 9,
+    fontSize: 12,
+    fontWeight: '500',
   },
   // Its own rule and its own tighter row rhythm: settingsSection's 24px gap is right for
   // separating unrelated controls, and far too loose for three switches that belong

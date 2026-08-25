@@ -40,8 +40,8 @@ type MatrixRow =
   | 'heavy_compound'
   | 'moderate_compound'
   | 'unilateral'
-  | 'large_isolation'
-  | 'small_isolation'
+  | 'high_cost_isolation'
+  | 'low_cost_isolation'
   | 'superset_transition'
   | 'superset_round';
 
@@ -90,9 +90,22 @@ const MATRIX: Record<MatrixRow, RestTriple> = {
   // timer event here.
   unilateral: { optimal: 150, moderate: 120, minimal: 90 },
   // 2 min / 75-90 s / 60 s
-  large_isolation: { optimal: 120, moderate: 90, minimal: 60 },
-  // 60-90 s / 45-75 s / 30-60 s
-  small_isolation: { optimal: 75, moderate: 60, minimal: 45 },
+  high_cost_isolation: { optimal: 120, moderate: 90, minimal: 60 },
+  // 90 s / 75 s / 60 s
+  //
+  // Raised 24 Aug 2026 from 75/60/45. Rationale, since these are the only
+  // numbers in the matrix not taken straight from rest-guidance.md:
+  //   - 90 (optimal): Singer 2024 puts the hypertrophy plateau at ~90 s, and
+  //     rest-guidance.md's own moderate-confidence line already names ~90 s as
+  //     the isolation default. The old 75 sat below the file's own recommendation.
+  //   - 60 (minimal): Singer found the benefit appears ABOVE 60 s, so 60 is the
+  //     floor of the useful zone. The old 45 sat under it.
+  //   - 75 (moderate): interpolation. No study says 75.
+  // Caveat worth keeping in view: rest-guidance.md also states that within
+  // ±30 s of recommended values no published RCT shows a meaningful adaptation
+  // difference, and 60 vs 90 is exactly 30 s. On these exercises the pace
+  // control is at the edge of what the evidence can distinguish.
+  low_cost_isolation: { optimal: 90, moderate: 75, minimal: 60 },
   // Antagonist superset edge case: 30-60 s between the two exercises,
   // then 90 s-2 min before repeating the pair.
   superset_transition: { optimal: 60, moderate: 45, minimal: 30 },
@@ -220,10 +233,10 @@ function selectRow(family: RestFamily, ctx: RestContext): MatrixRow {
       return 'moderate_compound';
     case 'unilateral_compound':
       return 'unilateral';
-    case 'large_isolation':
-      return 'large_isolation';
-    case 'small_isolation':
-      return 'small_isolation';
+    case 'high_cost_isolation':
+      return 'high_cost_isolation';
+    case 'low_cost_isolation':
+      return 'low_cost_isolation';
   }
 }
 

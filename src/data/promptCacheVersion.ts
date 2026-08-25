@@ -22,4 +22,4 @@
 // rir-guidance.md, rep-range-guidance.md, rest-guidance.md, deload-guidance.md,
 // phase-selection.md, lean-mass-targets.md. Then rebuild — the constant only
 // reaches users through a new app build.
-export const PROMPT_CACHE_VERSION = '2026-08-20c'; // summary sections on both the workout and meal prompt chains
+export const PROMPT_CACHE_VERSION = '2026-08-24a'; // rep-range-guidance: isolation bands tightened to 10-15, band-is-the-prescription rule, hard floors

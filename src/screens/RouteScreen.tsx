@@ -101,6 +101,15 @@ type Nav = StackNavigationProp<RootStackParamList>;
 type Beat = 1 | 2 | 3 | 4 | 7 | 8 | 9 | 10;
 
 /**
+ * How far above today's body fat the "bulk up to" peak has to sit.
+ *
+ * WAS 2, LOWERED TO 1 ON 24 Aug 2026. At 18% a two point floor made 20% the
+ * leanest peak available, and a user who wants a short first bulk had no way to
+ * say so. One point is the smallest gap that is still a bulk rather than a hold.
+ */
+const MIN_BULK_HEADROOM_PCT = 1;
+
+/**
  * The three routes.
  *
  * WHAT A ROUTE MAY CLAIM (13 Aug 2026, after external review).
@@ -644,14 +653,14 @@ export default function RouteScreen() {
   const [routeId, setRouteId] = useState<RouteId>('lean');
   /** The capped route's first answer: the body fat they bulk UP TO. */
   const [bulkTo, setBulkTo] = useState<number | null>(null);
-  /** The lit point on the plan chart, and its numbers. Opens on today. */
-  const [tapped, setTapped] = useState<{
-    i: number;
-    month: number;
-    bodyFatPct: number;
-    weightKg: number;
-    when: string;
-  } | null>(null);
+  /**
+   * The lit point on the plan chart. Opens on today.
+   *
+   * An INDEX, not the node itself: the chart draws the numbers now, so keeping
+   * a copy of them here would be a second version of the same reading, free to
+   * drift from the one on screen the moment the roadmap changes underneath it.
+   */
+  const [tapped, setTapped] = useState<number | null>(null);
   /**
    * THE RANGE, both edges. Null means untouched, so `operatingRangeFor`'s
    * default stands and the screen shows what the plan would do anyway.
@@ -909,19 +918,26 @@ export default function RouteScreen() {
   }, [profile?.currentBodyFatPct, driftTopBf]);
 
   const bulkAt = bulkTo ?? defaultBulkTo;
-  /** True while the number they set can never come into play. */
-  const bulkInert = driftTopBf != null && bulkAt >= driftTopBf;
   /**
-   * The readout opens on TODAY rather than empty. It teaches the interaction by
+   * The leanest peak on offer. One point above today: below that it stops being
+   * a bulk. The DEFAULT is left alone at two points above — a limit and a
+   * suggestion are different things, and lowering the floor is not a reason to
+   * open the control lower than it did.
+   */
+  const bulkFloor = (profile?.currentBodyFatPct ?? 0) + MIN_BULK_HEADROOM_PCT;
+  /**
+   * The flag opens on TODAY rather than empty. It teaches the interaction by
    * example, costs no words, and where they are standing right now is the first
    * thing anyone wants off this chart.
+   *
+   * The body fat guard stays: with no measured body fat the chart falls back to
+   * a straight walk and emits NO nodes, so node 0 would light nothing and the
+   * flag would have no numbers to carry.
    */
   React.useEffect(() => {
     if (beat !== 9 || rangeStep !== 3 || tapped != null) return;
-    const w = profile?.currentWeightKg;
-    const bf = profile?.currentBodyFatPct;
-    if (w == null || bf == null) return;
-    setTapped({ i: 0, month: 0, bodyFatPct: bf, weightKg: w, when: 'today' });
+    if (profile?.currentWeightKg == null || profile?.currentBodyFatPct == null) return;
+    setTapped(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beat, rangeStep]);
 
@@ -1212,14 +1228,19 @@ export default function RouteScreen() {
    * one off it.
    */
   /**
-   * The peak, in half points. Floored two above where they stand, because a
-   * peak at today's body fat is not a bulk, and unbounded above — a number
-   * above the drift top is allowed and the screen says it will not fire rather
-   * than refusing it.
+   * The peak, in half points.
+   *
+   * FLOORED ONE POINT ABOVE WHERE THEY STAND, not two. At 18% a two point floor
+   * made 20% the leanest peak on offer, which is a bigger first bulk than some
+   * people want to run; one point is the smallest gap that is still a bulk
+   * rather than a hold. Unbounded above — a number above the drift top is
+   * allowed rather than refused.
+   *
+   * `bulkFloor` is read by the minus button's disabled test too, so the limit
+   * and the control that enforces it cannot drift apart.
    */
   const nudgeBulk = (delta: number) => {
-    const now = currentBf ?? 0;
-    const next = Math.max(now + 2, Math.round((bulkAt + delta) * 2) / 2);
+    const next = Math.max(bulkFloor, Math.round((bulkAt + delta) * 2) / 2);
     if (next === bulkAt) return;
     setBulkTo(next);
     void updateGoalsProfileField('bulkToBf', next);
@@ -1281,6 +1302,9 @@ export default function RouteScreen() {
   const bandHi = range?.top ?? 0;
   const atLeanStop = range != null && bandLo <= range.leanStop;
   const atMinWidth = range != null && bandHi - bandLo <= range.minWidth;
+  /** Both ends already on the suggestion, which is what spends the Use row. */
+  const onSuggested =
+    range != null && bandLo === range.suggestedBottom && bandHi === range.suggestedTop;
 
   const pulse = (v: Animated.Value) => {
     v.setValue(0.86);
@@ -1921,9 +1945,9 @@ export default function RouteScreen() {
                   <Text style={styles.edgeKey}>BULK UP TO</Text>
                   <View style={styles.edgeCtl}>
                     <TouchableOpacity
-                      style={[styles.stepBtn, bulkAt <= (currentBf ?? 0) + 2 && styles.stepBtnOff]}
+                      style={[styles.stepBtn, bulkAt <= bulkFloor && styles.stepBtnOff]}
                       onPress={() => nudgeBulk(-0.5)}
-                      disabled={bulkAt <= (currentBf ?? 0) + 2}
+                      disabled={bulkAt <= bulkFloor}
                       activeOpacity={0.7}
                       accessibilityRole="button"
                       accessibilityLabel="Lower the body fat you bulk up to"
@@ -1943,18 +1967,6 @@ export default function RouteScreen() {
                   </View>
                 </View>
               </View>
-
-              {/* A limit explains itself only while you are standing on it. Above
-                  the drift top the answer does nothing at all, and saying so is
-                  better than drawing a plan identical to the option above. */}
-              {bulkInert ? (
-                <View style={styles.rangeLimitRow}>
-                  <View style={styles.rangeLimitDot} />
-                  <Text style={styles.rangeLimitText}>
-                    {`Your build tops out at ${driftTopBf}%, so anything above that never comes into play.`}
-                  </Text>
-                </View>
-              ) : null}
             </View>
           </>
         ) : null}
@@ -1967,22 +1979,45 @@ export default function RouteScreen() {
         routeId !== 'bulk' ? (
           <>
             <View style={styles.beat1Body}>
-              <Text style={styles.rangeQ}>
-                {routeId === 'capped'
-                  ? 'Where do you sit after that cut?'
-                  : 'Where should your body fat sit while you grow?'}
-              </Text>
-              {/* THE RECOMMENDATION, STATED UP FRONT. This line used to
-                  describe the mechanism ("a build that reaches the top is
-                  interrupted for a cut"), which explains the machine to
-                  someone who only wants to know what to pick. The suggestion
-                  is a convention three points wide, and it says so by being
-                  offered rather than defended. */}
-              <Text style={styles.rangeSub}>
-                {routeId === 'capped'
-                  ? `You stay in this range while you finish growing. The last cut is the one that takes you to ${Math.round(provisionalGoalBf)}%.`
-                  : `We recommend ${range.suggestedBottom} to ${range.suggestedTop}%.`}
-              </Text>
+              {/* ONE QUESTION FOR BOTH ROUTES. This branched — "Where do you sit
+                  after that cut?" on capped, "Where should your body fat sit
+                  while you grow?" on lean — and both were read as confusing.
+                  What the screen actually asks is what body fat you want to
+                  LOOK like for the years this takes, which is true on either
+                  route, so the branch goes with the wording. */}
+              <Text style={styles.rangeQ}>What body fat do you want to sit at?</Text>
+              {/* THE RECOMMENDATION IS THE BUTTON.
+                  It used to be stated here as a sentence AND offered as a link
+                  at the bottom of the screen, which put the same two numbers on
+                  screen twice. One hairline row now does both jobs, in the same
+                  shape as the HOW YOU GROW and YOUR RANGE rows on the plan
+                  screen.
+
+                  IT DOES NOT DISAPPEAR WHEN IT IS TAKEN. The old link hid itself
+                  once the values matched, which was safe while the sentence
+                  above still stated the recommendation — as the only place the
+                  suggestion appears, hiding it would take the numbers off the
+                  screen and pull everything below it up at the moment of a tap.
+                  It states "In use" instead. */}
+              <TouchableOpacity
+                style={styles.recRow}
+                onPress={onSuggested ? undefined : useSuggested}
+                activeOpacity={onSuggested ? 1 : 0.7}
+                disabled={onSuggested}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  onSuggested
+                    ? `Using the suggested range, ${range.suggestedBottom} to ${range.suggestedTop} percent`
+                    : `Use the suggested range, ${range.suggestedBottom} to ${range.suggestedTop} percent`
+                }
+              >
+                <Text style={styles.recKey}>
+                  {`We recommend ${range.suggestedBottom} to ${range.suggestedTop}%`}
+                </Text>
+                <Text style={[styles.recAct, onSuggested && styles.recActOff, !onSuggested && { color: themeColor }]}>
+                  {onSuggested ? 'In use' : 'Use'}
+                </Text>
+              </TouchableOpacity>
               <JourneyChart
                 profile={profile}
                 roadmap={roadmap}
@@ -2064,16 +2099,6 @@ export default function RouteScreen() {
                   </Text>
                 </TouchableOpacity>
               ) : null}
-
-              {/* A link, never a mode, and now a restatement of the line at the
-                  top rather than an introduction of it. */}
-              {bandLo !== range.suggestedBottom || bandHi !== range.suggestedTop ? (
-                <TouchableOpacity onPress={useSuggested} activeOpacity={0.7}>
-                  <Text style={styles.suggestLink}>
-                    {`Use the suggested ${range.suggestedBottom} to ${range.suggestedTop}%`}
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
             </View>
           </>
         ) : null}
@@ -2123,8 +2148,9 @@ export default function RouteScreen() {
                 // A plan with no range carries a fallback ceiling nobody chose,
                 // and shading it would show a rule the user never set.
                 band={routeId !== 'bulk'}
-                onSelectNode={(nd, i) => setTapped(tapped?.i === i ? null : { ...nd, i })}
-                selectedNode={tapped?.i ?? null}
+                onSelectNode={(_nd, i) => setTapped(tapped === i ? null : i)}
+                selectedNode={tapped}
+                nodeFlag
                 muscleKg={roadmap.gapKg != null && roadmap.gapKg > 0 ? Math.round(roadmap.gapKg) : undefined}
               />
               <View style={styles.chartEnds}>
@@ -2152,34 +2178,15 @@ export default function RouteScreen() {
                   mass grows across the plan and the same body fat is a different
                   number depending on when you stand on it.
 
-                  A readout rather than a bubble over the point: at four years
-                  the boundaries sit about thirty points apart, and a callout
-                  covers the neighbours you are comparing against. It opens on
-                  today so the tap teaches itself. */}
-              <View style={styles.readout}>
-                {tapped ? (
-                  <>
-                    <View style={styles.readCell}>
-                      <Text style={styles.readKey}>WEIGHT</Text>
-                      <Text style={styles.readVal}>{tapped.weightKg.toFixed(1)} kg</Text>
-                    </View>
-                    <View style={styles.readCell}>
-                      <Text style={styles.readKey}>BODY FAT</Text>
-                      <Text style={styles.readVal}>{tapped.bodyFatPct.toFixed(1)}%</Text>
-                    </View>
-                    <View style={[styles.readCell, { flex: 1.3 }]}>
-                      <Text style={styles.readKey}>WHEN</Text>
-                      <Text style={styles.readVal}>
-                        {tapped.month < 0.5 ? 'Now' : `Month ${Math.round(tapped.month)}`}
-                      </Text>
-                      <Text style={styles.readSub}>{tapped.when}</Text>
-                    </View>
-                  </>
-                ) : (
-                  <Text style={styles.readHint}>Tap any point on the line.</Text>
-                )}
-              </View>
+                  THE ROW THAT USED TO SAY THAT IS GONE. It lived here because a
+                  bubble anchored to a point covers the neighbours you are
+                  comparing it against, which is true and still true. The chart's
+                  `nodeFlag` answers it a different way: the numbers sit at a
+                  fixed height ABOVE the plot, so nothing is drawn over the line
+                  and the reading does not jump as you walk along the plan.
 
+                  Worth 98pt on a screen that does not scroll, and the flag pays
+                  30 of it back. */}
               {/* NO CONTROLS HERE. Each row states a choice and jumps back to
                   the screen that owns it, which is also the revisit path — the
                   choice is never buried behind a settings menu. */}
@@ -2802,25 +2809,29 @@ const styles = StyleSheet.create({
   rangeLimitRow: { flexDirection: 'row', gap: 9, marginTop: 14, alignItems: 'flex-start' },
   rangeLimitDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#d1a44a', marginTop: 6 },
   rangeLimitText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: '#8e8e93' },
-  suggestLink: { fontSize: 12.5, color: '#8e8e93', marginTop: 16 },
   /**
-   * The tap readout. A row rather than a callout over the point: at four years
-   * across the canvas the phase boundaries sit about thirty points apart, and a
-   * bubble covers the neighbours the user is comparing against.
+   * The recommendation row. Same hairline shape as the plan screen's rows, and
+   * bordered top and bottom rather than just on top, because it sits between
+   * the question and the chart with nothing above it to butt against.
    */
-  readout: {
+  recRow: {
     flexDirection: 'row',
-    marginTop: 20,
-    paddingTop: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 4,
+    paddingVertical: 13,
     borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#232328',
-    minHeight: 62,
+    borderBottomColor: '#232328',
   },
-  readCell: { flex: 1 },
-  readKey: { fontSize: 9.5, fontWeight: '700', letterSpacing: 1.2, color: '#4b4b52' },
-  readVal: { fontSize: 20, fontWeight: '700', color: '#fff', marginTop: 6, letterSpacing: -0.3 },
-  readSub: { fontSize: 11.5, color: '#8e8e93', marginTop: 3 },
-  readHint: { fontSize: 12.5, color: '#4b4b52', paddingTop: 4 },
+  recKey: { fontSize: 13.5, color: '#8e8e93' },
+  recAct: { fontSize: 14, fontWeight: '700' },
+  recActOff: { color: '#4b4b52', fontWeight: '400' },
+  // The tap readout styles (readout / readCell / readKey / readVal / readSub /
+  // readHint) went with the row on 24 Aug. The numbers are drawn inside the
+  // chart now — see JourneyChart's `nodeFlag`.
   optRow: {
     flexDirection: 'row',
     alignItems: 'center',

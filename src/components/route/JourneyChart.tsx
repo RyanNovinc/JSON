@@ -29,6 +29,16 @@
 //
 // The straight walk survives as the fallback for a profile with no measured
 // body fat, where there is no lean mass and therefore no trajectory to compute.
+//
+// ── THE NUMBERS MOVED ONTO THE CHART (24 Aug 2026) ──────────────────────────
+//
+// The tapped point's weight, body fat and month used to be a labelled row under
+// the chart, on the argument that a bubble anchored to a point covers the
+// neighbouring points the user is comparing it against — which is true, and at
+// four years across 278pt the boundaries sit about 30pt apart. `nodeFlag` keeps
+// that objection satisfied: the numbers sit at a FIXED height above the plot,
+// so nothing is ever drawn over the line, and the readout does not jump as the
+// user walks along the plan. Only the leader moves.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
@@ -42,6 +52,45 @@ import { planCurve } from '../../utils/planCurve';
 // into the build beside it. The array is still fixed length, which is what lets
 // two plans morph into each other.
 const CHART = { X0: 30, X1: 308, Y0: 14, Y1: 104, N: 96 } as const;
+
+/**
+ * Vertical space the node flag needs above the plot, in viewBox units.
+ *
+ * It is CONSTANT while `nodeFlag` is on rather than appearing with the
+ * selection: room that arrives on the first tap would shove the whole chart
+ * down by 30pt at the moment the user touches it.
+ */
+const FLAG_ROOM = 30;
+
+/**
+ * Roughly how wide a string renders, so the flag can be centred on its point
+ * and clamped to the plot.
+ *
+ * react-native-svg cannot measure text, and the alternatives are both worse: a
+ * fixed width leaves a gutter beside "82.0 kg · 20.4% · Now" and clips
+ * "91.9 kg · 14.2% · Month 27", and measuring off-screen with onLayout costs a
+ * render pass on every tap. The set of strings here is narrow — digits, a
+ * decimal point, "kg", "%", "Month" — so per-class em widths are close enough,
+ * and being a point or two wide only pads the pill.
+ */
+function approxWidth(s: string, size: number): number {
+  let em = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch >= '0' && ch <= '9') em += 0.56;
+    else if (ch === ' ' || ch === '.') em += 0.28;
+    else if (ch === '\u00b7') em += 0.34;
+    else if (ch === '%') em += 0.86;
+    else if (ch >= 'A' && ch <= 'Z') em += 0.66;
+    else em += 0.52;
+  }
+  return em * size;
+}
+
+/** The flag's own copy of the readout's wording, so both agree. */
+function whenLabel(month: number): string {
+  return month < 0.5 ? 'Now' : `Month ${Math.round(month)}`;
+}
 
 type ChartTarget = {
   ys: number[];
@@ -280,6 +329,7 @@ export default function JourneyChart({
   targetPct,
   onSelectNode,
   selectedNode,
+  nodeFlag = false,
 }: {
   profile: GoalsProfile;
   roadmap: Roadmap;
@@ -369,10 +419,9 @@ export default function JourneyChart({
    */
   targetPct?: number;
   /**
-   * Makes every phase boundary tappable. The readout that receives this lives
-   * outside the chart, because the numbers a user wants at a point — weight and
-   * body fat — do not fit beside the point at this size without covering the
-   * neighbouring ones.
+   * Makes every phase boundary tappable. The numbers themselves are drawn by
+   * `nodeFlag` below; a caller can still take the node and render its own
+   * readout, which is what this did before the flag existed.
    */
   onSelectNode?: (
     node: { month: number; bodyFatPct: number; weightKg: number; when: string },
@@ -380,6 +429,25 @@ export default function JourneyChart({
   ) => void;
   /** Index of the lit node, or null. */
   selectedNode?: number | null;
+  /**
+   * THE SELECTED NODE'S NUMBERS, ON THE CHART.
+   *
+   * One line — weight, body fat, month — pinned at a FIXED height above the
+   * plot, tracking the point horizontally and clamped to the plot edges, with a
+   * hairline leader dropping to the dot.
+   *
+   * This replaces the labelled row that used to sit under the chart, and it is
+   * the one shape that survives the objection which put the numbers down there
+   * in the first place: at four years across 278pt the phase boundaries sit
+   * about 30pt apart, so a bubble ANCHORED to a point covers the neighbours the
+   * user is comparing it against. A flag at a fixed height never sits over the
+   * line at all, and it does not jump vertically as the user moves along the
+   * plan — only the leader moves.
+   *
+   * It costs `FLAG_ROOM` above the plot, taken by extending the viewBox UPWARD
+   * so that not one plotted coordinate moves.
+   */
+  nodeFlag?: boolean;
 }) {
   const target = React.useMemo(
     () => buildChartTarget(profile, roadmap, sparkline, compact, bandOnly, leanStopPct, band),
@@ -500,8 +568,27 @@ export default function JourneyChart({
   const seg2w = Math.max(0, cur.stripB[1] - cur.stripB[0] - 4);
   const seg3w = Math.max(0, X1 - cur.stripB[1] - 2);
 
+  /**
+   * THE FLAG GETS ITS ROOM FROM THE VIEWBOX, NOT FROM THE LAYOUT.
+   *
+   * Moving Y0 down by 30 would have moved the band, the year lines, the marks
+   * and every y in `ys` with it, and `shown.current` interpolates those across
+   * a 350ms morph — so the whole chart would have had two different geometries
+   * depending on a boolean. Extending the viewBox upward instead leaves every
+   * plotted coordinate exactly where it was and simply reveals negative y.
+   */
+  const flagRoom = nodeFlag ? FLAG_ROOM : 0;
+  /** The selected node, if there is one to draw. Empty for a profile with no
+   *  measured body fat, where `nodes` is [] and the fallback line has no
+   *  boundaries to tap. */
+  const flagNode = nodeFlag && selectedNode != null ? target.nodes[selectedNode] : undefined;
+
   return (
-    <Svg width="100%" height={svgHeight} viewBox={`0 0 320 ${svgHeight}`}>
+    <Svg
+      width="100%"
+      height={svgHeight + flagRoom}
+      viewBox={`0 ${-flagRoom} 320 ${svgHeight + flagRoom}`}
+    >
       {sparkline || !band ? null : (
         <Rect
           x={X0}
@@ -528,15 +615,45 @@ export default function JourneyChart({
           })
         : null}
 
-      {/* THE TARGET, not a region: one rule, nothing under it. */}
-      {targetPct != null ? (
-        <>
-          <Line x1={X0} y1={yAt(targetPct)} x2={X1} y2={yAt(targetPct)} stroke={color} strokeWidth={1.5} />
-          <SvgText x={X1 - 2} y={yAt(targetPct) - 5} fontSize={8.5} fill={color} textAnchor="end">
-            {`${targetPct}%`}
-          </SvgText>
-        </>
-      ) : null}
+      {/* THE TARGET, not a region: one rule, nothing under it.
+
+          PINNED AT THE EDGE WHEN IT IS ABOVE THE CHART. The domain deliberately
+          does NOT grow to include this rule — doing that would rescale the band,
+          today and the goal underneath the user while they tap the stepper, and
+          those three sitting still is the whole reason the band-only domain
+          comes from the marks. So a target past the top of the chart sticks to
+          the frame, dims, and carries a caret with its own value: it then reads
+          as pointing off the chart rather than as claiming to be 20%. */}
+      {targetPct != null
+        ? (() => {
+            const hiPct = target.domain[1];
+            const off = targetPct > hiPct;
+            const y = off ? Y0 : yAt(targetPct);
+            return (
+              <>
+                <Line
+                  x1={X0}
+                  y1={y}
+                  x2={X1}
+                  y2={y}
+                  stroke={color}
+                  strokeWidth={1.5}
+                  strokeOpacity={off ? 0.55 : 1}
+                />
+                <SvgText
+                  x={X1 - 2}
+                  y={y - 5}
+                  fontSize={8.5}
+                  fill={color}
+                  fillOpacity={off ? 0.75 : 1}
+                  textAnchor="end"
+                >
+                  {off ? `\u25b2 ${targetPct}%` : `${targetPct}%`}
+                </SvgText>
+              </>
+            );
+          })()
+        : null}
       {/* THE MARKS THE RANGE SITS AGAINST. Dashed for today and the goal because
           neither is a decision — they are where the user already is and where
           they already said they wanted to be — and solid amber for the stop,
@@ -676,6 +793,69 @@ export default function JourneyChart({
               />
             </React.Fragment>
           ))
+        : null}
+
+      {/* ── THE NODE FLAG ─────────────────────────────────────────────────
+          One line at a fixed height above the plot, with a hairline leader down
+          to the dot it belongs to. Drawn after the line and the dots so the
+          pill sits over both; the leader crossing the line is what makes it
+          read as pointing rather than as another rule on the chart.
+
+          The pill is filled with the SCREEN background rather than a card
+          colour. It is a label on the chart, not a surface floating above it,
+          which is the rule the rest of this flow follows — and it means the
+          leader disappears cleanly behind it. */}
+      {flagNode
+        ? (() => {
+            const label = `${flagNode.weightKg.toFixed(1)} kg \u00b7 ${flagNode.bodyFatPct.toFixed(
+              1,
+            )}% \u00b7 ${whenLabel(flagNode.month)}`;
+            const fs = 11;
+            const w = Math.min(X1 - X0, approxWidth(label, fs) + 22);
+            const h = 21;
+            const top = -flagRoom + 4;
+            /**
+             * CLAMPED TO THE PLOT, so the first and last nodes keep their
+             * numbers on screen instead of half of them hanging past the axis.
+             * The leader is what tells the user which point an off-centre flag
+             * belongs to, which is why it is drawn to the node's own x and not
+             * to the middle of the pill.
+             */
+            const bx = Math.min(Math.max(flagNode.x - w / 2, X0), X1 - w);
+            return (
+              <>
+                <Line
+                  x1={flagNode.x}
+                  y1={top + h}
+                  x2={flagNode.x}
+                  y2={flagNode.y - 7}
+                  stroke={color}
+                  strokeWidth={1}
+                  strokeOpacity={0.45}
+                />
+                <Rect
+                  x={bx}
+                  y={top}
+                  width={w}
+                  height={h}
+                  rx={h / 2}
+                  fill="#0a0a0b"
+                  stroke="#2c2c33"
+                  strokeWidth={1}
+                />
+                <SvgText
+                  x={bx + w / 2}
+                  y={top + 14.5}
+                  fontSize={fs}
+                  fontWeight="600"
+                  fill="#e8e8ea"
+                  textAnchor="middle"
+                >
+                  {label}
+                </SvgText>
+              </>
+            );
+          })()
         : null}
 
       {muscleKg != null && buildSpan && !sparkline

@@ -19,7 +19,7 @@
         "backgroundColor": "#000000"
       },
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "136",
+      "buildNumber": "137",
       "associatedDomains": [
         "applinks:json.fit"
       ],
@@ -80,7 +80,7 @@
         "backgroundColor": "#22d3ee"
       },
       "package": "com.RyanNovinc.JSON",
-      "versionCode": 99,
+      "versionCode": 100,
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,

@@ -39,6 +39,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "/Users/ryannovinc/keys/play-service-account.json",
+        "track": "production"
+      }
+    }
   }
 }
