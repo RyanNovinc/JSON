@@ -18,7 +18,10 @@ android/
 dist/
 venv/
 aws-setup/
-jsonfit-share-backend/
+# jsonfit-share-backend/ itself must upload: src/services/shareService.ts
+# imports jsonfit-share-backend/src/shared/shareLimits. Only its SAM build
+# artifacts are excluded.
+jsonfit-share-backend/.aws-sam/
 images/
 DateDownMobile/
 lambda-*/
