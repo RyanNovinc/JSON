@@ -278,9 +278,10 @@ const MEAL_VIDEOS: Partial<Record<MealSlug, MealVideo>> = {
     video: `${VIDEO_BASE}/butter_chicken.mp4`,
     poster: `${VIDEO_BASE}/butter_chicken.jpg`,
   },
-  /* Encoded and ready to upload:
-   * mango_mass:                 { video: `${VIDEO_BASE}/mango_mass.mp4` },
-   * turkey_meatballs_spaghetti: { video: `${VIDEO_BASE}/turkey_meatballs_spaghetti.mp4` }, */
+  king_kong_chocolate: {
+    video: `${VIDEO_BASE}/king_kong_chocolate.mp4`,
+    poster: `${VIDEO_BASE}/king_kong_chocolate.jpg`,
+  },
 };
 
 /* Module-scope overlay rather than context or a prop: mealVideo() is called
