@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigationRef } from '../utils/navigationRef';
 import MealCycleHero from './MealCycleHero';
 import { OnboardingAnalytics } from '../services/onboardingAnalytics';
+import { hasPriorUserData } from '../utils/onboardingGate';
 
 // ============================================================================
 // IntentForkModal — first-open "what do you want to do first?" screen.
@@ -240,6 +241,21 @@ export default function IntentForkModal() {
         if (legacy) {
           // Existing user who finished the old onboarding — migrate silently,
           // never show the fork.
+          await AsyncStorage.multiSet([
+            [KEY_COMPLETED, new Date().toISOString()],
+            [KEY_INTENT, 'skipped'],
+          ]);
+          fadeOutCover();
+          return;
+        }
+
+        // Neither gate key, but real data on the device: a returning user from
+        // before the gate keys existed (or after a reset). Same silent
+        // migration — an update must never replay onboarding over an account.
+        const returning = await hasPriorUserData();
+        if (cancelled) return;
+        if (returning) {
+          console.log('🚪 [ONBOARDING] No gate key but user data present — closing gate silently');
           await AsyncStorage.multiSet([
             [KEY_COMPLETED, new Date().toISOString()],
             [KEY_INTENT, 'skipped'],
