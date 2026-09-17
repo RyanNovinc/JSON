@@ -17,6 +17,12 @@
 /** Longest a workout timer is allowed to keep running unattended. */
 export const MAX_ACTIVE_WORKOUT_AGE_MS = 6 * 60 * 60 * 1000;
 
+/**
+ * Quiet time after the last logged set before the "Still training?" nudge
+ * fires. The Apple Watch pattern: remind, never auto-end.
+ */
+export const INACTIVITY_NUDGE_MS = 2 * 60 * 60 * 1000;
+
 export interface ActiveWorkoutRouteParams {
   day: any;
   blockName: string;
@@ -43,8 +49,57 @@ export interface CurrentWorkoutRecord {
   allSetsData?: any[][];
   workoutStartTime?: string | Date | null;
   workoutDuration?: number;
+  /** Last time the user logged something (set edit, tick, start). Not bumped by saves on open. */
+  lastActivityAt?: number;
   timestamp?: number;
   savedAt?: number;
+}
+
+/** True when any set carries a value or a tick: something the user would lose. */
+export function hasLoggedSets(allSetsData: any[][] | null | undefined): boolean {
+  if (!Array.isArray(allSetsData)) return false;
+  return allSetsData.some(
+    (sets) => Array.isArray(sets) && sets.some((s) => s && (s.weight !== '' || s.reps !== '' || s.completed)),
+  );
+}
+
+/** Number of ticked sets, for the abandoned-session prompt copy. */
+export function countCompletedSets(allSetsData: any[][] | null | undefined): number {
+  if (!Array.isArray(allSetsData)) return 0;
+  return allSetsData.reduce(
+    (n, sets) => n + (Array.isArray(sets) ? sets.filter((s) => s && s.completed).length : 0),
+    0,
+  );
+}
+
+/**
+ * A believable duration for a session the user walked away from: start to the
+ * last thing they logged, never the 16 hours until they came back. Falls back
+ * to the record's last save when no activity stamp exists (records written
+ * before lastActivityAt was added), then to a floor of one minute so a saved
+ * workout never reads as 0:00.
+ */
+export function abandonedSessionDurationSeconds(
+  start: Date,
+  lastActivityAt: number | null | undefined,
+  fallbackSavedAt?: number | null,
+): number {
+  const end = lastActivityAt || fallbackSavedAt || start.getTime();
+  const raw = Math.floor((end - start.getTime()) / 1000);
+  const capped = Math.min(raw, Math.floor(MAX_ACTIVE_WORKOUT_AGE_MS / 1000));
+  return Math.max(60, capped);
+}
+
+/** "today at 4:57 PM" / "yesterday at 4:57 PM" / "Mon 15 Sep at 4:57 PM". */
+export function describeStartTime(start: Date, now: number = Date.now()): string {
+  const time = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const startDay = new Date(start); startDay.setHours(0, 0, 0, 0);
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const dayDiff = Math.round((today.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000));
+  if (dayDiff === 0) return `today at ${time}`;
+  if (dayDiff === 1) return `yesterday at ${time}`;
+  const date = start.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  return `${date} at ${time}`;
 }
 
 export function parseWorkoutStartTime(value: unknown): Date | null {

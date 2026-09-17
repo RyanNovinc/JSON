@@ -12,6 +12,12 @@
  *       [ DURATION ] [ SWAP ]  ← tappable, cycles the comparison above
  *   - Optional PR callout
  *   - Cancel + Finish Workout buttons
+ *   - "Discard workout" link (when the caller provides onDiscard)
+ *
+ * The DURATION tile is tappable: it opens an inline hours/minutes editor, and
+ * the value the user enters is what onConfirm receives. Hevy and Strong both
+ * let the duration be corrected; a phone left in a locker should not turn a
+ * 50-minute session into a 3-hour one.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -22,6 +28,7 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -43,7 +50,10 @@ export interface PRInfo {
 export interface FinishWorkoutModalProps {
   visible: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  /** Receives the duration to record: the edited value if the user changed it. */
+  onConfirm: (durationSeconds: number) => void;
+  /** When set, a "Discard workout" link is offered below the buttons. */
+  onDiscard?: () => void;
 
   allSetsData: SetData[][];
   durationSeconds: number;
@@ -138,6 +148,7 @@ export default function FinishWorkoutModal({
   visible,
   onCancel,
   onConfirm,
+  onDiscard,
   allSetsData,
   durationSeconds,
   pr,
@@ -195,11 +206,39 @@ export default function FinishWorkoutModal({
     setComparisonIndex((i) => (i + 1) % meaningfulComparisons.length);
   };
 
-  const durationLabel = useMemo(() => {
-    const mins = Math.floor(durationSeconds / 60);
-    const secs = durationSeconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }, [durationSeconds]);
+  // Duration editing. null = untouched (live value flows through); a number =
+  // what the user typed, frozen so the ticking prop can't overwrite it.
+  const [editedDuration, setEditedDuration] = useState<number | null>(null);
+  const [editingDuration, setEditingDuration] = useState(false);
+  const [hoursText, setHoursText] = useState('0');
+  const [minutesText, setMinutesText] = useState('0');
+  useEffect(() => {
+    if (visible) {
+      setEditedDuration(null);
+      setEditingDuration(false);
+    }
+  }, [visible]);
+
+  const effectiveDuration = editedDuration ?? durationSeconds;
+  const durationLabel = useMemo(() => formatDuration(effectiveDuration), [effectiveDuration]);
+
+  const openDurationEditor = () => {
+    setHoursText(String(Math.floor(effectiveDuration / 3600)));
+    setMinutesText(String(Math.floor((effectiveDuration % 3600) / 60)));
+    setEditingDuration(true);
+  };
+  const commitDurationEditor = () => {
+    const h = Math.max(0, parseInt(hoursText, 10) || 0);
+    const m = Math.min(59, Math.max(0, parseInt(minutesText, 10) || 0));
+    const seconds = h * 3600 + m * 60;
+    // Keep the live seconds when the user didn't actually change anything.
+    if (h === Math.floor(effectiveDuration / 3600) && m === Math.floor((effectiveDuration % 3600) / 60)) {
+      setEditingDuration(false);
+      return;
+    }
+    setEditedDuration(seconds);
+    setEditingDuration(false);
+  };
 
   return (
     <Modal
@@ -282,7 +321,18 @@ export default function FinishWorkoutModal({
                 value={`${stats.completedSets} / ${stats.totalSets}`}
               />
               <StatCard label="REPS" value={String(stats.totalReps)} />
-              <StatCard label="DURATION" value={durationLabel} />
+              <DurationCard
+                label={durationLabel}
+                edited={editedDuration !== null}
+                editing={editingDuration}
+                hoursText={hoursText}
+                minutesText={minutesText}
+                themeColor={themeColor}
+                onHoursChange={setHoursText}
+                onMinutesChange={setMinutesText}
+                onPress={openDurationEditor}
+                onDone={commitDurationEditor}
+              />
               <SwapComparisonCard
                 disabled={meaningfulComparisons.length <= 1}
                 themeColor={themeColor}
@@ -321,12 +371,24 @@ export default function FinishWorkoutModal({
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, { backgroundColor: themeColor }]}
-                onPress={onConfirm}
+                onPress={() => onConfirm(effectiveDuration)}
                 activeOpacity={0.85}
               >
                 <Text style={styles.confirmButtonText}>Finish Workout</Text>
               </TouchableOpacity>
             </View>
+
+            {onDiscard && (
+              <TouchableOpacity
+                style={styles.discardLink}
+                onPress={onDiscard}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Discard workout"
+              >
+                <Text style={styles.discardLinkText}>Discard workout</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -337,6 +399,85 @@ export default function FinishWorkoutModal({
 // ──────────────────────────────────────────────────────────────────
 // Sub-components
 // ──────────────────────────────────────────────────────────────────
+
+function DurationCard({
+  label,
+  edited,
+  editing,
+  hoursText,
+  minutesText,
+  themeColor,
+  onHoursChange,
+  onMinutesChange,
+  onPress,
+  onDone,
+}: {
+  label: string;
+  edited: boolean;
+  editing: boolean;
+  hoursText: string;
+  minutesText: string;
+  themeColor: string;
+  onHoursChange: (t: string) => void;
+  onMinutesChange: (t: string) => void;
+  onPress: () => void;
+  onDone: () => void;
+}) {
+  if (editing) {
+    return (
+      <View style={styles.statBoxOuter}>
+        <View style={[styles.statBoxInner, { borderColor: hexA(themeColor, 0.4) }]}>
+          <Text style={styles.statLabel}>DURATION</Text>
+          <View style={styles.durationEditRow}>
+            <TextInput
+              style={styles.durationInput}
+              value={hoursText}
+              onChangeText={onHoursChange}
+              keyboardType="number-pad"
+              maxLength={2}
+              selectTextOnFocus
+              autoFocus
+              onSubmitEditing={onDone}
+              accessibilityLabel="Hours"
+            />
+            <Text style={styles.durationUnit}>h</Text>
+            <TextInput
+              style={styles.durationInput}
+              value={minutesText}
+              onChangeText={onMinutesChange}
+              keyboardType="number-pad"
+              maxLength={2}
+              selectTextOnFocus
+              onSubmitEditing={onDone}
+              accessibilityLabel="Minutes"
+            />
+            <Text style={styles.durationUnit}>m</Text>
+          </View>
+          <TouchableOpacity onPress={onDone} hitSlop={8} accessibilityRole="button">
+            <Text style={[styles.durationDone, { color: themeColor }]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.statBoxOuter}>
+      <TouchableOpacity
+        style={styles.statBoxInner}
+        onPress={onPress}
+        activeOpacity={0.6}
+        accessibilityRole="button"
+        accessibilityLabel={`Duration ${label}, tap to edit`}
+      >
+        <View style={styles.durationLabelRow}>
+          <Text style={styles.statLabel}>DURATION</Text>
+          <Ionicons name="pencil" size={9} color={edited ? themeColor : '#55555f'} style={{ marginLeft: 4 }} />
+        </View>
+        <Text style={[styles.statValue, edited && { color: themeColor }]}>{label}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
@@ -378,6 +519,16 @@ function SwapComparisonCard({
 // ──────────────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────────────
+
+function formatDuration(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 function hexA(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
@@ -517,6 +668,52 @@ const styles = StyleSheet.create({
   },
 
   // Swap card uses base stat card styling — centered via statBoxInner
+
+  // Duration tile editor
+  durationLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  durationEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  durationInput: {
+    width: 36,
+    height: 30,
+    color: '#f0f0f2',
+    fontSize: 17,
+    fontWeight: '600',
+    fontFamily: 'Outfit-SemiBold',
+    textAlign: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 6,
+    paddingVertical: 0,
+  },
+  durationUnit: {
+    color: '#9898a4',
+    fontSize: 12,
+    marginHorizontal: 4,
+    fontFamily: 'DMMono-Regular',
+  },
+  durationDone: {
+    fontSize: 11,
+    marginTop: 4,
+    fontFamily: 'Outfit-Medium',
+  },
+  discardLink: {
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  discardLinkText: {
+    color: '#ef4444',
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'Outfit-Medium',
+  },
 
   // PR callout
   prCallout: {

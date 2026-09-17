@@ -265,7 +265,8 @@ export interface WorkoutLogScreenProps {
   /** Workout-level handlers */
   onBack: () => void;
   onStartWorkout: () => void;
-  onFinishWorkout: () => void;
+  /** durationSeconds is the value the user confirmed in the summary (edited or live). */
+  onFinishWorkout: (durationSeconds?: number) => void;
   /** End the session without recording a completion (clears sets + timer). */
   onDiscardWorkout?: () => void;
 
@@ -1781,12 +1782,19 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   };
 
   // Confirm finish workout
-  const confirmFinishWorkout = () => {
+  const confirmFinishWorkout = (durationSeconds?: number) => {
     if (finishingRef.current) return; // ignore repeat taps / re-entry
     finishingRef.current = true;
     stopTimer(); // kill any running rest timer so it can't buzz after completion
     setShowFinishModal(false);
-    onFinishWorkout();
+    onFinishWorkout(durationSeconds);
+  };
+
+  // Discard from the summary sheet: close it first so the confirm alert is
+  // not stacked on top of a modal (Android renders that badly).
+  const discardFromFinishModal = () => {
+    setShowFinishModal(false);
+    setTimeout(handleDiscardWorkoutPress, 250);
   };
 
   // ── Handlers reachable from the pinned header / menu / cards ──────
@@ -2937,6 +2945,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
       visible={showFinishModal}
       onCancel={() => setShowFinishModal(false)}
       onConfirm={confirmFinishWorkout}
+      onDiscard={onDiscardWorkout ? discardFromFinishModal : undefined}
       allSetsData={allSetsData}
       durationSeconds={workoutDuration}
       pr={prInfo}

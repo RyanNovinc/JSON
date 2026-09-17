@@ -15,7 +15,17 @@ import { resolveRest } from '../utils/restResolver';
 import { WorkoutStorage } from '../utils/storage';
 import RobustStorage from '../utils/robustStorage';
 import { Analytics } from '../services/analytics';
-import { isWorkoutStartStale, isSameWorkoutSession, elapsedSecondsSince } from '../utils/activeWorkoutSession';
+import {
+  isWorkoutStartStale,
+  isSameWorkoutSession,
+  elapsedSecondsSince,
+  hasLoggedSets,
+  countCompletedSets,
+  abandonedSessionDurationSeconds,
+  describeStartTime,
+} from '../utils/activeWorkoutSession';
+import { scheduleWorkoutNudge, cancelWorkoutNudge } from '../utils/workoutNudge';
+import StaleWorkoutModal from '../components/StaleWorkoutModal';
 
 // This adapter connects the new beautiful WorkoutLogScreen with your existing app navigation and data structures
 
@@ -110,6 +120,23 @@ export default function WorkoutLogScreenAdapter() {
   // auto-save effect refuses to write until the load for the new key has landed.
   const sessionKey = `${day?.day_name || ''}|${blockName || ''}|${currentWeek || 1}`;
   const loadedSessionRef = useRef<string | null>(null);
+  // When the user last logged something (edit, tick, start). Persisted with the
+  // record; NOT bumped by the save that happens on open, so it survives as the
+  // honest end of an abandoned session.
+  const [lastActivityAt, setLastActivityAt] = useState<number | null>(null);
+  // Set when a saved session is too old to resume AND has logged sets: the
+  // user is asked what it was (save / keep going / discard). Null otherwise.
+  const [staleSession, setStaleSession] = useState<{
+    startTime: Date;
+    completedSets: number;
+    suggestedDurationSeconds: number;
+  } | null>(null);
+
+  // Every logged action: stamp the time and re-arm the inactivity nudge.
+  const noteActivity = () => {
+    setLastActivityAt(Date.now());
+    scheduleWorkoutNudge(day?.day_name || '');
+  };
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   
   // Exercise alternatives state
@@ -221,6 +248,8 @@ export default function WorkoutLogScreenAdapter() {
         setWorkoutDuration(0);
         setWorkoutCompleted(false);
         setCurrentIndex(0);
+        setLastActivityAt(null);
+        setStaleSession(null);
         setDataLoaded(false);
       }
 
@@ -232,10 +261,24 @@ export default function WorkoutLogScreenAdapter() {
       // session: the sets are kept, the timer is not. It restarts on the next edit.
       let restoredStart: Date | null = null;
       let restoredDuration = 0;
+      let stale: typeof staleSession = null;
       if (savedWorkout?.workoutStartTime) {
         const startTime = new Date(savedWorkout.workoutStartTime);
         if (isWorkoutStartStale(startTime)) {
           console.log('⏱️ [TIMER-DEBUG] Saved start time is stale, dropping timer:', savedWorkout.workoutStartTime);
+          if (hasLoggedSets(savedWorkout.allSetsData)) {
+            // Something to lose: ask, instead of deciding for them.
+            stale = {
+              startTime,
+              completedSets: countCompletedSets(savedWorkout.allSetsData),
+              suggestedDurationSeconds: abandonedSessionDurationSeconds(
+                startTime,
+                savedWorkout.lastActivityAt,
+                savedWorkout.savedAt || savedWorkout.timestamp,
+              ),
+            };
+          }
+          cancelWorkoutNudge();
         } else if (!Number.isNaN(startTime.getTime())) {
           restoredStart = startTime;
           restoredDuration = elapsedSecondsSince(startTime);
@@ -289,6 +332,8 @@ export default function WorkoutLogScreenAdapter() {
       setWorkoutStartTime(restoredStart);
       setWorkoutDuration(restoredDuration);
       setWorkoutStarted(restoredStart !== null);
+      setLastActivityAt(typeof savedWorkout?.lastActivityAt === 'number' ? savedWorkout.lastActivityAt : null);
+      setStaleSession(stale);
       loadedSessionRef.current = sessionKey;
       setDataLoaded(true);
     };
@@ -313,6 +358,7 @@ export default function WorkoutLogScreenAdapter() {
         exerciseNotes: {}, // TODO: Add notes support if needed
         workoutStartTime,
         workoutDuration,
+        lastActivityAt,
         timestamp: Date.now(),
       };
       await WorkoutStorage.saveCurrentWorkout(progressData);
@@ -328,7 +374,7 @@ export default function WorkoutLogScreenAdapter() {
     if (dataLoaded && (allSetsData.length > 0 || workoutStartTime)) {
       saveWorkoutProgress();
     }
-  }, [allSetsData, workoutStartTime, dataLoaded, sessionKey]);
+  }, [allSetsData, workoutStartTime, lastActivityAt, dataLoaded, sessionKey]);
 
   // The timer used to auto-start from an effect whenever any set held text. That
   // could not tell a user's keystroke from restored data, so a stale session whose
@@ -413,6 +459,7 @@ export default function WorkoutLogScreenAdapter() {
       setWorkoutStartTime(new Date());
       setWorkoutStarted(true);
     }
+    if (value !== '' && !workoutCompleted) noteActivity();
     setAllSetsData(prev => {
       const newData = [...prev];
       const inner = [...(newData[exerciseIndex] || [])];
@@ -530,6 +577,7 @@ export default function WorkoutLogScreenAdapter() {
       setWorkoutStartTime(new Date());
       setWorkoutStarted(true);
     }
+    if (!wasCompleted && !workoutCompleted) noteActivity();
     
     if (!wasCompleted) {
       // The rest timer and the superset switch depend only on "did the set happen",
@@ -640,6 +688,7 @@ export default function WorkoutLogScreenAdapter() {
     if (!workoutStartTime) {
       setWorkoutStartTime(new Date());
     }
+    noteActivity();
   };
 
   const shakeStartButton = () => {
@@ -856,8 +905,14 @@ export default function WorkoutLogScreenAdapter() {
     });
   };
 
-  const handleConfirmFinish = async () => {
-    console.log('🏁 FINISH WORKOUT: User confirmed workout completion');
+  const handleConfirmFinish = async (durationOverrideSeconds?: number) => {
+    // The duration to record: what the user confirmed in the summary (possibly
+    // edited), or the abandoned-session estimate, else the live timer.
+    const finalDuration =
+      typeof durationOverrideSeconds === 'number' && Number.isFinite(durationOverrideSeconds)
+        ? Math.max(0, Math.floor(durationOverrideSeconds))
+        : workoutDuration;
+    console.log('🏁 FINISH WORKOUT: User confirmed workout completion, duration', finalDuration, 's');
     console.log('🏁 FINISH WORKOUT: currentWeek =', currentWeek, 'blockName =', blockName);
     
     // Set flags to prevent useEffect from re-setting ActiveWorkout and auto-starting
@@ -968,7 +1023,7 @@ export default function WorkoutLogScreenAdapter() {
       };
 
       const stats = {
-        duration: Math.round(workoutDuration / 60), // Convert to minutes
+        duration: Math.round(finalDuration / 60), // Convert to minutes
         totalVolume: calculateTotalVolume(),
         date: new Date().toISOString(),
       };
@@ -983,11 +1038,13 @@ export default function WorkoutLogScreenAdapter() {
 
     Analytics.track('workout_logged', {
       exercise_count: exercises.length,
-      duration_ms: workoutDuration * 1000,
+      duration_ms: finalDuration * 1000,
+      duration_edited: typeof durationOverrideSeconds === 'number',
     });
 
     // Clear saved workout data since workout is complete
     await WorkoutStorage.clearCurrentWorkout(day?.day_name, blockName, currentWeek);
+    cancelWorkoutNudge();
     setWorkoutStarted(false);
     setWorkoutDuration(0);
     
@@ -1023,6 +1080,7 @@ export default function WorkoutLogScreenAdapter() {
     setActiveWorkout(null);
 
     await WorkoutStorage.clearCurrentWorkout(day?.day_name, blockName, currentWeek);
+    cancelWorkoutNudge();
     setWorkoutStarted(false);
     setWorkoutDuration(0);
 
@@ -1039,10 +1097,34 @@ export default function WorkoutLogScreenAdapter() {
   };
 
   // Wrapper for the new screen that expects synchronous function
-  const handleFinishWorkout = () => {
+  const handleFinishWorkout = (durationSeconds?: number) => {
     // Fire and forget the async completion logic
-    handleConfirmFinish().catch(error => {
+    handleConfirmFinish(durationSeconds).catch(error => {
       console.error('🏁 FINISH WORKOUT: Error in completion:', error);
+    });
+  };
+
+  // ── Abandoned-session prompt ──────────────────────────────────────
+  const handleStaleSave = () => {
+    if (!staleSession) return;
+    const seconds = staleSession.suggestedDurationSeconds;
+    setStaleSession(null);
+    Analytics.track('stale_workout_resolved', { choice: 'save', duration_ms: seconds * 1000 });
+    handleFinishWorkout(seconds);
+  };
+  const handleStaleKeepGoing = () => {
+    setStaleSession(null);
+    Analytics.track('stale_workout_resolved', { choice: 'keep_going' });
+    // Fresh timer from now: the old start time is gone, the sets are kept.
+    setWorkoutStartTime(new Date());
+    setWorkoutStarted(true);
+    noteActivity();
+  };
+  const handleStaleDiscard = () => {
+    setStaleSession(null);
+    Analytics.track('stale_workout_resolved', { choice: 'discard' });
+    handleDiscardWorkout().catch((error) => {
+      console.error('🗑️ [WORKOUT-LOG] Error discarding stale workout:', error);
     });
   };
 
@@ -1228,7 +1310,18 @@ export default function WorkoutLogScreenAdapter() {
       shakeAnimation={shakeAnimation}
       onSetTapWhenNotStarted={handleSetTapWhenNotStarted}
     />
-    
+
+    <StaleWorkoutModal
+      visible={staleSession !== null}
+      dayName={day?.day_name || ''}
+      startedDescription={staleSession ? describeStartTime(staleSession.startTime) : ''}
+      completedSets={staleSession?.completedSets ?? 0}
+      suggestedDurationSeconds={staleSession?.suggestedDurationSeconds ?? 60}
+      themeColor={themeColor}
+      onSave={handleStaleSave}
+      onKeepGoing={handleStaleKeepGoing}
+      onDiscard={handleStaleDiscard}
+    />
     </>
   );
 }

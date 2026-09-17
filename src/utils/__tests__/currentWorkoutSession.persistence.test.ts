@@ -18,6 +18,10 @@ import {
   sessionFromRecord,
   isSameWorkoutSession,
   elapsedSecondsSince,
+  hasLoggedSets,
+  countCompletedSets,
+  abandonedSessionDurationSeconds,
+  describeStartTime,
 } from '../activeWorkoutSession';
 
 const DAY = { day_name: 'Full Body A — Squat Focus', exercises: [] };
@@ -166,5 +170,44 @@ describe('activeWorkoutSession helpers', () => {
   it('never reports negative elapsed time', () => {
     expect(elapsedSecondsSince(new Date(NOW + 5000), NOW)).toBe(0);
     expect(elapsedSecondsSince(new Date(NOW - 5000), NOW)).toBe(5);
+  });
+});
+
+describe('abandoned-session helpers', () => {
+  const NOW = Date.parse('2026-09-18T09:19:00.000Z');
+
+  it('hasLoggedSets / countCompletedSets see values and ticks, not empty rows', () => {
+    const empty = [[{ weight: '', reps: '', completed: false }], []];
+    const typed = [[{ weight: '20', reps: '', completed: false }]];
+    const ticked = [[{ weight: '', reps: '', completed: true }, { weight: '', reps: '', completed: true }]];
+    expect(hasLoggedSets(empty)).toBe(false);
+    expect(hasLoggedSets(typed)).toBe(true);
+    expect(hasLoggedSets(ticked)).toBe(true);
+    expect(hasLoggedSets(null)).toBe(false);
+    expect(countCompletedSets(ticked)).toBe(2);
+    expect(countCompletedSets(typed)).toBe(0);
+  });
+
+  it('abandoned duration runs start → last activity, capped and floored', () => {
+    const start = new Date(NOW - 16.5 * 60 * 60 * 1000); // the 982-minute case
+    const lastActivity = start.getTime() + 47 * 60 * 1000; // 47 min of actual training
+    expect(abandonedSessionDurationSeconds(start, lastActivity)).toBe(47 * 60);
+    // No activity stamp (older record): fall back to the last save time.
+    expect(abandonedSessionDurationSeconds(start, null, start.getTime() + 30 * 60 * 1000)).toBe(30 * 60);
+    // Nothing at all: floor of one minute, never 0:00.
+    expect(abandonedSessionDurationSeconds(start, null, null)).toBe(60);
+    // Activity absurdly late is capped at the max session age, never 16 hours.
+    expect(abandonedSessionDurationSeconds(start, NOW)).toBe(MAX_ACTIVE_WORKOUT_AGE_MS / 1000);
+  });
+
+  it('describes when a session started relative to today', () => {
+    const now = new Date(2026, 8, 18, 9, 19).getTime(); // local time
+    const today = new Date(2026, 8, 18, 7, 0);
+    const yesterday = new Date(2026, 8, 17, 16, 57);
+    const older = new Date(2026, 8, 14, 18, 5);
+    expect(describeStartTime(today, now)).toMatch(/^today at /);
+    expect(describeStartTime(yesterday, now)).toMatch(/^yesterday at /);
+    expect(describeStartTime(older, now)).toMatch(/at /);
+    expect(describeStartTime(older, now)).not.toMatch(/^(today|yesterday)/);
   });
 });
