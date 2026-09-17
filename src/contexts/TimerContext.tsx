@@ -2,12 +2,26 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
-import {
-  createAudioPlayer,
-  setAudioModeAsync as setExpoAudioModeAsync,
-  type AudioPlayer,
-} from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
+
+// expo-audio is Android-only here (see ANDROID_COUNTDOWN_AUDIO_MODE). Conditional require,
+// same pattern as expo-live-activity below: a static import calls requireNativeModule at
+// module scope, which throws "Cannot find native module 'ExpoAudio'" on any iOS binary
+// built before the package was added — and iOS never uses it. A stale Android build gets
+// the same guard and falls back to the expo-av path rather than crashing at import.
+let createAudioPlayer: typeof import('expo-audio').createAudioPlayer | null = null;
+let setExpoAudioModeAsync: typeof import('expo-audio').setAudioModeAsync | null = null;
+if (Platform.OS === 'android') {
+  try {
+    const ea = require('expo-audio');
+    createAudioPlayer = ea.createAudioPlayer;
+    setExpoAudioModeAsync = ea.setAudioModeAsync;
+  } catch (e) {
+    console.log('🔊 [ANDROID] expo-audio not available - countdown falls back to expo-av');
+  }
+}
+const ANDROID_EXPO_AUDIO = Platform.OS === 'android' && !!createAudioPlayer && !!setExpoAudioModeAsync;
 
 // Mirror the guard pattern in src/utils/liveActivity.ts: conditional require so
 // the native module is never loaded on Android (named exports throw when called there).
@@ -516,13 +530,13 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('Loading countdown sound...');
 
-      if (Platform.OS === 'android') {
+      if (ANDROID_EXPO_AUDIO) {
         // No audio focus, no ducking, nothing to restore — see ANDROID_COUNTDOWN_AUDIO_MODE.
         // Same create-before-swap, remove-after ordering as the expo-av path below, for the
         // same reason: a failed reload must leave the previous working player in place.
-        await setExpoAudioModeAsync({ ...ANDROID_COUNTDOWN_AUDIO_MODE });
+        await setExpoAudioModeAsync!({ ...ANDROID_COUNTDOWN_AUDIO_MODE });
         const previousPlayer = androidPlayerRef.current;
-        const player = createAudioPlayer(require('../../json_fit_timer_v3.wav'));
+        const player = createAudioPlayer!(require('../../json_fit_timer_v3.wav'));
         player.volume = 1.0;
         androidPlayerRef.current = player;
         previousPlayer?.remove();
@@ -940,7 +954,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      if (Platform.OS === 'android') {
+      if (ANDROID_EXPO_AUDIO) {
         // expo-audio path \u2014 see ANDROID_COUNTDOWN_AUDIO_MODE. No status handler and no
         // post-playback cycle: nothing was ducked, so there is nothing to give back.
         const player = androidPlayerRef.current;
@@ -950,7 +964,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         }
         // Written next to the read, as on iOS. Nothing else in the app writes expo-audio's
         // mode today; this keeps that true by construction rather than by inspection.
-        await setExpoAudioModeAsync({ ...ANDROID_COUNTDOWN_AUDIO_MODE });
+        await setExpoAudioModeAsync!({ ...ANDROID_COUNTDOWN_AUDIO_MODE });
         // seekTo takes SECONDS. It also doubles as the rewind for the ordinary case:
         // ExoPlayer sits in STATE_ENDED after a natural finish, and a seek is what brings
         // it back to READY so play() actually plays.
@@ -1055,7 +1069,7 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
    * that cycle rather than here.
    */
   const stopCountdownSound = () => {
-    if (Platform.OS === 'android') {
+    if (ANDROID_EXPO_AUDIO) {
       // pause() is synchronous and never throws on an idle player. No un-duck needed:
       // the Android path holds no focus (see ANDROID_COUNTDOWN_AUDIO_MODE).
       androidPlayerRef.current?.pause();
