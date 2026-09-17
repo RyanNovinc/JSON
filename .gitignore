@@ -89,3 +89,6 @@ venv/
 simulator_screenshot_*.pngfable-handoff/
 .aws-sam/
 fable-handoff/
+
+# Kotlin compiler session cache
+android/.kotlin/

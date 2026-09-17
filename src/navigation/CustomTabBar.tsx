@@ -5,6 +5,8 @@ import { BottomTabBarProps, BottomTabBarHeightCallbackContext } from '@react-nav
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, NUTRITION_GREEN } from '../contexts/ThemeContext';
 import { useCheckInDue } from '../hooks/useCheckInDue';
+import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
+import { useLiveWorkoutDuration, formatWorkoutDuration } from '../hooks/useLiveWorkoutDuration';
 
 /**
  * Custom bottom tab bar for JSON.fit.
@@ -41,6 +43,13 @@ import { useCheckInDue } from '../hooks/useCheckInDue';
  * the user is actually standing on, not from Profile's own options. It reads
  * the same source of truth ProfileScreen does, so both dots clear on the same
  * write rather than drifting apart.
+ *
+ * LIVE WORKOUT TIMER. While a workout is running and the user is on any tab
+ * other than Workouts, the Workouts tab turns the theme colour and its label
+ * becomes the live timer. That replaces the floating resume bar on those tabs
+ * (FloatingWorkoutIndicator hides itself there). On the Workouts tab itself
+ * the label stays "Workouts" and the resume bar sits above this bar instead.
+ * The tab still just navigates to Workouts; the resume bar is waiting there.
  */
 
 const TAB_CONFIG: Record<
@@ -60,6 +69,11 @@ const BAR_HEIGHT = 56;
 const CREATE_SIZE = 52;
 const CREATE_OVERHANG = 14; // How far above the bar's top edge the button pokes
 
+// Exported so FloatingWorkoutIndicator can sit clear of the bar and the Create
+// button on the Workouts tab without copying the numbers.
+export const TAB_BAR_HEIGHT = BAR_HEIGHT;
+export const TAB_BAR_CREATE_OVERHANG = CREATE_OVERHANG;
+
 const BAR_BACKGROUND = '#0f0f10';
 const ICON_SIZE = 24;
 
@@ -74,6 +88,8 @@ export function CustomTabBar({ state, navigation, descriptors }: BottomTabBarPro
   const { themeColor } = useTheme();
   const insets = useSafeAreaInsets();
   const checkInDue = useCheckInDue();
+  const { activeWorkout } = useActiveWorkout();
+  const liveDuration = useLiveWorkoutDuration();
 
   // Sparkle scale pulse — loops forever while the tab bar is mounted.
   const pulseScale = useRef(new Animated.Value(PULSE_MIN_SCALE)).current;
@@ -177,11 +193,21 @@ export function CustomTabBar({ state, navigation, descriptors }: BottomTabBarPro
             }
           };
 
-          const activeColor = isFocused 
+          // A workout is running and the user is somewhere else: this tab
+          // carries the live timer.
+          const showLiveTimer = route.name === 'Workouts' && !!activeWorkout && !isFocused;
+
+          const activeColor = isFocused || showLiveTimer
             ? (route.name === 'Nutrition' ? NUTRITION_GREEN.primary : themeColor)
             : '#52525b';
 
           const showDot = route.name === 'Profile' && checkInDue;
+
+          const accessibilityLabel = showLiveTimer
+            ? `${config.label}, workout running ${formatWorkoutDuration(liveDuration)}`
+            : showDot
+              ? `${config.label}, weekly check-in ready`
+              : config.label;
 
           return (
             <Pressable
@@ -189,9 +215,7 @@ export function CustomTabBar({ state, navigation, descriptors }: BottomTabBarPro
               style={styles.tabSlot}
               onPress={onPress}
               accessibilityRole="button"
-              accessibilityLabel={
-                showDot ? `${config.label}, weekly check-in ready` : config.label
-              }
+              accessibilityLabel={accessibilityLabel}
               accessibilityState={isFocused ? { selected: true } : {}}
             >
               <View style={styles.iconWrap}>
@@ -212,14 +236,15 @@ export function CustomTabBar({ state, navigation, descriptors }: BottomTabBarPro
               <Text
                 style={[
                   styles.tabLabel,
+                  showLiveTimer && styles.liveTimerLabel,
                   {
                     color: activeColor,
-                    fontWeight: isFocused ? '500' : '400',
+                    fontWeight: showLiveTimer ? '600' : isFocused ? '500' : '400',
                   },
                 ]}
                 numberOfLines={1}
               >
-                {config.label}
+                {showLiveTimer ? formatWorkoutDuration(liveDuration) : config.label}
               </Text>
             </Pressable>
           );
@@ -300,6 +325,10 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     textAlign: 'center',
+  },
+  // Digits all the same width, so the label doesn't shimmy as the timer ticks.
+  liveTimerLabel: {
+    fontVariant: ['tabular-nums'],
   },
   createButton: {
     position: 'absolute',
