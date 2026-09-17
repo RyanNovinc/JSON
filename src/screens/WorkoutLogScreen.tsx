@@ -10,7 +10,7 @@
  *  - Title + 1RM badge
  *  - Muscle tags (subtle)
  *  - Prescription banner
- *  - Sets table (SET · PREV · KG · REPS · ✓)
+ *  - Sets table (SET · KG · REPS · ✓), with a LAST line under each set
  *  - "Up Next" list of remaining exercises (tappable to swap focus)
  *  - Bottom bar: rest timer + start/finish button
  *
@@ -374,7 +374,7 @@ const CARD_ONE_RM_H = 14 + 2 + 20;            // oneRMLabel.lineHeight + oneRMVa
 const CARD_TITLE_ROW_MB = 6;                  // styles.titleRow.marginBottom
 const CARD_PRESCRIPTION_H = 8 + 1 + 8 + 16 + 8 + 1 + 12; // mt + border + pt + text + pb + border + mb
 const CARD_SETS_HEADER_H = 14 + 6 + 1 + 4;    // text lineHeight + paddingBottom + border + marginBottom
-const CARD_SET_ROW_H = 44 + 4 * 2;            // setInput.minHeight (== setCheckCell.height) + setRow paddingVertical
+const CARD_SET_ROW_H = 4 + 44 + 2 + 22;      // setRow paddingTop + setInput.minHeight (== setCheckCell.height) + setRow paddingBottom + prevLine.height
 const CARD_ADD_SET_H = 42 + 4;                // styles.addSetBtn height + marginTop
 const CARD_FOCUS_PB = 8;                      // styles.focusArea.paddingBottom (there is no paddingTop)
 
@@ -576,13 +576,10 @@ function parseTargetReps(repsString: string, setCount: number): string[] {
   return scheme ? Array(setCount).fill(scheme) : [];
 }
 
-/** Shown under PREV when last session's set carried no weight at all. */
-const PREV_NO_WEIGHT = '—';
-
 /**
- * PREV shows last session's load, which is stored in whatever unit it was logged
- * in — convert it to the unit on screen. Trailing zeros are dropped so a clean
- * 60kg reads as "60", not "60.0", in a 60px-wide cell.
+ * The LAST line shows last session's load, which is stored in whatever unit it was
+ * logged in — convert it to the unit on screen. Trailing zeros are dropped so a clean
+ * 60kg reads as "60", not "60.0".
  *
  * Weight is optional: bodyweight work is logged with reps and no load, and stores
  * as ''. That must render blank, not as a fabricated 0 — "0 × 10" reads as a real
@@ -594,10 +591,27 @@ function formatPrevWeight(
   globalUnit: 'kg' | 'lbs',
 ): string {
   const raw = parseFloat(previous.weight);
-  if (!Number.isFinite(raw)) return PREV_NO_WEIGHT;
+  if (!Number.isFinite(raw)) return '';
 
   const converted = convertWeight(raw, previous.unit ?? globalUnit, globalUnit);
   return String(Number(converted.toFixed(1)));
+}
+
+/**
+ * The text after LAST for one set: "12.5 × 8", "× 10" for bodyweight, or '' when
+ * last session has nothing for this set. '' means the line renders nothing at all:
+ * no dash, no label. The row keeps its height either way (see CARD_SET_ROW_H).
+ */
+function formatPrevLine(
+  previous: { weight: string; reps: string; unit?: 'kg' | 'lbs' } | undefined,
+  globalUnit: 'kg' | 'lbs',
+): string {
+  if (!previous) return '';
+  const weight = formatPrevWeight(previous, globalUnit);
+  const reps = (previous.reps ?? '').trim();
+  if (weight && reps) return `${weight} × ${reps}`;
+  if (reps) return `× ${reps}`;
+  return weight;
 }
 
 /**
@@ -667,7 +681,7 @@ function weightForRepsAgainstOneRM(
 
 /**
  * Round a suggested load to something loadable in the display unit — nearest
- * 2.5 kg or nearest 5 lbs — formatted like PREV (trailing zeros dropped).
+ * 2.5 kg or nearest 5 lbs — formatted like the LAST line (trailing zeros dropped).
  * '' when rounding lands on zero: a bar you can't load isn't a suggestion.
  */
 function formatSuggestedWeight(weightKg: number, unit: 'kg' | 'lbs'): string {
@@ -3707,7 +3721,6 @@ function SetsTable({
       {/* Header row */}
       <View style={styles.setsHeader}>
         <Text style={[styles.setsHeaderCell, { width: 30 }]}>SET</Text>
-        <Text style={[styles.setsHeaderCell, { width: 60 }]}>PREV</Text>
         {/* The unit header doubles as the entry point to the ghost explainer: the
             info dot sits beside KG/LBS because the weight column is where the
             suggestion lives. Inert on neighbour cards like every other control. */}
@@ -3786,7 +3799,7 @@ interface SetRowProps {
   onSetTapWhenNotStarted: () => void;
   onFocusField: (field: 'weight' | 'reps') => void;
   registerWeightRef: (ref: TextInput | null) => void;
-  globalUnit: 'kg' | 'lbs'; // For the PREV column's unit conversion
+  globalUnit: 'kg' | 'lbs'; // For the LAST line's unit conversion
 }
 
 function SetRow({
@@ -3821,7 +3834,7 @@ function SetRow({
   // plates. Deliberately holds that 1RM flat — the mesocycle already progresses via
   // reps_weekly / rir_weekly, and adding load on top would progress twice. Only a
   // prescription can drive it — suggesting against last session's reps would just
-  // echo the PREV column.
+  // echo the LAST line.
   const targetRepsInt = targetReps ? parseInt(targetReps, 10) : NaN;
   const suggestedWeight =
     Number.isFinite(targetRepsInt) && targetRepsInt > 0 && prevOneRMKg > 0
@@ -3830,6 +3843,8 @@ function SetRow({
           globalUnit,
         )
       : '';
+  const prevLine = formatPrevLine(previous, globalUnit);
+
   const handlePressIn = () => {
     if (interactive && !workoutStarted) {
       onSetTapWhenNotStarted();
@@ -3867,6 +3882,7 @@ function SetRow({
 
   return (
     <View style={[styles.setRow, completed && styles.setRowCompleted]}>
+      <View style={styles.setRowMain}>
         <Pressable
           onLongPress={interactive ? onLongPress : undefined}
           delayLongPress={500}
@@ -3877,13 +3893,6 @@ function SetRow({
             {isLastSet && <Text style={styles.setRowLastMark}>×</Text>}
           </View>
         </Pressable>
-
-        {/* PREV — last session's reference */}
-        <View style={styles.prevCellBox}>
-          <Text style={styles.prevCell} numberOfLines={1}>
-            {previous ? `${formatPrevWeight(previous, globalUnit)} × ${previous.reps}` : '—'}
-          </Text>
-        </View>
 
         {/* No per-row unit label — the column header already states kg/lbs, and it
             tracks the toggle. Repeating it on every row cost the weight input width
@@ -3943,7 +3952,7 @@ function SetRow({
             // that load works out to against last session's estimated 1RM (both
             // sides normalised to kg). With no weight yet, this week's prescription
             // shows — what to hit, not what was hit last time. Last session's reps
-            // are still one column to the left, under PREV.
+            // are on the LAST line under the row.
             placeholder={targetReps || previous?.reps || ''}
             placeholderTextColor="#3a3a44"
             editable={workoutStarted && !completed}
@@ -3967,6 +3976,22 @@ function SetRow({
             <Ionicons name="ellipse-outline" size={26} color="#3a3a44" />
           )}
         </TouchableOpacity>
+      </View>
+
+      {/* LAST: last session's numbers for this set, under the inputs it refers to.
+          Plain text, not pressable: it sits right under the fields and would take
+          accidental taps. Height is pinned whether or not there is anything to show,
+          so every row is the same height and CARD_SET_ROW_H stays exact. */}
+      <View style={styles.prevLine}>
+        {prevLine !== '' && (
+          <>
+            <Text style={styles.prevLineLabel}>LAST</Text>
+            <Text style={styles.prevLineValue} numberOfLines={1}>
+              {prevLine}
+            </Text>
+          </>
+        )}
+      </View>
     </View>
   );
 }
@@ -4695,10 +4720,14 @@ const styles = StyleSheet.create({
     fontFamily: 'DMMono-Regular',
   },
   setRow: {
+    flexDirection: 'column',
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
+  setRowMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 4,
   },
   setRowCompleted: {
     opacity: 0.55,
@@ -4727,10 +4756,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: 'DMMono-Regular',
   },
-  prevCellBox: {
-    width: 60,
-    paddingLeft: 2,
-  },
   setCheckCell: {
     width: 34,
     // Pinned to match setInput.minHeight. The cell holds a 26px Ionicon, whose line-box
@@ -4747,8 +4772,28 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: 'DMMono-Medium',
   },
-  prevCell: {
+  // LAST line under each set. Left edge lines up with the KG input (setNumCell width
+  // + setInputCell marginHorizontal), right edge stops before the check column.
+  // Height pinned for the pager maths: see CARD_SET_ROW_H.
+  prevLine: {
+    height: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 30 + 4,
+    marginRight: 34 + 4,
+    paddingLeft: 2,
+  },
+  prevLineLabel: {
     color: '#55555f',
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1.4,
+    fontFamily: 'DMMono-Regular',
+    marginRight: 8,
+  },
+  prevLineValue: {
+    flexShrink: 1,
+    color: '#8a8a94',
     fontSize: 12,
     lineHeight: 16,
     fontFamily: 'DMMono-Regular',

@@ -4,6 +4,12 @@
  * Modal component for displaying 1RM progression data for a specific exercise.
  * Animated bottom-sheet with two tabs: Chart (visualization with range filters)
  * and Sessions (chronological history with change indicators).
+ *
+ * Chart points are inspectable: tapping anywhere on the chart selects the nearest
+ * session (each point owns the strip from halfway to its left neighbour to halfway
+ * to its right neighbour, full chart height), and dragging moves the selection.
+ * A callout shows the date, the estimated 1RM and the set that produced it.
+ * Tapping the selected session again clears it.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -20,6 +26,7 @@ import {
   Easing,
   Platform,
   KeyboardAvoidingView,
+  PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +36,15 @@ import { WorkoutStorage } from '../utils/storage';
 // Chart width is capped so it doesn't stretch to an unreasonable size on
 // tablets/resized windows — see chartWidth in ProgressionChart below.
 const MAX_CHART_WIDTH = 500;
+
+// Chart callout geometry. Height is pinned by the explicit lineHeights in the
+// callout styles (8 + 12 + 2 + 24 + 2 + 14 + 8 padding/lines + 2 border) so the
+// callout can be clamped inside the plot without measuring it.
+const CALLOUT_W = 120;
+const CALLOUT_H = 72;
+const CALLOUT_GAP = 14; // distance between the selected point and the callout
+// Horizontal finger travel before a touch counts as a drag rather than a tap.
+const TAP_SLOP = 6;
 
 // Epley formula: 1RM = weight × (1 + reps/30)
 const defaultCalc1RM = (weight: number, reps: number): number => {
@@ -48,6 +64,10 @@ interface ProgressionData {
   dayName: string;
   oneRM: number;
   timestamp: number;
+  /** Weight of the set that produced this session's best 1RM, in kg. */
+  bestWeightKg: number;
+  /** Reps of that same set. */
+  bestReps: number;
 }
 
 type RangeKey = '14D' | '1M' | '3M' | '6M' | '12M' | 'ALL';
@@ -100,6 +120,30 @@ function formatShortDate(timestamp: number): string {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+/** Trailing zeros dropped: 60 reads "60", 12.5 reads "12.5". */
+function formatSetWeight(weight: number): string {
+  return String(Number(weight.toFixed(1)));
+}
+
+/**
+ * Index of the point whose x is closest to `x`. Nearest-by-x is the same as giving
+ * each point the strip between the midpoints to its neighbours, so a tap anywhere
+ * on the chart always lands on a session.
+ */
+function nearestIndex(xs: number[], x: number): number | null {
+  if (xs.length === 0) return null;
+  let best = 0;
+  let bestDist = Math.abs(xs[0] - x);
+  for (let i = 1; i < xs.length; i++) {
+    const dist = Math.abs(xs[i] - x);
+    if (dist < bestDist) {
+      best = i;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 export default function OneRMProgressionModal({
@@ -172,19 +216,26 @@ export default function OneRMProgressionModal({
         const progression: ProgressionData[] = history
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
           .map((workout) => {
-            const bestOneRM = workout.sets.reduce((best, set) => {
-              const weight = parseFloat(set.weight) || 0;
-              const reps = parseInt(set.reps) || 0;
-              const weightKg = toKg(weight, set.unit);
-              const oneRM = weightKg > 0 && reps > 0 ? defaultCalc1RM(weightKg, reps) : 0;
-              return Math.max(best, oneRM);
-            }, 0);
+            // Keep the set that produced the best 1RM, not just the number, so the
+            // chart callout can show what was actually lifted.
+            const best = workout.sets.reduce(
+              (acc, set) => {
+                const weight = parseFloat(set.weight) || 0;
+                const reps = parseInt(set.reps) || 0;
+                const weightKg = toKg(weight, set.unit);
+                const oneRM = weightKg > 0 && reps > 0 ? defaultCalc1RM(weightKg, reps) : 0;
+                return oneRM > acc.oneRM ? { oneRM, weightKg, reps } : acc;
+              },
+              { oneRM: 0, weightKg: 0, reps: 0 },
+            );
 
             return {
               date: workout.date,
               dayName: workout.dayName || workout.date,
-              oneRM: bestOneRM,
+              oneRM: best.oneRM,
               timestamp: new Date(workout.date).getTime(),
+              bestWeightKg: best.weightKg,
+              bestReps: best.reps,
             };
           })
           .filter((session) => session.oneRM > 0);
@@ -632,6 +683,82 @@ function ProgressionChart({
   const yForValue = (v: number) =>
     chartTopPad + (1 - (v - yMin) / yRange) * plotHeight;
 
+  // ── Selected session (tap / drag to inspect) ─────────────────────
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  // A different range is a different set of points, so an old index would name the
+  // wrong session.
+  useEffect(() => {
+    setSelectedIdx(null);
+  }, [activeRange]);
+
+  // The PanResponder is created once, so everything its handlers read goes
+  // through refs that are refreshed every render.
+  const pointXsRef = useRef<number[]>([]);
+  pointXsRef.current = data.map((p) => xForTime(p.timestamp));
+  const selectedRef = useRef<number | null>(null);
+  selectedRef.current = selectedIdx;
+  const gestureRef = useRef<{ startSelected: number | null; lastIdx: number | null; moved: boolean }>({
+    startSelected: null,
+    lastIdx: null,
+    moved: false,
+  });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => pointXsRef.current.length > 0,
+      onMoveShouldSetPanResponder: () => pointXsRef.current.length > 0,
+      // Let the sheet's ScrollView take over when the finger moves vertically.
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderGrant: (evt) => {
+        const idx = nearestIndex(pointXsRef.current, evt.nativeEvent.locationX);
+        gestureRef.current = { startSelected: selectedRef.current, lastIdx: idx, moved: false };
+        if (idx !== null) setSelectedIdx(idx);
+      },
+      onPanResponderMove: (evt, gesture) => {
+        if (Math.abs(gesture.dx) > TAP_SLOP) gestureRef.current.moved = true;
+        const idx = nearestIndex(pointXsRef.current, evt.nativeEvent.locationX);
+        if (idx !== null && idx !== gestureRef.current.lastIdx) {
+          gestureRef.current.lastIdx = idx;
+          setSelectedIdx(idx);
+        }
+      },
+      onPanResponderRelease: () => {
+        const g = gestureRef.current;
+        // A plain tap on the session that was already selected clears it.
+        if (!g.moved && g.lastIdx !== null && g.lastIdx === g.startSelected) {
+          setSelectedIdx(null);
+        }
+      },
+      // The ScrollView took the touch (the user was scrolling the sheet, not
+      // inspecting): put the selection back how it was before the finger landed.
+      onPanResponderTerminate: () => {
+        setSelectedIdx(gestureRef.current.startSelected);
+      },
+    }),
+  ).current;
+
+  const activeIdx = selectedIdx !== null && selectedIdx < data.length ? selectedIdx : null;
+  const selectedPoint = activeIdx !== null ? data[activeIdx] : null;
+
+  let calloutLeft = 0;
+  let calloutTop = 0;
+  let selectedX = 0;
+  let selectedY = 0;
+  if (selectedPoint) {
+    selectedX = xForTime(selectedPoint.timestamp);
+    selectedY = yForValue(selectedPoint.oneRM);
+    // Sit on whichever side of the point has room, and stay inside the plot.
+    const rawLeft = selectedX > chartWidth / 2
+      ? selectedX - CALLOUT_GAP - CALLOUT_W
+      : selectedX + CALLOUT_GAP;
+    calloutLeft = Math.max(0, Math.min(rawLeft, chartWidth - CALLOUT_W));
+    calloutTop = Math.max(
+      0,
+      Math.min(selectedY - CALLOUT_H / 2, chartTopPad + plotHeight - CALLOUT_H),
+    );
+  }
+
   let pathData = '';
   let areaPathData = '';
   if (data.length > 0) {
@@ -700,119 +827,179 @@ function ProgressionChart({
           <Text style={styles.chartEmptyText}>No sessions in this range</Text>
         </View>
       ) : (
-        <Svg width={chartWidth} height={chartHeight}>
-          <Defs>
-            <LinearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={themeColor} stopOpacity={0.22} />
-              <Stop offset="1" stopColor={themeColor} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
+        <View style={{ width: chartWidth, height: chartHeight }}>
+          <Svg width={chartWidth} height={chartHeight}>
+            <Defs>
+              <LinearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={themeColor} stopOpacity={0.22} />
+                <Stop offset="1" stopColor={themeColor} stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
 
-          {/* Y-axis grid lines and labels */}
-          {yTicks.map((tick, idx) => {
-            const y = yForValue(tick);
-            return (
-              <React.Fragment key={`tick-${idx}`}>
-                <Line
-                  x1={chartLeftPad}
-                  y1={y}
-                  x2={chartLeftPad + plotWidth}
-                  y2={y}
-                  stroke="rgba(255,255,255,0.04)"
-                  strokeWidth={1}
-                />
-                <SvgText
-                  x={chartLeftPad - 6}
-                  y={y + 3}
-                  fontSize={9}
-                  fill="#55555f"
-                  textAnchor="end"
-                  fontFamily="DMMono-Medium"
-                >
-                  {tick.toFixed(0)}
-                </SvgText>
-              </React.Fragment>
-            );
-          })}
+            {/* Y-axis grid lines and labels */}
+            {yTicks.map((tick, idx) => {
+              const y = yForValue(tick);
+              return (
+                <React.Fragment key={`tick-${idx}`}>
+                  <Line
+                    x1={chartLeftPad}
+                    y1={y}
+                    x2={chartLeftPad + plotWidth}
+                    y2={y}
+                    stroke="rgba(255,255,255,0.04)"
+                    strokeWidth={1}
+                  />
+                  <SvgText
+                    x={chartLeftPad - 6}
+                    y={y + 3}
+                    fontSize={9}
+                    fill="#55555f"
+                    textAnchor="end"
+                    fontFamily="DMMono-Medium"
+                  >
+                    {tick.toFixed(0)}
+                  </SvgText>
+                </React.Fragment>
+              );
+            })}
 
-          {/* Area fill */}
-          {data.length > 1 && (
-            <Path d={areaPathData} fill="url(#areaFill)" />
-          )}
+            {/* Area fill */}
+            {data.length > 1 && (
+              <Path d={areaPathData} fill="url(#areaFill)" />
+            )}
 
-          {/* Line */}
-          {data.length > 1 && (
-            <Path
-              d={pathData}
-              stroke={themeColor}
-              strokeWidth={2.2}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
+            {/* Line */}
+            {data.length > 1 && (
+              <Path
+                d={pathData}
+                stroke={themeColor}
+                strokeWidth={2.2}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
 
-          {/* Data point dots */}
-          {data.map((point, idx) => {
-            const x = xForTime(point.timestamp);
-            const y = yForValue(point.oneRM);
-            const isPR = point.oneRM === allTimeBest;
+            {/* Guide line under the selected session */}
+            {selectedPoint && (
+              <Line
+                x1={selectedX}
+                y1={chartTopPad}
+                x2={selectedX}
+                y2={chartTopPad + plotHeight}
+                stroke={themeColor}
+                strokeOpacity={0.5}
+                strokeWidth={1}
+                strokeDasharray={[3, 3]}
+              />
+            )}
 
-            return (
-              <React.Fragment key={`dot-${idx}`}>
-                {isPR && (
+            {/* Data point dots */}
+            {data.map((point, idx) => {
+              const x = xForTime(point.timestamp);
+              const y = yForValue(point.oneRM);
+              const isPR = point.oneRM === allTimeBest;
+              const isSelected = activeIdx === idx;
+              // While one session is selected, the others step back.
+              const dotOpacity = activeIdx !== null && !isSelected ? 0.5 : 1;
+
+              return (
+                <React.Fragment key={`dot-${idx}`}>
+                  {isPR && (
+                    <Circle
+                      cx={x}
+                      cy={y}
+                      r={7}
+                      fill="none"
+                      stroke={themeColor}
+                      strokeWidth={1}
+                      opacity={0.5 * dotOpacity}
+                    />
+                  )}
+                  {isSelected && (
+                    <Circle
+                      cx={x}
+                      cy={y}
+                      r={11}
+                      fill="none"
+                      stroke={themeColor}
+                      strokeWidth={1.5}
+                      opacity={0.6}
+                    />
+                  )}
                   <Circle
                     cx={x}
                     cy={y}
-                    r={7}
-                    fill="none"
-                    stroke={themeColor}
-                    strokeWidth={1}
-                    opacity={0.5}
+                    r={isSelected ? 6 : isPR ? 4.5 : 3.5}
+                    fill={themeColor}
+                    opacity={dotOpacity}
                   />
-                )}
-                <Circle
-                  cx={x}
-                  cy={y}
-                  r={isPR ? 4.5 : 3.5}
-                  fill={themeColor}
-                />
-                <Circle
-                  cx={x}
-                  cy={y}
-                  r={1.4}
-                  fill="#000"
-                />
-              </React.Fragment>
-            );
-          })}
+                  <Circle
+                    cx={x}
+                    cy={y}
+                    r={isSelected ? 2 : 1.4}
+                    fill="#000"
+                  />
+                </React.Fragment>
+              );
+            })}
 
-          {/* X-axis labels — first and last only */}
-          {data.length >= 1 && (
-            <SvgText
-              x={chartLeftPad}
-              y={chartHeight - 8}
-              fontSize={9}
-              fill="#55555f"
-              textAnchor="start"
-              fontFamily="DMMono-Medium"
+            {/* X-axis labels — first and last only */}
+            {data.length >= 1 && (
+              <SvgText
+                x={chartLeftPad}
+                y={chartHeight - 8}
+                fontSize={9}
+                fill="#55555f"
+                textAnchor="start"
+                fontFamily="DMMono-Medium"
+              >
+                {formatShortDate(data[0].timestamp)}
+              </SvgText>
+            )}
+            {data.length >= 2 && (
+              <SvgText
+                x={chartLeftPad + plotWidth}
+                y={chartHeight - 8}
+                fontSize={9}
+                fill="#55555f"
+                textAnchor="end"
+                fontFamily="DMMono-Medium"
+              >
+                {formatShortDate(data[data.length - 1].timestamp)}
+              </SvgText>
+            )}
+          </Svg>
+
+          {/* Callout for the selected session */}
+          {selectedPoint && (
+            <View
+              pointerEvents="none"
+              style={[styles.callout, { left: calloutLeft, top: calloutTop }]}
             >
-              {formatShortDate(data[0].timestamp)}
-            </SvgText>
+              <Text style={styles.calloutDate}>
+                {formatShortDate(selectedPoint.timestamp).toUpperCase()}
+              </Text>
+              <View style={styles.calloutValueRow}>
+                <Text style={[styles.calloutValue, { color: themeColor }]}>
+                  {selectedPoint.oneRM.toFixed(1)}
+                </Text>
+                <Text style={styles.calloutUnit}>{globalUnit}</Text>
+              </View>
+              <Text style={styles.calloutSet}>
+                {formatSetWeight(fromKg(selectedPoint.bestWeightKg, globalUnit))} × {selectedPoint.bestReps}
+              </Text>
+            </View>
           )}
-          {data.length >= 2 && (
-            <SvgText
-              x={chartLeftPad + plotWidth}
-              y={chartHeight - 8}
-              fontSize={9}
-              fill="#55555f"
-              textAnchor="end"
-              fontFamily="DMMono-Medium"
-            >
-              {formatShortDate(data[data.length - 1].timestamp)}
-            </SvgText>
-          )}
-        </Svg>
+
+          {/* Touch layer: the whole chart area. Nearest session wins, so there is
+              no small dot to aim for. */}
+          <View
+            style={StyleSheet.absoluteFill}
+            collapsable={false}
+            {...panResponder.panHandlers}
+          />
+        </View>
       )}
 
       {/* Chart footer */}
@@ -1035,6 +1222,51 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 1.4,
     fontFamily: 'DMMono-Medium',
+  },
+
+  // ── Chart callout ─────────────────────────────────────────────────
+  // Every line height is explicit so the box is CALLOUT_H tall and can be
+  // clamped inside the plot without measuring.
+  callout: {
+    position: 'absolute',
+    width: CALLOUT_W,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#16161d',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  calloutDate: {
+    color: '#9898a4',
+    fontSize: 9,
+    lineHeight: 12,
+    letterSpacing: 1.2,
+    fontFamily: 'DMMono-Medium',
+  },
+  calloutValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginTop: 2,
+  },
+  calloutValue: {
+    fontSize: 20,
+    lineHeight: 24,
+    letterSpacing: -0.4,
+    fontFamily: 'Outfit-Bold',
+  },
+  calloutUnit: {
+    color: '#55555f',
+    fontSize: 10,
+    fontFamily: 'DMMono-Regular',
+  },
+  calloutSet: {
+    color: '#c8c8d0',
+    fontSize: 11,
+    lineHeight: 14,
+    marginTop: 2,
+    fontFamily: 'DMMono-Regular',
   },
 
   // ── Stats summary card ────────────────────────────────────────────
