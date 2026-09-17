@@ -2,7 +2,7 @@
   "expo": {
     "name": "JSON.fit",
     "slug": "json",
-    "version": "1.0.26",
+    "version": "1.0.27",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -19,7 +19,7 @@
         "backgroundColor": "#000000"
       },
       "bundleIdentifier": "com.RyanNovinc.JSON",
-      "buildNumber": "138",
+      "buildNumber": "139",
       "associatedDomains": [
         "applinks:json.fit"
       ],
@@ -80,7 +80,7 @@
         "backgroundColor": "#22d3ee"
       },
       "package": "com.RyanNovinc.JSON",
-      "versionCode": 101,
+      "versionCode": 102,
       "edgeToEdgeEnabled": true,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,

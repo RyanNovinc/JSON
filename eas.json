@@ -43,6 +43,13 @@
       "android": {
         "serviceAccountKeyPath": "/Users/ryannovinc/keys/play-service-account.json",
         "track": "production"
+      },
+      "ios": {
+        "ascApiKeyPath": "/Users/ryannovinc/keys/AuthKey_M6KPTJWZU3.p8",
+        "ascApiKeyId": "M6KPTJWZU3",
+        "ascApiKeyIssuerId": "ab2eb2e4-3930-445f-822a-49eb6b35b035",
+        "ascAppId": "6758357834",
+        "appleTeamId": "RJL5VQK2DK"
       }
     }
   }
