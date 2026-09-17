@@ -552,33 +552,55 @@ export class WorkoutStorage {
   }
 
   // Current workout progress (for resuming sessions)
+  // ── Current (in-progress) workout ─────────────────────────────────────────
+  //
+  // Key: `${CURRENT_WORKOUT}_${dayName}_${blockName}_week${week}`.
+  // The week is part of the identity: a timer left running in week 1 must not
+  // reappear when the same day is opened in week 2. Two older key shapes are
+  // still read (and migrated forward on read) so an in-flight workout survives
+  // the update:
+  //   `${CURRENT_WORKOUT}_${dayName}_${blockName}`  — pre-week key
+  //   `${CURRENT_WORKOUT}`                          — original single-slot key
+  private static currentWorkoutKey(dayName: string, blockName: string, currentWeek?: number): string {
+    const base = `${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`;
+    return currentWeek ? `${base}_week${currentWeek}` : base;
+  }
+
   static async saveCurrentWorkout(workoutData: any): Promise<void> {
     try {
       const dataWithTimestamp = {
         ...workoutData,
         savedAt: Date.now()
       };
-      const workoutKey = `${STORAGE_KEYS.CURRENT_WORKOUT}_${workoutData.day?.day_name}_${workoutData.blockName}`;
+      const workoutKey = WorkoutStorage.currentWorkoutKey(
+        workoutData.day?.day_name,
+        workoutData.blockName,
+        workoutData.currentWeek,
+      );
       await AsyncStorage.setItem(workoutKey, JSON.stringify(dataWithTimestamp));
     } catch (error) {
       console.error('Failed to save current workout:', error);
     }
   }
+  static async loadCurrentWorkout(dayName?: string, blockName?: string, currentWeek?: number): Promise<any> {
+    // Keys to try, most specific first. The first hit wins; a hit on a legacy
+    // key is migrated forward to the week key so it is found there next time.
+    const candidates: string[] = [];
+    if (dayName && blockName && currentWeek) {
+      candidates.push(WorkoutStorage.currentWorkoutKey(dayName, blockName, currentWeek));
+    }
+    if (dayName && blockName) {
+      candidates.push(WorkoutStorage.currentWorkoutKey(dayName, blockName));
+    }
+    candidates.push(STORAGE_KEYS.CURRENT_WORKOUT);
 
-  static async loadCurrentWorkout(dayName?: string, blockName?: string): Promise<any> {
+    let workoutKey = candidates[0];
     try {
       let data: string | null = null;
-      let workoutKey: string;
-
-      if (dayName && blockName) {
-        workoutKey = `${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`;
-        data = await AsyncStorage.getItem(workoutKey);
-      }
-
-      // Fallback to old key for backwards compatibility
-      if (!data) {
-        workoutKey = STORAGE_KEYS.CURRENT_WORKOUT;
-        data = await AsyncStorage.getItem(workoutKey);
+      for (const key of candidates) {
+        workoutKey = key;
+        data = await AsyncStorage.getItem(key);
+        if (data) break;
       }
 
       if (!data) {
@@ -595,34 +617,71 @@ export class WorkoutStorage {
         return null;
       }
 
+      // Found under a legacy key: move it to the week key so the record has one
+      // home, and so clearCurrentWorkout for this week removes it.
+      if (dayName && blockName && currentWeek && workoutKey !== candidates[0]) {
+        console.log(`🔄 [STORAGE] Migrating current workout from legacy key "${workoutKey}"`);
+        const migrated = { ...result, day: result.day ?? { day_name: dayName }, blockName, currentWeek };
+        await AsyncStorage.setItem(candidates[0], JSON.stringify(migrated));
+        await AsyncStorage.removeItem(workoutKey);
+        return migrated;
+      }
+
       console.log('🔄 [STORAGE] Current workout loaded successfully');
       return result;
     } catch (error) {
       console.error('❌ [STORAGE] Failed to load current workout, removing corrupted data:', error);
       // Clean up corrupted data
       try {
-        if (dayName && blockName) {
-          await AsyncStorage.removeItem(`${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`);
-        }
-        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_WORKOUT);
+        await AsyncStorage.multiRemove(candidates);
       } catch (cleanupError) {
         console.error('❌ [STORAGE] Failed to cleanup corrupted workout data:', cleanupError);
       }
       return null;
     }
   }
-
-  static async clearCurrentWorkout(dayName?: string, blockName?: string): Promise<void> {
+  static async clearCurrentWorkout(dayName?: string, blockName?: string, currentWeek?: number): Promise<void> {
     try {
       if (dayName && blockName) {
-        const workoutKey = `${STORAGE_KEYS.CURRENT_WORKOUT}_${dayName}_${blockName}`;
-        await AsyncStorage.removeItem(workoutKey);
+        // Remove the week key and the pre-week key: a record that was read from
+        // the legacy key but never re-saved must not come back after a finish.
+        const keys = [WorkoutStorage.currentWorkoutKey(dayName, blockName)];
+        if (currentWeek) keys.unshift(WorkoutStorage.currentWorkoutKey(dayName, blockName, currentWeek));
+        await AsyncStorage.multiRemove(keys);
       } else {
         // Clear old key for backwards compatibility
         await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_WORKOUT);
       }
     } catch (error) {
       console.error('Failed to clear current workout:', error);
+    }
+  }
+  /**
+   * Every stored in-progress workout record, newest save first. Used at launch
+   * to find a session whose timer is still running so the resume bar can show
+   * it again; nothing else should need to enumerate these.
+   */
+  static async loadAllCurrentWorkouts(): Promise<any[]> {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const keys = allKeys.filter((k) => k.startsWith(STORAGE_KEYS.CURRENT_WORKOUT));
+      if (keys.length === 0) return [];
+      const pairs = await AsyncStorage.multiGet(keys);
+      const records: any[] = [];
+      for (const [, value] of pairs) {
+        if (!value) continue;
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed && typeof parsed === 'object') records.push(parsed);
+        } catch {
+          // A corrupt record is dropped by loadCurrentWorkout when its screen opens.
+        }
+      }
+      records.sort((a, b) => (b.savedAt || b.timestamp || 0) - (a.savedAt || a.timestamp || 0));
+      return records;
+    } catch (error) {
+      console.error('❌ [STORAGE] Failed to enumerate current workouts:', error);
+      return [];
     }
   }
 

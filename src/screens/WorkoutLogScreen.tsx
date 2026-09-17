@@ -151,7 +151,9 @@ import {
   Modal,
   Platform,
   Keyboard,
+  Alert,
 } from 'react-native';
+import { formatWorkoutDuration } from '../hooks/useLiveWorkoutDuration';
 // expo-image, not RN's Image. RN's offers exactly two behaviours when `source` changes and
 // both are broken for a pager: keyed, it remounts the native view, which has no decoded bitmap
 // and paints BLANK; unkeyed, it retains the view and keeps painting the PREVIOUS source's
@@ -264,6 +266,8 @@ export interface WorkoutLogScreenProps {
   onBack: () => void;
   onStartWorkout: () => void;
   onFinishWorkout: () => void;
+  /** End the session without recording a completion (clears sets + timer). */
+  onDiscardWorkout?: () => void;
 
   /** Optional: custom action handlers (kept for interface compatibility; unused here) */
   onOpenNotes?: (exerciseIndex: number) => void;
@@ -735,6 +739,7 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     onBack,
     onStartWorkout,
     onFinishWorkout,
+    onDiscardWorkout,
     onExerciseSelect,
     onSetExercisePreference,
     onSuperset,
@@ -1739,11 +1744,8 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
   }, [workoutStartTime]);
 
   // Format workout duration as MM:SS
-  const formatWorkoutDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  // Duration text comes from the shared formatter (with an hours field) so the
+  // finish pill, the resume bar and the tab-bar timer all read the same way.
 
   // Handle finish workout button press → open the summary modal
   const handleFinishWorkoutPress = () => {
@@ -1751,6 +1753,31 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     setFocusedSet(null);
     finishingRef.current = false; // allow a fresh finish each time the modal opens
     setShowFinishModal(true);
+  };
+
+  // Discard: confirm, then hand off to the adapter. Only offered once there is a
+  // session to discard (a running timer or any entered set).
+  const hasSessionToDiscard =
+    !!workoutStartTime ||
+    allSetsData.some((sets) => sets.some((s) => s.weight !== '' || s.reps !== '' || s.completed));
+  const handleDiscardWorkoutPress = () => {
+    if (!onDiscardWorkout) return;
+    Keyboard.dismiss();
+    Alert.alert(
+      'Discard workout?',
+      'The timer stops and the sets entered on this screen are cleared. Sets you ticked off are already in your history and stay there.',
+      [
+        { text: 'Keep going', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            stopTimer();
+            onDiscardWorkout();
+          },
+        },
+      ],
+    );
   };
 
   // Confirm finish workout
@@ -2404,6 +2431,9 @@ export default function WorkoutLogScreen(props: WorkoutLogScreenProps) {
     { label: '1RM progress', icon: 'trending-up-outline', onPress: openOneRMProgressionForCurrent },
     { label: 'Notes', icon: 'document-text-outline', onPress: handleExerciseNotesPress },
     { label: 'How it works', icon: 'help-circle-outline', onPress: () => setShowHowItWorks(true) },
+    ...(onDiscardWorkout && hasSessionToDiscard
+      ? [{ label: 'Discard workout', icon: 'trash-outline', onPress: handleDiscardWorkoutPress }]
+      : []),
   ];
 
   // The three mounted card slots: prev / current / next, bounds-filtered. Keyed by

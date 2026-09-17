@@ -11,6 +11,7 @@ import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
 import { navigate, getCurrentRoute, navigationRef } from '../utils/navigationRef';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLiveWorkoutDuration, formatWorkoutDuration } from '../hooks/useLiveWorkoutDuration';
+import { isSameWorkoutSession } from '../utils/activeWorkoutSession';
 import { TAB_BAR_HEIGHT, TAB_BAR_CREATE_OVERHANG } from '../navigation/CustomTabBar';
 
 /**
@@ -85,9 +86,9 @@ export function FloatingWorkoutIndicator() {
     const currentParams = currentRoute.params as any;
     const activeParams = activeWorkout.routeParams;
 
-    // Compare day name and block name to determine if it's the same workout
-    const isSameWorkout = currentParams?.day?.day_name === activeParams?.day?.day_name &&
-                         currentParams?.blockName === activeParams?.blockName;
+    // Same day, block AND week: a week-1 session is a different workout from
+    // week 2 of the same day, and the bar must stay up to say so.
+    const isSameWorkout = isSameWorkoutSession(currentParams, activeParams);
 
     // Only hide if it's the same workout
     if (isSameWorkout) {

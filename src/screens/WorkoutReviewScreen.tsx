@@ -21,6 +21,7 @@ import { WorkoutStorage, WorkoutHistory } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { useWeightUnit } from '../contexts/WeightUnitContext';
 import { useActiveWorkout } from '../contexts/ActiveWorkoutContext';
+import { isSameWorkoutSession } from '../utils/activeWorkoutSession';
 import { navigate } from '../utils/navigationRef';
 
 type WorkoutReviewScreenNavigationProp = StackNavigationProp<RootStackParamList, 'WorkoutReview'>;
@@ -84,8 +85,7 @@ export default function WorkoutReviewScreen() {
 
   const handleRedo = () => {
     if (activeWorkout) {
-      const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
-                                   activeWorkout.routeParams?.blockName === blockName;
+      const currentWorkoutMatches = isSameWorkoutSession(activeWorkout.routeParams, { day, blockName, currentWeek });
 
       if (!currentWorkoutMatches) {
         setShowActiveWorkoutModal(true);
@@ -113,7 +113,9 @@ export default function WorkoutReviewScreen() {
       await AsyncStorage.setItem(statsKey, JSON.stringify(Array.from(statsMap)));
     }
 
-    navigation.replace('WorkoutLog' as any, { day, blockName });
+    // Carry the week: without it the log screen defaults to week 1, so a redo of
+    // week 3 would file its progress record and completion marker under week 1.
+    navigation.replace('WorkoutLog' as any, { day, blockName, currentWeek });
   };
 
   const formatDate = (dateString: string) => {

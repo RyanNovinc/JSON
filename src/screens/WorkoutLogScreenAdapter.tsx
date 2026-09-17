@@ -15,6 +15,7 @@ import { resolveRest } from '../utils/restResolver';
 import { WorkoutStorage } from '../utils/storage';
 import RobustStorage from '../utils/robustStorage';
 import { Analytics } from '../services/analytics';
+import { isWorkoutStartStale, isSameWorkoutSession, elapsedSecondsSince } from '../utils/activeWorkoutSession';
 
 // This adapter connects the new beautiful WorkoutLogScreen with your existing app navigation and data structures
 
@@ -97,6 +98,18 @@ export default function WorkoutLogScreenAdapter() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isFinishingWorkout, setIsFinishingWorkout] = useState(false);
   const [workoutCompleted, setWorkoutCompleted] = useState(false);
+  // Ref twin of isFinishingWorkout for the auto-save effect. Finish and discard
+  // clear storage, and the state flips that accompany them would otherwise fire
+  // one more save (sets + null timer) that lands AFTER the clear and resurrects
+  // the record. A ref is visible to the effect in the same commit, and never
+  // re-runs the effect when it flips back.
+  const finishingRef = useRef(false);
+  // Identity of the session this mount has loaded: day + block + week. When the
+  // route params change on a mounted adapter (navigate() reuses the instance),
+  // allSetsData still belongs to the PREVIOUS session for a render or two. The
+  // auto-save effect refuses to write until the load for the new key has landed.
+  const sessionKey = `${day?.day_name || ''}|${blockName || ''}|${currentWeek || 1}`;
+  const loadedSessionRef = useRef<string | null>(null);
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   
   // Exercise alternatives state
@@ -135,8 +148,13 @@ export default function WorkoutLogScreenAdapter() {
   useEffect(() => {
     const loadExercisesWithSupersets = async () => {
       if (day?.exercises) {
-        // Only initialize if exercises is empty or if the day data has changed
-        if (exercises.length === 0 || exercises.length !== day.exercises.length) {
+        // Only initialize if exercises is empty or if the day data has changed.
+        // Compare names too: a param swap to a different day with the same number
+        // of exercises must not keep showing the previous day's exercises.
+        const dayChanged =
+          exercises.length !== day.exercises.length ||
+          exercises.some((ex, i) => ex.exercise !== day.exercises[i]?.exercise);
+        if (exercises.length === 0 || dayChanged) {
           const transformedExercises = (day.exercises || []).map((exercise: any, index: number) => ({
             id: `${exercise.exercise}-${index}`,
             exercise: exercise.exercise,
@@ -192,41 +210,48 @@ export default function WorkoutLogScreenAdapter() {
   // Initialize sets data and load saved progress
   useEffect(() => {
     const loadSavedData = async () => {
-      const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day?.day_name || '', blockName);
-      
+      const isNewSession = loadedSessionRef.current !== null && loadedSessionRef.current !== sessionKey;
+      if (isNewSession) {
+        // Param swap on a live instance: drop the previous session's state so
+        // nothing of it can be shown under, or saved as, the new one.
+        console.log('🔄 [WORKOUT-LOG] Session changed on a mounted adapter, resetting state');
+        setAllSetsData([]);
+        setWorkoutStartTime(null);
+        setWorkoutStarted(false);
+        setWorkoutDuration(0);
+        setWorkoutCompleted(false);
+        setCurrentIndex(0);
+        setDataLoaded(false);
+      }
+
+      const savedWorkout = await WorkoutStorage.loadCurrentWorkout(day?.day_name || '', blockName, currentWeek);
+
+      // Resolve the timer. Priority: a fresh start time in the saved record, then
+      // the context (in-memory session for this exact day/block/week), else none.
+      // A saved start time older than MAX_ACTIVE_WORKOUT_AGE_MS is an abandoned
+      // session: the sets are kept, the timer is not. It restarts on the next edit.
+      let restoredStart: Date | null = null;
+      let restoredDuration = 0;
+      if (savedWorkout?.workoutStartTime) {
+        const startTime = new Date(savedWorkout.workoutStartTime);
+        if (isWorkoutStartStale(startTime)) {
+          console.log('⏱️ [TIMER-DEBUG] Saved start time is stale, dropping timer:', savedWorkout.workoutStartTime);
+        } else if (!Number.isNaN(startTime.getTime())) {
+          restoredStart = startTime;
+          restoredDuration = elapsedSecondsSince(startTime);
+        }
+      }
+      if (!restoredStart && activeWorkout && activeWorkout.duration > 0 && !workoutCompleted) {
+        const currentWorkoutMatches = isSameWorkoutSession(activeWorkout.routeParams, { day, blockName, currentWeek });
+        if (currentWorkoutMatches) {
+          // Calculate what the start time should be based on current duration
+          restoredStart = new Date(Date.now() - (activeWorkout.duration * 1000));
+          restoredDuration = activeWorkout.duration;
+        }
+      }
+
       if (savedWorkout && savedWorkout.allSetsData) {
         setAllSetsData(savedWorkout.allSetsData);
-        
-        // Restore workout timer state if it was active
-        if (savedWorkout.workoutStartTime) {
-          const startTime = new Date(savedWorkout.workoutStartTime);
-          setWorkoutStartTime(startTime);
-          setWorkoutDuration(savedWorkout.workoutDuration || 0); // Restore saved duration
-          setWorkoutStarted(true);
-        } else {
-          
-          // Check if there's an active workout context for this screen that has a timer (matching old screen logic)
-          if (activeWorkout) {
-            const currentWorkoutMatches = activeWorkout.routeParams?.day?.day_name === day?.day_name &&
-                                         activeWorkout.routeParams?.blockName === blockName;
-            const contextHasTimer = activeWorkout.duration > 0;
-            
-            
-            if (currentWorkoutMatches && contextHasTimer && !workoutCompleted) {
-              // Calculate what the start time should be based on current duration
-              const estimatedStartTime = new Date(Date.now() - (activeWorkout.duration * 1000));
-              setWorkoutStartTime(estimatedStartTime);
-              setWorkoutDuration(activeWorkout.duration); // Initialize duration to match context
-              setWorkoutStarted(true);
-            } else {
-              setWorkoutStartTime(null);
-              setWorkoutStarted(false);
-            }
-          } else {
-            setWorkoutStartTime(null);
-            setWorkoutStarted(false);
-          }
-        }
       } else {
         // FRESH workout: seed each exercise's selected alternative from the saved
         // global preference. selectedExerciseIndex inside allSetsData is the single
@@ -260,13 +285,18 @@ export default function WorkoutLogScreenAdapter() {
         });
         setAllSetsData(initialSetsData);
       }
+
+      setWorkoutStartTime(restoredStart);
+      setWorkoutDuration(restoredDuration);
+      setWorkoutStarted(restoredStart !== null);
+      loadedSessionRef.current = sessionKey;
       setDataLoaded(true);
     };
     
     if (exercises.length > 0) {
       loadSavedData();
     }
-  }, [exercises.length, day?.day_name, blockName]);
+  }, [exercises.length, sessionKey]);
 
   // Auto-save workout progress when sets data or workout state changes
   useEffect(() => {
@@ -274,6 +304,11 @@ export default function WorkoutLogScreenAdapter() {
       const progressData = {
         day,
         blockName,
+        currentWeek,
+        // Carried so the resume bar can rebuild this screen's route params after
+        // a relaunch (ActiveWorkoutProvider rehydrates from this record).
+        block,
+        routineName: block?.routineName,
         allSetsData,
         exerciseNotes: {}, // TODO: Add notes support if needed
         workoutStartTime,
@@ -283,29 +318,22 @@ export default function WorkoutLogScreenAdapter() {
       await WorkoutStorage.saveCurrentWorkout(progressData);
     };
 
+    // Never write while finishing/discarding (storage is being cleared), and never
+    // write state that belongs to a different session than the one in the params.
+    if (finishingRef.current || loadedSessionRef.current !== sessionKey) {
+      return;
+    }
     // Save if data is loaded AND (we have sets data OR we have a workout start time)
     // This ensures timer state is saved even before any sets are entered
     if (dataLoaded && (allSetsData.length > 0 || workoutStartTime)) {
       saveWorkoutProgress();
-    } else {
     }
-  }, [allSetsData, workoutStartTime, dataLoaded, day, blockName]);
+  }, [allSetsData, workoutStartTime, dataLoaded, sessionKey]);
 
-  // Update workout start time when first set is logged
-  useEffect(() => {
-    const hasSetsWithData = allSetsData.some(exerciseSets => 
-      exerciseSets.some(set => set.weight !== '' || set.reps !== '')
-    );
-    
-    
-    // Only create a new timer if data is loaded, we don't have a start time, and there are sets with data
-    // This prevents overwriting restored timer data during the loading process
-    // Also don't auto-start if workout was already completed
-    if (!workoutStartTime && hasSetsWithData && dataLoaded && !workoutCompleted) {
-      setWorkoutStartTime(new Date());
-      setWorkoutStarted(true);
-    }
-  }, [allSetsData, workoutStartTime, dataLoaded]);
+  // The timer used to auto-start from an effect whenever any set held text. That
+  // could not tell a user's keystroke from restored data, so a stale session whose
+  // timer had just been dropped restarted it on the spot. Now it starts only from
+  // an actual edit: see handleSetUpdate.
 
   // Workout duration timer - updates based on start time (matching old screen)
   useEffect(() => {
@@ -380,6 +408,11 @@ export default function WorkoutLogScreenAdapter() {
   // meant the previous state object was being written through — mutation of state
   // React believes is immutable.
   const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: string) => {
+    // First real entry starts the workout timer (unless this session was finished).
+    if (!workoutStartTime && value !== '' && dataLoaded && !workoutCompleted) {
+      setWorkoutStartTime(new Date());
+      setWorkoutStarted(true);
+    }
     setAllSetsData(prev => {
       const newData = [...prev];
       const inner = [...(newData[exerciseIndex] || [])];
@@ -491,6 +524,12 @@ export default function WorkoutLogScreenAdapter() {
     newData[exerciseIndex] = inner;
 
     setAllSetsData(newData);
+
+    // A ticked set is a workout even if nothing was typed (bodyweight, no reps).
+    if (!wasCompleted && !workoutStartTime && dataLoaded && !workoutCompleted) {
+      setWorkoutStartTime(new Date());
+      setWorkoutStarted(true);
+    }
     
     if (!wasCompleted) {
       // The rest timer and the superset switch depend only on "did the set happen",
@@ -822,6 +861,7 @@ export default function WorkoutLogScreenAdapter() {
     console.log('🏁 FINISH WORKOUT: currentWeek =', currentWeek, 'blockName =', blockName);
     
     // Set flags to prevent useEffect from re-setting ActiveWorkout and auto-starting
+    finishingRef.current = true;
     setIsFinishingWorkout(true);
     setWorkoutCompleted(true);
     
@@ -947,7 +987,7 @@ export default function WorkoutLogScreenAdapter() {
     });
 
     // Clear saved workout data since workout is complete
-    await WorkoutStorage.clearCurrentWorkout(day?.day_name, blockName);
+    await WorkoutStorage.clearCurrentWorkout(day?.day_name, blockName, currentWeek);
     setWorkoutStarted(false);
     setWorkoutDuration(0);
     
@@ -963,6 +1003,37 @@ export default function WorkoutLogScreenAdapter() {
       console.error('🧭 [NAVIGATION] ❌ Error calling navigation.goBack():', error);
     } finally {
       // Always reset the finishing flag
+      setIsFinishingWorkout(false);
+    }
+  };
+
+  /**
+   * End the session WITHOUT recording a completion: stop the timer, forget the
+   * logged sets, clear the resume bar, leave. Completed sets already live in
+   * workout history (saved on each ✓), so nothing done is lost. Before this
+   * existed, Finish was the only way out, so a timer started by mistake ran
+   * forever and greeted the user with a 16-hour elapsed time the next day.
+   */
+  const handleDiscardWorkout = async () => {
+    console.log('🗑️ [WORKOUT-LOG] Discarding in-progress workout:', day?.day_name, blockName, 'week', currentWeek);
+    finishingRef.current = true;
+    setIsFinishingWorkout(true);
+    setWorkoutCompleted(true);
+    setWorkoutStartTime(null);
+    setActiveWorkout(null);
+
+    await WorkoutStorage.clearCurrentWorkout(day?.day_name, blockName, currentWeek);
+    setWorkoutStarted(false);
+    setWorkoutDuration(0);
+
+    Analytics.track('workout_discarded', {
+      exercise_count: exercises.length,
+      duration_ms: workoutDuration * 1000,
+    });
+
+    try {
+      navigation.goBack();
+    } finally {
       setIsFinishingWorkout(false);
     }
   };
@@ -1141,6 +1212,7 @@ export default function WorkoutLogScreenAdapter() {
       onBack={handleBack}
       onStartWorkout={handleStartWorkout}
       onFinishWorkout={handleFinishWorkout}
+      onDiscardWorkout={handleDiscardWorkout}
       onOpenNotes={handleOpenNotes}
       onOpenHistory={handleOpenHistory}
       onOpenSettings={handleOpenSettings}
