@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+import {
+  createAudioPlayer,
+  setAudioModeAsync as setExpoAudioModeAsync,
+  type AudioPlayer,
+} from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 
 // Mirror the guard pattern in src/utils/liveActivity.ts: conditional require so
@@ -128,6 +133,62 @@ const COUNTDOWN_AUDIO_MODE = {
   shouldDuckAndroid: true,
   interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
   playThroughEarpieceAndroid: false,
+} as const;
+
+/**
+ * ANDROID ONLY. Since 17 Sep 2026 the countdown alert on Android does not go through
+ * expo-av at all; it plays on an expo-audio player in this mode. Everything above about
+ * the Android side of COUNTDOWN_AUDIO_MODE (the AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK request,
+ * the setIsEnabledAsync cycle that abandons it, the per-rest setMode/setSpeakerphoneOn
+ * pokes) is now history on Android and stays accurate for iOS only.
+ *
+ * WHY. Samsung users reported that once the beeps played, their music (Spotify, YouTube)
+ * stayed quiet for good. The expo-av path was traced end to end and is correct in
+ * principle: every play requests transient may-duck focus on STREAM_MUSIC, and the
+ * didJustFinish handler cycles Audio off/on, which is an unconditional abandonAudioFocus
+ * (AVManager.java:398-402, :362-370). Abandoning focus is the ONLY signal Android gives
+ * the ducked app to restore its volume. On Samsung One UI that signal is unreliable at the
+ * firmware level: Samsung's own community forums carry threads of media volume being
+ * "lowered and stays lowered" after nothing more than a system notification sound, which
+ * uses the identical transient-may-duck mechanism. No app-side abandon can fix an OS that
+ * does not act on it.
+ *
+ * THE FIX is therefore to never request audio focus for the beep, so there is nothing to
+ * un-duck and nothing an OEM can get stuck. expo-av cannot do that: its player acquires
+ * focus on every unmuted play (SimpleExoPlayerData.java:150-152) with no opt-out.
+ * expo-audio 1.1 can: with interruptionMode 'mixWithOthers' its requestAudioFocus returns
+ * before touching AudioManager (AudioModule.kt, `interruptionMode == MIX_WITH_OTHERS`
+ * early return), and its ExoPlayer is built with setAudioAttributes(DEFAULT, false), so
+ * ExoPlayer does not request focus behind its back either. Verified against the sdk-54
+ * sources on 17 Sep 2026.
+ *
+ * WHAT CHANGES FOR THE USER. The beeps now play OVER the music at full volume instead of
+ * dipping it. That is a deliberate trade: a beep that is a little less prominent under
+ * loud music, against music that stays half-volume until the phone is rebooted. It is
+ * applied to all Android, not just Samsung — ducking restoration is OEM firmware
+ * behaviour, a manufacturer gate would split this into two paths nobody tests, and the
+ * beep mixing over music is how most rest-timer apps behave anyway.
+ *
+ * WHY iOS IS UNTOUCHED. The iOS duck/un-duck path (COUNTDOWN_AUDIO_MODE +
+ * RESTORE_AUDIO_MODE) was verified on device and expo-audio's iOS session handling is a
+ * different animal; there was no iOS complaint to justify re-deriving it. expo-audio's
+ * iOS module does nothing to AVAudioSession until setAudioModeAsync is called
+ * (AudioModule.swift OnCreate registers a permission requester and interruption observers
+ * only), so merely installing it does not perturb the expo-av session on iOS.
+ *
+ * KNOWN COSMETIC. expo-audio pauses its players when the activity backgrounds and resumes
+ * them on foreground (AudioModule.kt OnActivityEntersBackground/Foreground). A beep cut off
+ * by locking the phone mid-alert will play its remaining tail when the app comes back.
+ * Three seconds at most, and only if the user backgrounds inside the alert window.
+ *
+ * shouldRouteThroughEarpiece is asserted false rather than inherited: expo-audio's
+ * updatePlaySoundThroughEarpiece does the same AudioManager.setMode/setSpeakerphoneOn
+ * pair expo-av does, and false is the branch that leaves the routing alone.
+ */
+const ANDROID_COUNTDOWN_AUDIO_MODE = {
+  interruptionMode: 'mixWithOthers',
+  shouldPlayInBackground: false,
+  shouldRouteThroughEarpiece: false,
 } as const;
 
 /**
@@ -424,6 +485,9 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const hapticTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const appStateRef = useRef(AppState.currentState);
   const soundRef = useRef<Audio.Sound | null>(null);
+  // Android's countdown player. expo-audio, never expo-av — see ANDROID_COUNTDOWN_AUDIO_MODE.
+  // soundRef stays null on Android; androidPlayerRef stays null on iOS.
+  const androidPlayerRef = useRef<AudioPlayer | null>(null);
   const getExerciseContextRef = useRef<((exerciseIndex?: number, setIndex?: number) => ExerciseContext) | null>(null);
   const backgroundLiveActivityId = useRef<string | null>(null); // Store Live Activity ID when going to background
   // Pending teardown of a finished rest's Live Activity. A ref for the same reason as
@@ -451,6 +515,20 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
   const loadCountdownSound = async () => {
     try {
       console.log('Loading countdown sound...');
+
+      if (Platform.OS === 'android') {
+        // No audio focus, no ducking, nothing to restore — see ANDROID_COUNTDOWN_AUDIO_MODE.
+        // Same create-before-swap, remove-after ordering as the expo-av path below, for the
+        // same reason: a failed reload must leave the previous working player in place.
+        await setExpoAudioModeAsync({ ...ANDROID_COUNTDOWN_AUDIO_MODE });
+        const previousPlayer = androidPlayerRef.current;
+        const player = createAudioPlayer(require('../../json_fit_timer_v3.wav'));
+        player.volume = 1.0;
+        androidPlayerRef.current = player;
+        previousPlayer?.remove();
+        console.log('🔊 [ANDROID] Countdown player created (expo-audio, mixWithOthers)');
+        return;
+      }
 
       // This is not only mount-time code: playCountdownSound's recovery path calls it too,
       // so a reload has to hand over from a live sound to a live sound. The ordering below
@@ -563,6 +641,8 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
       if (soundRef.current) {
         soundRef.current.unloadAsync();
       }
+      androidPlayerRef.current?.remove();
+      androidPlayerRef.current = null;
     };
   }, []);
 
@@ -860,6 +940,26 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      if (Platform.OS === 'android') {
+        // expo-audio path \u2014 see ANDROID_COUNTDOWN_AUDIO_MODE. No status handler and no
+        // post-playback cycle: nothing was ducked, so there is nothing to give back.
+        const player = androidPlayerRef.current;
+        if (!player) {
+          await reloadAndPlayOnce('androidPlayerRef.current is null');
+          return;
+        }
+        // Written next to the read, as on iOS. Nothing else in the app writes expo-audio's
+        // mode today; this keeps that true by construction rather than by inspection.
+        await setExpoAudioModeAsync({ ...ANDROID_COUNTDOWN_AUDIO_MODE });
+        // seekTo takes SECONDS. It also doubles as the rewind for the ordinary case:
+        // ExoPlayer sits in STATE_ENDED after a natural finish, and a seek is what brings
+        // it back to READY so play() actually plays.
+        await player.seekTo(fromPositionMs / 1000);
+        player.play();
+        console.log('Countdown sound played successfully (android)');
+        return;
+      }
+
       if (!soundRef.current) {
         await reloadAndPlayOnce('soundRef.current is null');
         return;
@@ -883,11 +983,13 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
           // Clear the status update handler to prevent repeated calls
           soundRef.current?.setOnPlaybackStatusUpdate(null);
 
-          // Give the music its volume back — one mechanism per platform.
+          // Give the music its volume back. This handler is iOS-only in practice now —
+          // Android returns above before reaching it (see ANDROID_COUNTDOWN_AUDIO_MODE).
           //
-          // Android: the setIsEnabledAsync(false/true) cycle below is the real lever.
-          // setAudioIsEnabled(false) abandons audio focus, and abandoning focus is what
-          // un-ducks other apps. Kept exactly as it was.
+          // Android (historical): the setIsEnabledAsync(false/true) cycle below was the
+          // real lever. setAudioIsEnabled(false) abandons audio focus, and abandoning
+          // focus is what un-ducks other apps — except on Samsung firmware, which is why
+          // Android no longer ducks at all.
           //
           // iOS: the cycle is a no-op at the OS level — previously marked UNVERIFIED,
           // now CONFIRMED by a full node_modules trace (4 Aug 2026) plus device
@@ -953,6 +1055,12 @@ export const TimerProvider = ({ children }: { children: React.ReactNode }) => {
    * that cycle rather than here.
    */
   const stopCountdownSound = () => {
+    if (Platform.OS === 'android') {
+      // pause() is synchronous and never throws on an idle player. No un-duck needed:
+      // the Android path holds no focus (see ANDROID_COUNTDOWN_AUDIO_MODE).
+      androidPlayerRef.current?.pause();
+      return;
+    }
     const sound = soundRef.current;
     if (!sound) return;
     // Fire and forget, and swallow: a sound that is not playing, or not loaded, throws here
