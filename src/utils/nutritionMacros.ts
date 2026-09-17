@@ -18,8 +18,11 @@
 import { WorkoutStorage } from './storage';
 import { clearNutritionAnswers } from './nutritionQuestionnaireStorage';
 import type { NutritionAnswers } from './nutritionQuestionnaireStorage';
-import { derivePhase } from './goalsProfile';
-import type { GoalsProfile, DerivedPhase, TrainingState } from './goalsProfile';
+import { derivePhase, wayInFor } from './goalsProfile';
+import type { GoalsProfile, DerivedPhase, TrainingState, WayIn } from './goalsProfile';
+// roadmap imports goalsProfile, syntheticNutritionAnswers and operatingBands,
+// none of which import this file, so this cannot cycle under Metro.
+import { EASE_FRACTION_BW_PER_WEEK } from './roadmap';
 
 export interface MacroResults {
   bmr: number;
@@ -207,12 +210,39 @@ export async function finalizeNutrition(
 
 // Daily calorie target derived from the research-based rates in the build plan.
 // Used by computeMacrosPhaseAware; exported for unit tests.
+//
+// ── THE WAY IN REACHES THE PLATE, 14 Sep 2026 ───────────────────────────────
+//
+// This is the number the meal plan is actually built from: the prompt builder
+// recomputes through here and never reads the finalised questionnaire result.
+// So a choice that changed the seed but not this function changed the summary
+// screen and nothing the user eats. The way-in screen sets how the opening cut
+// is run (see WayIn in goalsProfile), and two of its three answers land here:
+//
+//   hold  The user chose to keep the scale where it is, and the plan was timed
+//         on that. The recomp deficit below (8% or 300 kcal) would drift them
+//         down about a quarter of a kilo a week, which is exactly the "ease"
+//         they did not pick. So a held recomp eats at maintenance: the
+//         composition change is paid for by the fat that leaves as lean is
+//         built, and needs no deficit on the plate. The 300 stays for every
+//         recomp derivePhase hands out on its own (rule 1's newbie window,
+//         rule 3 above the band), which are recommendations, not a promise
+//         about the scale.
+//   ease  A cut at the engine's ease band, about 250 kcal a day on an
+//         average frame, instead of the full deficit the phase would draw.
+//         The slow bound, matching what the seed resolves for 'steady'. The
+//         pace choice does not reach this path for the ordinary cut either,
+//         which is older than this work.
+//
+// `wayIn` is what wayInFor returns: the stored choice only while there is an
+// opening cut for it to run on, so a stale answer changes nothing.
 export function phaseCaloricTarget(
   tdee: number,
   phase: DerivedPhase,
   weightKg: number,
   bodyFatPct?: number,
-  trainingState?: TrainingState
+  trainingState?: TrainingState,
+  wayIn?: WayIn | null
 ): number {
   switch (phase) {
     case 'bulk': {
@@ -242,10 +272,19 @@ export function phaseCaloricTarget(
         : 0.75;
       const maxWeeklyLossKg = (weightKg * maxWeeklyLossPct) / 100;
       const ceilingDeficit = Math.round((maxWeeklyLossKg * 7700) / 7);
+      if (wayIn === 'ease') {
+        // The ease band's slow bound, still under the fat-mass ceiling for
+        // anyone it could apply to, and never over the 500 either.
+        const easeKg = weightKg * EASE_FRACTION_BW_PER_WEEK[0];
+        const easeDeficit = Math.round((easeKg * 7700) / 7);
+        return Math.round(tdee - Math.min(easeDeficit, ceilingDeficit, 500));
+      }
       const deficit = Math.min(500, ceilingDeficit);
       return Math.round(tdee - deficit);
     }
     case 'recomp':
+      // A held recomp holds the scale: maintenance, see the header.
+      if (wayIn === 'hold') return tdee;
       // Small deficit (8% or 300 kcal, whichever is smaller) — maintenance-adjacent.
       return Math.round(tdee - Math.min(300, Math.round(tdee * 0.08)));
     case 'maintain':
@@ -421,7 +460,14 @@ export function computeMacrosPhaseAware(
 
   const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIERS[activityLevel] ?? 1.55));
   const phase = derivePhase(profile);
-  const asked = phaseCaloricTarget(tdee, phase, weight, profile.currentBodyFatPct, profile.trainingState);
+  const asked = phaseCaloricTarget(
+    tdee,
+    phase,
+    weight,
+    profile.currentBodyFatPct,
+    profile.trainingState,
+    wayInFor(profile),
+  );
 
   // ── ENERGY AVAILABILITY FLOOR ────────────────────────────────────────────
   //

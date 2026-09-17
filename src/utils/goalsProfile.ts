@@ -124,6 +124,42 @@ export type CutPace = 'steady' | 'faster';
  */
 export type PhaseOrder = 'cut_first' | 'build_first';
 
+/**
+ * HOW THE OPENING CUT IS RUN, when there is one — the way into the range.
+ *
+ * ── WHY THIS IS A RATE AND NOT A ROUTE, 13 Sep 2026 ─────────────────────────
+ *
+ * The routes decide whether there is a cut before the building and whether a
+ * ceiling interrupts it. Neither says anything about what the scale does
+ * during that opening cut, and that is the number people object to: "I don't
+ * want to weigh less than I do now". The engine's own loss sim already makes
+ * the exit weight a function of the rate — it credits lean gain and
+ * suppresses it as the deficit grows — so the three answers are three points
+ * on one dial rather than three kinds of phase:
+ *
+ *   hold  0%/wk of bodyweight. Weight held, lean rises into the fat that
+ *         leaves. Priced by monthsToRecomp, which is that same dial at zero.
+ *   ease  EASE_FRACTION_BW_PER_WEEK, about 250 kcal/day on an average frame.
+ *         The scale drifts. Priced by the loss sim at that band.
+ *   cut   FAT_LOSS_FRACTION_BW_PER_WEEK, the shipped band. Lean held.
+ *
+ * WHAT IT DOES NOT CHANGE, measured before it was built: muscle at the goal,
+ * and the length of the plan. Run forward, all three land within half a kilo
+ * of lean at the same date and rejoin by month six. What differs is what the
+ * scale reads on the way, how long the user stays soft, and how big a deficit
+ * they have to run. So it is a preference, stated as consequences, like the
+ * band and the order before it.
+ *
+ * Applies to the OPENING cut only. Every later cut — the mid-build trims the
+ * ceiling rail inserts and the reveal — runs at the shipped rate. The reveal
+ * cannot be held at all: a hold keeps adding lean while the fat comes off, so
+ * it would arrive above the goal lean mass, which is a different goal rather
+ * than a different route.
+ *
+ * Absent means "not asked", and the plan runs the cut it always did.
+ */
+export type WayIn = 'hold' | 'ease' | 'cut';
+
 
 export interface GoalsProfile {
   currentWeightKg: number;
@@ -272,6 +308,15 @@ export interface GoalsProfile {
    */
   bulkToBf?: number;
 
+  /**
+   * How the opening cut is run. See WayIn.
+   *
+   * Written only by the way-in screen, which exists only when the plan opens
+   * with a cut, so a stale value on a profile that no longer has one is
+   * possible and harmless: deriveRoadmap and derivePhase both ignore it
+   * whenever there is nothing to cut into.
+   */
+  wayIn?: WayIn;
 
   /** Provenance of currentBodyFatPct. See BodyFatSource. Decides whether the
    *  reading can end a phase, not just how it is displayed. */
@@ -287,11 +332,13 @@ export interface VolumeTierInfo {
   rationale: string;
 }
 
-// Both thresholds derivePhase branches on live in operatingBands.ts — a leaf
+// The thresholds derivePhase branches on live in operatingBands.ts — a leaf
 // module, so this value import cannot cycle with roadmap.ts (which imports
 // this file). recompEntryBfFor is the rule-1 window (15 male / 24 female);
-// bandFor is the route- and sex-aware operating band that rule 3 reads.
-import { bandFor, recompEntryBfFor } from './operatingBands';
+// bandFor is the route- and sex-aware operating band that rule 3 reads;
+// leanStopFor is the floor the range dial is clamped to, which rule 0½ has to
+// apply too or it would see a cut ahead of a woman whose 12 the engine reads as 22.
+import { bandFor, leanStopFor, recompEntryBfFor } from './operatingBands';
 
 // Minimum body-fat gap (percentage points) before a goal BF is treated as
 // a meaningful leanness target rather than noise / rounding.
@@ -385,6 +432,13 @@ export function isRevealOnly(profile: GoalsProfile): boolean {
  *    This is the only rule that can return 'cut' for a user rule 1 would
  *    otherwise claim, and it is bounded to people whose own goal asks for no
  *    additional lean mass at all.
+ * 0½. The user has chosen how to run their opening cut, and there is one →
+ *    recomp for a hold, cut otherwise. See WayIn. It sits above rule 1 because
+ *    an explicit choice beats the default that rule exists to protect: a
+ *    novice at 20% who picked "cut" on the way-in screen is cutting, and the
+ *    badge must say so, or it disagrees with the plan the same screen drew.
+ *    Only fires when a cut is actually ahead — same test deriveRoadmap uses,
+ *    so a stale answer on a profile that no longer cuts is inert.
  * 1. New or returning trainee + elevated BF → recomp.
  *    Muscle-memory / newbie-gains window enables simultaneous fat loss and
  *    muscle gain. This is the "no cut-first mandate" rule. It runs BEFORE any
@@ -442,6 +496,10 @@ export function derivePhase(profile: GoalsProfile): DerivedPhase {
   // implies MORE lean, never less — so it cannot swallow rule 3.
   if (isRevealOnly(profile)) return 'cut';
 
+  // Rule 0½ — the chosen way in, when there is a cut ahead to run it on.
+  const wayIn = wayInFor(profile);
+  if (wayIn != null) return wayIn === 'hold' ? 'recomp' : 'cut';
+
   // Rule 1 — newbie/returner recomp window (no cut-first mandate)
   if (isNewOrReturning && hasElevatedBF) return 'recomp';
 
@@ -461,6 +519,39 @@ export function derivePhase(profile: GoalsProfile): DerivedPhase {
 
   // Rule 5 — nothing to act on
   return 'maintain';
+}
+
+/**
+ * The way in that APPLIES right now: the user's stored choice, when the plan
+ * has an opening cut for it to run on, else null.
+ *
+ * THE ONE DEFINITION of "is a cut ahead", shared by derivePhase (rule 0½) and
+ * lossRate (which band of rates to offer). The bottom of the range is the
+ * stored dial when there is one, clamped at the lean stop exactly as
+ * resolveBottom clamps it; without a dial, "meaningfully above goal" is the
+ * same test defaultPhaseOrder makes, so the two agree. The 0.2 margin matches
+ * deriveRoadmap's `needsCut`.
+ *
+ * KNOWN LIMIT, 14 Sep 2026: this is stateless, like everything that reads the
+ * profile. The choice was designed for the OPENING cut only, but the app
+ * re-derives from wherever the user stands, so once they are back above their
+ * bottom after a build this returns the same answer again and the next cut
+ * runs the same way. Scoping it to the first phase means clearing `wayIn`
+ * when that phase completes, which belongs with the phase-transition code
+ * rather than here.
+ */
+export function wayInFor(profile: GoalsProfile): WayIn | null {
+  const { currentBodyFatPct, goalBodyFatPct, sex, wayIn } = profile;
+  if (wayIn == null || currentBodyFatPct == null) return null;
+  const bottom =
+    profile.preBuildBf != null
+      ? Math.max(profile.preBuildBf, leanStopFor(sex))
+      : goalBodyFatPct != null
+        ? goalBodyFatPct + BF_GOAL_MARGIN
+        : undefined;
+  if (bottom == null) return null;
+  if ((profile.phaseOrder ?? defaultPhaseOrder(profile)) !== 'cut_first') return null;
+  return currentBodyFatPct > bottom + 0.2 ? wayIn : null;
 }
 
 /**

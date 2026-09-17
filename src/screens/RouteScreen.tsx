@@ -55,6 +55,7 @@ import RouteBodyFatField from '../components/route/RouteBodyFatField';
 import ScaleRuler from '../components/route/ScaleRuler';
 import LeanGauge from '../components/route/LeanGauge';
 import JourneyChart from '../components/route/JourneyChart';
+import WayInMini, { type WayInOption } from '../components/route/WayInChart';
 import PhaseLine from '../components/route/PhaseLine';
 import { expandPhases } from '../utils/phaseJourney';
 import { phaseIntentFor, phaseEndWeightKg } from '../utils/phaseIntent';
@@ -79,6 +80,7 @@ import type {
   GoalsProfile,
   RoutePreference,
   Sex,
+  WayIn,
 } from '../utils/goalsProfile';
 
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -396,7 +398,52 @@ interface BeatHelp {
   sources?: string;
 }
 
-function helpFor(beat: number, sex?: Sex): BeatHelp | null {
+function helpFor(beat: number, sex?: Sex, wayInScreen = false): BeatHelp | null {
+  if (beat === 9 && wayInScreen) {
+    /**
+     * The way-in sheet, 13 Sep 2026. Same shape as the route sheet below: one
+     * group per option, then what is not known, then sources. The claim that
+     * carries the screen — same muscle, same finish — is stated first because
+     * a user assumes the slow-looking option is the slow one.
+     */
+    return {
+      title: 'Getting into your range',
+      body:
+        'All three arrive at the same body fat with the same muscle, and the plan finishes at the same time whichever you pick. What differs is what the scale reads on the way, and how long you stay soft.',
+      groups: [
+        {
+          title: 'Hold your weight',
+          points: [
+            'Fat leaves only as fast as muscle arrives, so the scale sits still while the shape changes',
+            'Eating at maintenance, which is the easiest of the three to keep to',
+            'Cost: soft for longer, and nothing you can measure at home confirms it is working',
+          ],
+        },
+        {
+          title: 'Ease it down',
+          points: [
+            'A small deficit. In the one trial that tested it, that lost about twice the fat of holding weight for the same muscle gain',
+            'Cost: a deficit that small is inside most people\u2019s tracking error, so it is really letting the scale drift',
+          ],
+        },
+        {
+          title: 'Cut',
+          points: [
+            'Lean soonest, and the one the scale can confirm within a few weeks',
+            'Cost: the harder stretch of eating, and a smaller frame until the build brings it back',
+          ],
+        },
+        {
+          title: 'What is not known',
+          points: [
+            'No trial has followed any of the three through a whole plan',
+            'The one trial comparing a small deficit with maintenance ran ten weeks with ten people per arm',
+          ],
+        },
+      ],
+      sources: 'Vargas-Molina 2026 \u00b7 Garthe 2011 \u00b7 Murphy and Koehler 2022',
+    };
+  }
   if (beat === 2) {
     return {
       title: 'Why we ask',
@@ -548,19 +595,43 @@ const NO_CEILING_BF = 99;
  * lean route opens the range; the capped route opens its peak and then the
  * range, one question per screen.
  */
-const STEPS: Record<RouteId, Array<0 | 1 | 2 | 3>> = {
-  lean: [0, 1, 3],
-  bulk: [0, 3],
-  capped: [0, 1, 2, 3],
+type RangeStep = 0 | 1 | 2 | 3;
+/**
+ * The lean route's second question is THE WAY IN (13 Sep 2026): how the
+ * opening cut is run, asked after the range because its figures are
+ * consequences of the bottom the user just set. It exists only when the plan
+ * actually opens with a cut — someone standing at or under their bottom has
+ * nothing to choose and sees nothing — so the sequence is a function rather
+ * than a table.
+ */
+const stepsFor = (r: RouteId, wayInApplies: boolean): RangeStep[] => {
+  if (r === 'bulk') return [0, 3];
+  if (r === 'capped') return [0, 1, 2, 3];
+  return wayInApplies ? [0, 1, 2, 3] : [0, 1, 3];
 };
-const nextStep = (at: 0 | 1 | 2 | 3, r: RouteId) => {
-  const seq = STEPS[r];
-  return seq[Math.min(seq.indexOf(at) + 1, seq.length - 1)] ?? 3;
-};
-const prevStep = (at: 0 | 1 | 2 | 3, r: RouteId) => {
-  const seq = STEPS[r];
-  return seq[Math.max(seq.indexOf(at) - 1, 0)] ?? 0;
-};
+const nextStep = (at: RangeStep, seq: RangeStep[]): RangeStep =>
+  seq[Math.min(seq.indexOf(at) + 1, seq.length - 1)] ?? 3;
+const prevStep = (at: RangeStep, seq: RangeStep[]): RangeStep =>
+  seq[Math.max(seq.indexOf(at) - 1, 0)] ?? 0;
+
+/**
+ * The three ways into the range, in the order they sit on the screen: the
+ * scale held, the scale drifting, the scale falling.
+ *
+ * CUT BACK ON 14 Sep 2026, the day after it shipped. The first version stacked
+ * a sub-line, a statement line, a full chart, a gain-and-cost sentence on
+ * every row and a three-part meta line, and read as the one overloaded screen
+ * in a flow that is otherwise one question and one shape. It is now the route
+ * screen's shape: a miniature, a name, and ONE line in the user's own kilos
+ * and months. `line` survives for screen readers only, through the row's
+ * accessibilityLabel; everything else that explained an option lives in
+ * helpFor(9)'s way-in sheet.
+ */
+const WAY_IN_CHOICES: Array<{ id: WayIn; name: string; line: string }> = [
+  { id: 'hold', name: 'Hold your weight', line: 'Same size, just tighter, but soft for longer.' },
+  { id: 'ease', name: 'Ease it down', line: 'A little lighter with most of your size kept, and soft a bit longer than a cut.' },
+  { id: 'cut', name: 'Cut', line: 'Lighter and sharper soonest, but a smaller frame while you get there.' },
+];
 
 /** Wide enough that the falloff never shows an edge on any phone. */
 const GLOW = 760;
@@ -667,6 +738,12 @@ export default function RouteScreen() {
    */
   const [bottom, setBottom] = useState<number | null>(null);
   const [top, setTop] = useState<number | null>(null);
+  /**
+   * THE WAY IN: how the opening cut is run. Opens on the shipped cut so a
+   * user who taps straight through gets exactly the plan they get today;
+   * nobody is defaulted onto a hold. See WayIn in goalsProfile.
+   */
+  const [wayIn, setWayIn] = useState<WayIn>('cut');
   /**
    * Beat 9 is THREE screens, not three beats.
    *
@@ -791,6 +868,7 @@ export default function RouteScreen() {
                 : 'lean',
           );
           setBulkTo(p.bulkToBf ?? null);
+          setWayIn(p.wayIn ?? 'cut');
         }
         setBottom(p?.preBuildBf ?? null);
         // ── THE SENTINEL IS NOT A CEILING ─────────────────────────────────
@@ -876,11 +954,31 @@ export default function RouteScreen() {
       ...base,
       ceilingBf: r === 'bulk' ? NO_CEILING_BF : (chosen ?? suggested ?? undefined),
       bulkToBf: r === 'capped' ? (bulkTo ?? undefined) : undefined,
+      // Only the lean route opens with a cut, so only it has a way in. The
+      // engine ignores the field on the others regardless; leaving it off
+      // keeps the preview profiles honest about which questions were asked.
+      wayIn: r === 'lean' ? wayIn : undefined,
     };
   };
 
   const effProfile: GoalsProfile | null = planProfileFor('lean');
   const planProfile: GoalsProfile | null = planProfileFor(routeId);
+
+  /**
+   * Whether the way-in question exists at all: the lean route, and a plan
+   * that opens with a cut. Same test the engine makes (`needsCut`: standing
+   * more than 0.2 above the resolved bottom), read through the same function
+   * it resolves the bottom with, so the screen cannot ask a question the plan
+   * has no phase for. Computed up here, above the early returns, because
+   * `back` and `advance` need it and they are defined before the render body.
+   */
+  const wayInApplies = (() => {
+    const bf = profile?.currentBodyFatPct;
+    if (routeId !== 'lean' || !effProfile || bf == null) return false;
+    const r = operatingRangeFor(effProfile, preference);
+    return r != null && bf > r.bottom + 0.2;
+  })();
+  const steps = stepsFor(routeId, wayInApplies);
 
   // ── HOOKS LIVE ABOVE THE EARLY RETURNS ──────────────────────────────────
   //
@@ -960,8 +1058,48 @@ export default function RouteScreen() {
       bulkTo,
       bottom,
       top,
+      wayIn,
     ],
   );
+
+  /**
+   * One plan per way in, so each row can state the engine's own landing
+   * weight and months for THIS user. A hold the engine cannot price (a lifter
+   * with no lean-gain rate left) comes back as a cut, and the row for it is
+   * dropped rather than shown twice — that is the engine declining, not the
+   * screen hiding a choice.
+   */
+  const wayInOptions: WayInOption[] | null = React.useMemo(() => {
+    if (!wayInApplies) return null;
+    const base = planProfileFor('lean');
+    if (!base) return null;
+    const out: WayInOption[] = [];
+    for (const choice of WAY_IN_CHOICES) {
+      const rm = deriveRoadmap({ ...base, wayIn: choice.id }, preference);
+      const first = rm?.phases[0];
+      if (!first || first.exitWeightKg == null) continue;
+      if (choice.id === 'hold' && first.kind !== 'recomp') continue;
+      out.push({
+        id: choice.id,
+        exitWeightKg: first.exitWeightKg,
+        months: first.estMonths,
+        exitBodyFatPct: first.exitBodyFatPct,
+      });
+    }
+    return out.length > 1 ? out : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    wayInApplies,
+    profile?.currentWeightKg,
+    profile?.currentBodyFatPct,
+    profile?.heightCm,
+    profile?.sex,
+    provisionalGoalW,
+    provisionalGoalBf,
+    preference,
+    bottom,
+    top,
+  ]);
 
   const patch = async <K extends keyof GoalsProfile>(field: K, value: GoalsProfile[K]) => {
     setProfile((prev) => (prev ? { ...prev, [field]: value } : prev));
@@ -1041,7 +1179,7 @@ export default function RouteScreen() {
     // is stepped over in BOTH directions when it does not apply — skipping it
     // forward only would trap someone who reached the plan and pressed back.
     if (beat === 9 && rangeStep > 0) {
-      setRangeStep(prevStep(rangeStep, routeId));
+      setRangeStep(prevStep(rangeStep, steps));
       return;
     }
     // 4 -> 7 in both directions: 5 and 6 no longer exist.
@@ -1087,11 +1225,15 @@ export default function RouteScreen() {
           await patch('ceilingBf', top ?? r.top);
         }
       }
+      // The way in opens on the cut, and accepting it is still a choice.
+      // Written only when the question was actually asked, so a profile that
+      // never had an opening cut never carries an answer to it.
+      if (wayInApplies && profile.wayIn == null) await patch('wayIn', wayIn);
     }
 
     // Beat 9's sub-steps advance before the beat does.
     if (beat === 9 && rangeStep < 3) {
-      setRangeStep(nextStep(rangeStep, routeId));
+      setRangeStep(nextStep(rangeStep, steps));
       return;
     }
     if (beat === 8) {
@@ -1248,6 +1390,21 @@ export default function RouteScreen() {
 
   const routeName = (ROUTE_CHOICES.find((o) => o.id === routeId) ?? ROUTE_CHOICES[0]).name;
 
+  /** The way in, written the moment it is tapped, like the route above it. */
+  const chooseWayIn = (next: WayIn) => {
+    if (next === wayIn) return;
+    setWayIn(next);
+    void updateGoalsProfileField('wayIn', next);
+  };
+  const wayInName = (WAY_IN_CHOICES.find((o) => o.id === wayIn) ?? WAY_IN_CHOICES[2]).name;
+  /** "stays at 77 kg" or "down to 73 kg", off the plan's own opener. */
+  const wayInWhere = (() => {
+    const first = roadmap?.phases[0];
+    if (!first || first.exitWeightKg == null) return null;
+    const kg = imperial ? `${Math.round(kgToLb(first.exitWeightKg))} lbs` : `${Math.round(first.exitWeightKg)} kg`;
+    return first.kind === 'recomp' ? `stays at ${kg}` : `down to ${kg}`;
+  })();
+
   const openingCut =
     range != null && currentBf != null && currentBf > range.bottom + 0.2;
   const noCutNeeded = (roadmap?.gapKg ?? 0) > 0;
@@ -1363,7 +1520,7 @@ export default function RouteScreen() {
   // would silently apply the male set, which is the exact thing the opt out
   // was doing.
   const ctaBlocked = beat === 2 && profile.sex == null;
-  const beatHelp = helpFor(beat, profile.sex);
+  const beatHelp = helpFor(beat, profile.sex, beat === 9 && routeId === 'lean' && rangeStep === 2);
   const section = sectionFor(beat);
 
   /**
@@ -2103,6 +2260,77 @@ export default function RouteScreen() {
           </>
         ) : null}
 
+        {/* ── BEAT 9, THE LEAN ROUTE'S SECOND QUESTION: THE WAY IN ─────────
+            How the opening cut is run. Asked after the range, because every
+            figure on it is a consequence of the bottom the user just set, and
+            only when the plan actually opens with a cut — `wayInApplies` is
+            the engine's own test, so nobody is asked about a phase their plan
+            does not have. The route screen's shape: a miniature, a name, one
+            line. The sub-line carries the one claim the months would otherwise
+            get wrong, that the goal lands at the same time whichever is picked. */}
+        {beat === 9 &&
+        roadmap &&
+        rangeMatters &&
+        range &&
+        routeId === 'lean' &&
+        rangeStep === 2 &&
+        wayInOptions ? (
+          <>
+            <View style={styles.beat1Body}>
+              <Text style={styles.rangeQ}>{`How do you get down to ${bandLo}%?`}</Text>
+              <Text style={styles.rangeSub}>
+                {`Your goal takes about the same time either way. What changes is how soon you reach ${bandLo}%.`}
+              </Text>
+              <View style={styles.edgeRows}>
+                {WAY_IN_CHOICES.map((opt) => {
+                  const o = wayInOptions.find((x) => x.id === opt.id);
+                  if (!o) return null;
+                  const on = wayIn === opt.id;
+                  const kg = imperial
+                    ? `${Math.round(kgToLb(o.exitWeightKg))} lbs`
+                    : `${Math.round(o.exitWeightKg)} kg`;
+                  const where = opt.id === 'hold' ? `Stays at ${kg}` : `Down to ${kg}`;
+                  // Whole months on this line; the tenths live on the summary.
+                  const lo = Math.round(o.months[0]);
+                  const hi = Math.round(o.months[1]);
+                  const months = lo === hi ? `${lo} month${lo === 1 ? '' : 's'}` : `${lo} to ${hi} months`;
+                  // A hold that stops above the bottom (it reached the goal's
+                  // lean mass first) says where it stops, or the question above
+                  // and this row would disagree.
+                  const stops =
+                    Math.abs(o.exitBodyFatPct - bandLo) > 0.2 ? ` to ${Math.round(o.exitBodyFatPct)}%` : '';
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={styles.optRow}
+                      onPress={() => chooseWayIn(opt.id)}
+                      activeOpacity={0.85}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: on }}
+                      accessibilityLabel={`${opt.name}. ${opt.line} ${where}${stops}, ${months}.`}
+                    >
+                      <View style={styles.optMini}>
+                        <WayInMini
+                          id={opt.id}
+                          weightKg={currentWeight}
+                          exitWeightKg={o.exitWeightKg}
+                          deepestExitWeightKg={Math.min(...wayInOptions.map((x) => x.exitWeightKg))}
+                          color={on ? themeColor : '#54545e'}
+                        />
+                      </View>
+                      <View style={styles.optMain}>
+                        <Text style={[styles.optName, on && styles.optNameOn]}>{opt.name}</Text>
+                        <Text style={styles.optWhy}>{`${where}${stops} \u00b7 ${months}`}</Text>
+                      </View>
+                      <View style={[styles.optDot, on && { backgroundColor: themeColor }]} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        ) : null}
+
         {/* ── BEAT 9, SCREEN 3 OF 3: THE PLAN ─────────────────────────────
             The summary, unchanged in structure from what it was before the
             range existed: it is the confidence moment, and it now has no
@@ -2248,6 +2476,24 @@ export default function RouteScreen() {
                       <Text style={[styles.edgeChange, { color: themeColor }]}>Change</Text>
                     </TouchableOpacity>
                   ) : null}
+                  {/* NO ROW FOR A QUESTION THAT WAS NOT ASKED. The way in exists
+                      only when the plan opens with a cut, and this row exists
+                      only then. */}
+                  {wayInApplies && wayInWhere ? (
+                    <TouchableOpacity
+                      style={styles.edgeRow}
+                      onPress={() => setRangeStep(2)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Getting in: ${wayInName}, ${wayInWhere}. Tap to change.`}
+                    >
+                      <View>
+                        <Text style={styles.edgeKey}>GETTING IN</Text>
+                        <Text style={styles.edgeLine}>{`${wayInName} \u00b7 ${wayInWhere}`}</Text>
+                      </View>
+                      <Text style={[styles.edgeChange, { color: themeColor }]}>Change</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               ) : (
                 <Text style={[styles.orderNone, styles.orderNoneSpaced]}>
@@ -2305,12 +2551,19 @@ export default function RouteScreen() {
               {(() => {
                 const first = roadmap.phases[0];
                 const intent = phaseIntentFor(first.kind);
-                const endKg = phaseEndWeightKg(
-                  first.kind,
-                  profile.currentWeightKg ?? 0,
-                  currentBf,
-                  first.exitBodyFatPct,
-                );
+                // The phase's own exit weight first: phaseEndWeightKg is
+                // lean-held arithmetic, which under-reads an eased opener by
+                // a couple of kilos and has nothing to say about a hold, whose
+                // end weight is the one number it does know. The arithmetic
+                // stays as the fallback for a phase that carries no weight.
+                const endKg =
+                  first.exitWeightKg ??
+                  phaseEndWeightKg(
+                    first.kind,
+                    profile.currentWeightKg ?? 0,
+                    currentBf,
+                    first.exitBodyFatPct,
+                  );
 
                 /**
                  * "Lose fat, keep the muscle" is right for almost every cut and
@@ -2829,6 +3082,7 @@ const styles = StyleSheet.create({
   recKey: { fontSize: 13.5, color: '#8e8e93' },
   recAct: { fontSize: 14, fontWeight: '700' },
   recActOff: { color: '#4b4b52', fontWeight: '400' },
+
   // The tap readout styles (readout / readCell / readKey / readVal / readSub /
   // readHint) went with the row on 24 Aug. The numbers are drawn inside the
   // chart now — see JourneyChart's `nodeFlag`.

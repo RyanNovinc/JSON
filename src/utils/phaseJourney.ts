@@ -25,8 +25,39 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Roadmap, RoadmapPhaseKind } from './roadmap';
+// goalsProfileStorage imports nothing but AsyncStorage and goalsProfile types,
+// so this cannot form a cycle under Metro. Checked 14 Sep 2026.
+import { updateGoalsProfileField } from './goalsProfileStorage';
 
 const KEY = '@phase_journey';
+
+/**
+ * THE WAY IN IS SPENT BY THE FIRST TRANSITION, 14 Sep 2026.
+ *
+ * `wayIn` on the profile says how the OPENING cut is run — hold, ease or cut —
+ * and was designed for that phase only. But everything re-derives from where
+ * the user stands, so once they are back above their bottom after a build the
+ * engine would open with the same hold again, and a user who wanted to hold
+ * their weight ONCE would be shown four months at the top of their range
+ * every cycle. The header above says why nothing can tell a first cut from a
+ * third by looking at the profile; this log can, and this is where it does.
+ *
+ * So: the moment the completed count reaches one, the opening phase is behind
+ * them and the choice is cleared. Every later cut runs the shipped rate, and
+ * the plan, the badge and the nutrition seed agree because they all read the
+ * same field. Kept here rather than in the two screens that write the journey
+ * so any future caller gets it for free. Moving BACK to zero does not restore
+ * it: the route screen asks again if the plan still opens with a cut.
+ */
+async function spendWayIn(completedCount: number): Promise<void> {
+  if (completedCount < 1) return;
+  try {
+    await updateGoalsProfileField('wayIn', undefined);
+  } catch {
+    // Best effort, like the journey itself. saveGoalsProfile already swallows
+    // its own failures; this guards the load.
+  }
+}
 
 export interface PhaseTransition {
   /** ISO timestamp. Doubles as identity; the list is append-only. */
@@ -64,16 +95,19 @@ export async function loadPhaseJourney(): Promise<PhaseTransition[]> {
 }
 
 export async function recordPhaseTransition(t: Omit<PhaseTransition, 'confirmedAt'>): Promise<void> {
+  let count = 0;
   try {
     const journey = await loadPhaseJourney();
     await AsyncStorage.setItem(
       KEY,
       JSON.stringify([...journey, { ...t, confirmedAt: new Date().toISOString() }]),
     );
+    count = journey.length + 1;
   } catch {
     // Best effort. A lost transition costs an off-by-one in the counter, never
     // data the user gave us.
   }
+  await spendWayIn(count);
 }
 
 /**
@@ -107,6 +141,7 @@ export async function setCompletedPhaseCount(
       // an arbitrary slice — the log is chronological, so the transitions
       // being unmade are the last ones made.
       await AsyncStorage.setItem(KEY, JSON.stringify(journey.slice(0, clamped)));
+      await spendWayIn(clamped);
       return;
     }
 
@@ -126,6 +161,7 @@ export async function setCompletedPhaseCount(
       });
     }
     await AsyncStorage.setItem(KEY, JSON.stringify([...journey, ...added]));
+    await spendWayIn(journey.length + added.length);
   } catch (e) {
     console.error('setCompletedPhaseCount failed', e);
   }

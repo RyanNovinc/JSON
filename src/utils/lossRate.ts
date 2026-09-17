@@ -58,7 +58,8 @@
 // loss to pick.
 
 import type { GoalsProfile, DerivedPhase, CutPace } from './goalsProfile';
-import { FAT_LOSS_FRACTION_BW_PER_WEEK } from './roadmap';
+import { wayInFor } from './goalsProfile';
+import { FAT_LOSS_FRACTION_BW_PER_WEEK, EASE_FRACTION_BW_PER_WEEK } from './roadmap';
 
 /**
  * [B] Energy the fat store can release per kg of fat per day, kcal.
@@ -87,6 +88,14 @@ const KCAL_PER_KG_FAT = 7700;
  * two-option screen forces a bigger jump than the evidence requires.
  */
 const CANDIDATE_RATES = [0.005, 0.0075, 0.01] as const;
+
+/**
+ * The rates offered to someone who chose to EASE into their range (see WayIn
+ * in goalsProfile): the engine's ease band, [slow, fast], so the deficit the
+ * nutrition side prescribes is the one the plan was timed on. Both are far
+ * under any fat store's ceiling, so the Alpert gate never bites here.
+ */
+const EASE_RATES = [EASE_FRACTION_BW_PER_WEEK[0], EASE_FRACTION_BW_PER_WEEK[1]] as const;
 
 /**
  * [B] A rate slower than the roadmap's slow bound, offered ONLY to someone whose
@@ -210,7 +219,13 @@ export function rateOptionsFor(
     recommended,
   });
 
-  const affordable = CANDIDATE_RATES.filter(
+  // The way in decides which band is on offer. An eased opening cut runs the
+  // engine's ease band; the fast end of the shipped band is exactly what the
+  // user declined by choosing it.
+  const candidates: readonly number[] =
+    wayInFor(profile) === 'ease' ? EASE_RATES : CANDIDATE_RATES;
+
+  const affordable = candidates.filter(
     (rate) => deficitForRate(weightKg, rate) <= ceiling,
   );
 
@@ -232,7 +247,7 @@ export function rateOptionsFor(
     ceilingKcalPerDay: ceiling,
     // Flagged when the fastest rate the app models is off the table, so the
     // screen can say WHY there is only one button rather than looking broken.
-    constrained: affordable.length < CANDIDATE_RATES.length,
+    constrained: affordable.length < candidates.length,
     options: affordable.map((rate, i) => build(rate, i === 0)),
   };
 }

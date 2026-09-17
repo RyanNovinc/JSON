@@ -81,9 +81,10 @@ function easeFor(kind: RoadmapPhaseKind, months: number): (t: number) => number 
     return (t) => (1 - Math.exp(-a * t)) / denom;
   }
   // Cuts and reveals are exponential in WEIGHT, which is handled directly in
-  // the sampler below, so nothing eases here. Recomps hold weight roughly
-  // still while composition moves, and nothing in the literature gives that
-  // segment a shape, so it stays linear and says so.
+  // the sampler below, so nothing eases here. Recomps hold weight while the
+  // composition moves underneath, and nothing in the literature gives that
+  // segment a shape, so it stays linear and says so. An eased opening cut is
+  // a trim, so it takes the trim's shape.
   return (t) => t;
 }
 
@@ -151,6 +152,13 @@ export function planCurve(profile: GoalsProfile, roadmap: Roadmap | null): PlanC
     const endWeight =
       ph.exitWeightKg ??
       (ph.kind === 'build' ? weight + (weight * (endBf - bf)) / 100 : weightAt(leanNow, endBf));
+    // The lean the phase ENDS with, read off its own endpoint rather than
+    // assumed. For every trim the engine used to emit this equals leanNow, so
+    // nothing below changes for them. For the eased way in (13 Sep 2026) the
+    // exit weight carries lean the deficit let through, and holding leanNow
+    // across the segment would end the line two points above the node it is
+    // supposed to land on.
+    const endLean = leanMassKg(endWeight, endBf);
 
     const n = samplesFor(months);
     const ease = easeFor(ph.kind, months);
@@ -162,9 +170,11 @@ export function planCurve(profile: GoalsProfile, roadmap: Roadmap | null): PlanC
 
       if (ph.kind === 'trim' || ph.kind === 'reveal') {
         // Exponential in weight — a fixed fraction of a falling number — with
-        // lean held, which is what makes body fat fall faster as it goes.
+        // lean walked from where it starts to where the phase says it ends
+        // (held, for every cut but the eased opener), which is what makes body
+        // fat fall faster as it goes.
         wAt = weight * Math.pow(endWeight / weight, t);
-        bfAt = bfOf(leanNow, wAt);
+        bfAt = bfOf(leanNow + (endLean - leanNow) * t, wAt);
       } else {
         const e = ease(t);
         bfAt = bf + (endBf - bf) * e;

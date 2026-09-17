@@ -27,6 +27,7 @@ import type {
   RoutePreference,
   DerivedPhase,
   PhaseOrder,
+  WayIn,
 } from './goalsProfile';
 import { derivePhase, isRevealOnly, defaultPhaseOrder } from './goalsProfile';
 import { FAT_PER_LEAN_KG } from './syntheticNutritionAnswers';
@@ -416,6 +417,24 @@ export const RATE_SPREAD_ON_CONFLICT = 0.5;
 export const FAT_LOSS_FRACTION_BW_PER_WEEK: [number, number] = [0.005, 0.01];
 
 /**
+ * [B] The "ease it down" way into the range, as a fraction of bodyweight per
+ * week, [slow, fast]. See WayIn in goalsProfile.
+ *
+ * The band sits UNDER the shipped one on purpose: the shipped slow bound
+ * already exits a 77 kg lifter at 73.6 kg, and the whole point of this option
+ * is a scale that barely moves. 0.3%/wk is about 250 kcal/day on an average
+ * frame, which is the deficit Vargas-Molina et al. 2026 (Eur J Appl Physiol
+ * 126(7):4019-4030) ran against maintenance for ten weeks: the same lean gain
+ * as maintenance and about twice the fat loss. 0.2%/wk is the point where the
+ * loss sim and monthsToRecomp agree to within half a kilo and a fortnight,
+ * i.e. where "ease" stops being distinguishable from "hold".
+ *
+ * Ten weeks, ten per arm, one trial. Enough to set the band; not enough to
+ * recommend it over the other two, which the flow does not.
+ */
+export const EASE_FRACTION_BW_PER_WEEK: [number, number] = [0.002, 0.003];
+
+/**
  * [A] Murphy & Koehler, Scand J Med Sci Sports 2022;32(1):125-137. Their
  * meta-regression found an energy deficit of ~500 kcal/day PREVENTED gains in
  * lean mass under resistance training.
@@ -724,11 +743,41 @@ export function monthsToCut(
   profile?: GoalsProfile,
   targetWeightKg?: number,
 ): [number, number] | null {
+  return cutSim(leanKg, fromBfPct, toBfPct, FAT_LOSS_FRACTION_BW_PER_WEEK, profile, targetWeightKg)
+    ?.months ?? null;
+}
+
+/**
+ * The simulation behind monthsToCut, at any rate band, ALSO reporting the lean
+ * mass the cut ends with.
+ *
+ * ── WHY THE LEAN IS REPORTED, 13 Sep 2026 ───────────────────────────────────
+ *
+ * Every trim in deriveRoadmap prices its duration through this simulation,
+ * which credits lean gain during the deficit, and then sets its exit weight
+ * with lean HELD. At the shipped band the two agree to a few hundred grams,
+ * because the deficit suppresses nearly all of the gain. At the "ease" band
+ * they do not: a 77 kg lifter easing from 20% to 16% gains 1.5 to 2.7 kg of
+ * lean on the way and exits at 75.8 kg, not the 73.3 kg lean-held arithmetic
+ * gives. Using the held figure there would draw the option as a cut that
+ * merely takes longer, which is the one thing it is not.
+ *
+ * The lean is the mean of the two bounds, because a phase carries one exit
+ * weight and the honest range already lives on its duration.
+ */
+export function cutSim(
+  leanKg: number,
+  fromBfPct: number,
+  toBfPct: number,
+  rates: [number, number],
+  profile?: GoalsProfile,
+  targetWeightKg?: number,
+): { months: [number, number]; leanKg: number } | null {
   if (leanKg <= 0 || fromBfPct <= toBfPct) return null;
   const startW = leanKg / (1 - fromBfPct / 100);
   const fatKg = startW - leanKg;
   const weeklyGainKg = profile ? weeklyGainKgFor(profile) : 0;
-  const [slow, fast] = FAT_LOSS_FRACTION_BW_PER_WEEK;
+  const [slow, fast] = rates;
 
   const run = (rateFraction: number) =>
     simulateLoss({ leanKg, fatKg, targetBfPct: toBfPct, targetWeightKg, rateFraction, weeklyGainKg });
@@ -736,7 +785,10 @@ export function monthsToCut(
   const quick = run(fast);
   const slowRun = run(slow);
   if (!quick || !slowRun) return null;
-  return [round1(quick.weeks / 4.345), round1(slowRun.weeks / 4.345)];
+  return {
+    months: [round1(quick.weeks / 4.345), round1(slowRun.weeks / 4.345)],
+    leanKg: (quick.leanKg + slowRun.leanKg) / 2,
+  };
 }
 
 /**
@@ -817,6 +869,55 @@ export function monthsToRecomp(
 }
 
 /**
+ * Months to hold `weightKg` while body fat falls from one percentage to
+ * another, [lo, hi] — the way-in hold. The slower of two readings.
+ *
+ * ── WHY TWO INSTRUMENTS, 13 Sep 2026 ────────────────────────────────────────
+ *
+ * monthsToRecomp prices the swing at the FLAT lean-gain band, which is the
+ * same band the loss simulation credits during a cut or an ease — so against
+ * its siblings on the way-in screen it is the consistent reading, and it is
+ * always slower than the ease, as physics says a hold must be. But the flat
+ * band ignores the decay of the curve, so for a hold that banks twelve kilos
+ * of lean it is far too quick: 60 kg at 32% held down to 12% came out 40%
+ * shorter than cutting and building the same lean.
+ *
+ * The curve reading is the time yearsToBuild says that lean takes, divided by
+ * the deficit suppression the recomp form derives — the same 1/(1 + g·K),
+ * with K the fat-minus-lean energy over Murphy & Koehler's zero point. It is
+ * right for a long hold and, because the curve's opening rate runs above the
+ * flat band, optimistic for a short one: a three-kilo hold came out quicker
+ * than the eased cut beside it, which no user should be shown.
+ *
+ * Each is optimistic on its own ground, so the hold takes the slower of the
+ * two, bound by bound. Understating a hold's speed only makes the plan a
+ * little conservative; overstating it is the failure that costs trust. The
+ * rest of the plan then charges the REST of the curve for the lean the hold
+ * banked, so that lean is priced once. On a 77 kg lifter holding 20% to 16%
+ * the whole plan comes out within a month of the cut.
+ */
+export function monthsToHold(
+  profile: GoalsProfile,
+  weightKg: number,
+  fromBfPct: number,
+  toBfPct: number,
+): [number, number] | null {
+  const flat = monthsToRecomp(profile, weightKg, fromBfPct, toBfPct);
+  const leanGainedKg = (weightKg * (fromBfPct - toBfPct)) / 100;
+  const build = monthsToBuildLeanExact(leanGainedKg, profile);
+  const rate = leanGainKgPerYear(profile);
+  if (!flat || !build || !rate || rate[1] <= 0 || rate[0] <= 0) return null;
+  const k = (KCAL_PER_KG_FAT - KCAL_PER_KG_LEAN) / (7 * RECOMP_DEFICIT_CEILING_KCAL_PER_DAY);
+  const suppression = (annualKg: number) => 1 / (1 + (annualKg / 52) * k);
+  // Ordered, because yearsToBuild can return a degenerate range for a small
+  // gap and the two suppressions then pull its ends past each other.
+  const curveLo = build[0] / suppression(rate[1]);
+  const curveHi = build[1] / suppression(rate[0]);
+  const curve: [number, number] = [Math.min(curveLo, curveHi), Math.max(curveLo, curveHi)];
+  return [round1(Math.max(flat[0], curve[0])), round1(Math.max(flat[1], curve[1]))];
+}
+
+/**
  * Months to add a given amount of lean mass, [lo, hi].
  *
  * Thin wrapper over yearsToBuild so the phase durations and the whole-journey
@@ -833,6 +934,22 @@ export function monthsToBuildLean(
   const rate = leanGainKgPerYear(profile);
   if (!rate || rate[0] <= 0) return null;
   return [round1((gapKg / rate[1]) * 12), round1((gapKg / rate[0]) * 12)];
+}
+
+/**
+ * monthsToBuildLean without either rounding, for the small gaps the way in
+ * banks — see yearsToBuildExact. Same fallback, same nulls.
+ */
+export function monthsToBuildLeanExact(
+  gapKg: number,
+  profile: GoalsProfile,
+): [number, number] | null {
+  if (gapKg <= 0) return null;
+  const years = yearsToBuildExact(gapKg, profile);
+  if (years) return [years[0] * 12, years[1] * 12];
+  const rate = leanGainKgPerYear(profile);
+  if (!rate || rate[0] <= 0) return null;
+  return [(gapKg / rate[1]) * 12, (gapKg / rate[0]) * 12];
 }
 
 const ceilingFor = (sex?: Sex) => FFMI_CEILING[sex === 'female' ? 'female' : 'male'];
@@ -932,6 +1049,19 @@ export function spreadFor(profile: GoalsProfile): number {
  * conflict.
  */
 export function yearsToBuild(gapKg: number, profile: GoalsProfile): [number, number] | null {
+  const y = yearsToBuildExact(gapKg, profile);
+  return y ? [round1(y[0]), round1(y[1])] : null;
+}
+
+/**
+ * yearsToBuild before its rounding. Split out on 13 Sep 2026 because the
+ * rounding is to a tenth of a YEAR, and the way-in hold prices the lean it
+ * banks — three kilos, a few months — through this curve: at that scale a
+ * tenth of a year is a quarter of the answer, and both bounds of a small gap
+ * collapse onto the same value. Every existing caller still gets the rounded
+ * figure it always did.
+ */
+function yearsToBuildExact(gapKg: number, profile: GoalsProfile): [number, number] | null {
   const { heightCm, sex } = profile;
   if (heightCm == null || gapKg <= 0) return null;
   const L = lifetimeHeadroomKg(heightCm, sex);
@@ -963,7 +1093,7 @@ export function yearsToBuild(gapKg: number, profile: GoalsProfile): [number, num
   }
 
   const s = spreadFor(profile);
-  return [round1(mid / (1 + s)), round1(mid / (1 - s))];
+  return [mid / (1 + s), mid / (1 - s)];
 }
 
 /**
@@ -1889,15 +2019,28 @@ export function deriveRoadmap(
       // at 0.5 kg of fat per kg of lean you cannot add 16 kg of muscle without
       // body fat crossing 18% somewhere — and they are correct.
       const fatOut = nowFat - goalFat + fatFromBuild;
-      const leanPer = gapKg;
       const fatPer = fatOut;
 
       let lean = leanNowKg;
       let fat = nowFat;
 
-      const doTrim = () => {
+      // ── THE WAY IN, 13 Sep 2026 ───────────────────────────────────────────
+      //
+      // The opening cut used to be one thing. It is now the user's answer to
+      // "how do you get into your range", and the three answers are three
+      // rates on the one dial the loss sim already models — see WayIn. The
+      // exit body fat is the same for all three; what moves is the weight the
+      // phase lands on and the lean it carries into the build.
+      //
+      // The cut branch is byte-for-byte what shipped, and a profile with no
+      // answer takes it. The hold is priced by monthsToRecomp, which is the
+      // same dial at zero. The ease is the same simulation as the cut at the
+      // lower band, and the ONE place a trim's exit weight is not lean-held —
+      // cutSim explains why.
+      const wayIn: WayIn = profile.wayIn ?? 'cut';
+
+      const doWayIn = () => {
         const from = bfOf(lean, fat);
-        fat = Math.max(0, fat - fatPer);
         // Clamped at the DIAL, never at the goal. A cut must be allowed to go
         // BELOW the goal body fat, because the build that follows puts fat back
         // on — clamping to the goal instead made the single-cycle cut stop at
@@ -1907,13 +2050,80 @@ export function deriveRoadmap(
         // so for a profile with no dial set this is the same number it always
         // was. Raising the dial shortens this cut and leaves the rest to the
         // terminal reveal, which is the entire point of the control.
-        const exit = Math.max(trimTo, round1(bfOf(lean, fat)));
+        const exit = Math.max(trimTo, round1(bfOf(lean, Math.max(0, fat - fatPer))));
         const wBefore = lean + fatAt(lean, from);
+
+        if (wayIn === 'hold') {
+          // Weight held; the fat that leaves is replaced by lean, so the lean
+          // at the exit is whatever that weight carries at the exit body fat.
+          //
+          // STOPPED AT THE GOAL LEAN MASS. A hold adds muscle for as long as it
+          // runs, and on a heavy starter with a small gap it would sail past
+          // the lean the goal asks for before reaching the bottom of the range
+          // — 105 kg held down to 12% is 92 kg of lean against a goal of 87.
+          // That is isRevealOnly's objection in miniature: a hold cannot
+          // deliver a goal weight below the one it is standing on. So it ends
+          // where the muscle is built, and the reveal takes the rest off.
+          const holdExit = Math.max(exit, round1(100 * (1 - leanTargetKg / wBefore)));
+          const leanAfter = wBefore * (1 - holdExit / 100);
+          const months = monthsToHold(profile, wBefore, from, holdExit);
+          // null means the lifter has no lean-gain rate left (at the FFMI
+          // ceiling) or nothing to hold for. A hold with no muscle arriving is
+          // not slow, it is impossible, so the plan runs the cut instead.
+          if (months) {
+            lean = leanAfter;
+            fat = wBefore - lean;
+            push('recomp', holdExit, months, wBefore, wBefore);
+            return;
+          }
+        }
+
+        if (wayIn === 'ease') {
+          const eased = cutSim(lean, from, exit, EASE_FRACTION_BW_PER_WEEK, profile);
+          if (eased) {
+            // Same stop as the hold, for the same reason. The sim does not know
+            // the goal, so when the lean it let through overshoots the target
+            // the phase keeps the weight the sim arrived at, carries the goal
+            // lean instead, and exits at the body fat that weight then reads.
+            // Slightly generous on duration for that edge (the sim ran a little
+            // past where the phase now stops), which is the safe direction.
+            const wExit = eased.leanKg / (1 - exit / 100);
+            const capped = eased.leanKg > leanTargetKg;
+            lean = capped ? leanTargetKg : eased.leanKg;
+            const easeExit = capped ? Math.max(exit, round1(100 * (1 - lean / wExit))) : exit;
+            fat = fatAt(lean, easeExit);
+            push('trim', easeExit, eased.months, lean + fat, wBefore);
+            return;
+          }
+          // The sim could not price it (it refuses through negative fat), so
+          // the plan falls back to the cut it always drew rather than to nothing.
+        }
+
         fat = fatAt(lean, exit);
         push('trim', exit, monthsToCut(lean, from, exit, profile) ?? [1, 3], lean + fat, wBefore);
       };
 
+      // The lean still to add once the way in has run. A cut adds none, so this
+      // is the whole gap and the whole budget, exactly as before. A hold or an
+      // ease banks some, and that lean was priced by the opener — charging the
+      // build for it again would be the regain double-count of 18 Aug in a new
+      // coat. So the build gets the REST of the curve: the whole gap's budget
+      // minus what the curve says the banked lean took, spread across the legs
+      // by their share of what is left.
       const doBuild = () => {
+        const banked = round1(Math.max(0, lean - leanNowKg));
+        const leanPer = round1(Math.max(0, gapKg - banked));
+        const openerBudget: [number, number] =
+          banked > 0 ? monthsToBuildLeanExact(banked, profile) ?? [0, 0] : [0, 0];
+        // Ordered for the same reason monthsToHold orders its result: the two
+        // ranges being subtracted are not guaranteed to have the same spread.
+        const restLo = Math.max(0, buildBudget[0] - openerBudget[0]);
+        const restHi = Math.max(0, buildBudget[1] - openerBudget[1]);
+        const restBudget: [number, number] = [Math.min(restLo, restHi), Math.max(restLo, restHi)];
+        const legMonths = (leanShare: number): [number, number] =>
+          leanPer > 0
+            ? [round1((restBudget[0] * leanShare) / leanPer), round1((restBudget[1] * leanShare) / leanPer)]
+            : restBudget;
         const { segs } = planBuild(lean, fat, leanPer, trimTo);
         segs.forEach((sg) => {
           const from = bfOf(lean, fat);
@@ -1921,7 +2131,7 @@ export function deriveRoadmap(
           if (sg.kind === 'build') {
             lean += sg.lean;
             fat += sg.lean * fatPerLean;
-            push('build', sg.exit, buildMonthsFor(sg.lean), lean + fat, wBefore);
+            push('build', sg.exit, legMonths(sg.lean), lean + fat, wBefore);
           } else {
             fat = fatAt(lean, sg.exit);
             push('trim', sg.exit, monthsToCut(lean, from, sg.exit, profile) ?? [1, 3], lean + fat, wBefore);
@@ -1934,7 +2144,7 @@ export function deriveRoadmap(
       // that user to the no-cut path above with an identical result: the same
       // build segments, then a terminal cut landing on the goal. Reaching this
       // point at all means there is fat to shed before the build starts.
-      doTrim();
+      doWayIn();
       doBuild();
 
       // Anything the cycles could not shed — a floor clamp above, or a build

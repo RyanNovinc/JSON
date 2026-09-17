@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GoalsProfile, TrainingState, Sex, RoutePreference, BodyFatSource, ActivityLevel } from './goalsProfile';
+import { GoalsProfile, TrainingState, Sex, RoutePreference, BodyFatSource, ActivityLevel, WayIn } from './goalsProfile';
 
 const KEY = '@goals_profile';
 
@@ -39,6 +39,7 @@ const SEXES: Sex[] = ['male', 'female', 'prefer_not_to_say'];
 const ROUTE_PREFERENCES: RoutePreference[] = ['lean', 'balanced', 'roomy'];
 const BODY_FAT_SOURCES: BodyFatSource[] = ['reported', 'visual', 'tape'];
 const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'heavy', 'extreme'];
+const WAY_INS: WayIn[] = ['hold', 'ease', 'cut'];
 
 const inRange = (v: unknown, lo: number, hi: number): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
@@ -147,6 +148,13 @@ export function sanitizeGoalsProfile(
 
   if (clean.activityLevel != null && !ACTIVITY_LEVELS.includes(clean.activityLevel)) {
     delete clean.activityLevel;
+    repaired = true;
+  }
+
+  // Same rule as the other enums: an unknown value is dropped, and the plan
+  // runs the cut it always did.
+  if (clean.wayIn != null && !WAY_INS.includes(clean.wayIn)) {
+    delete clean.wayIn;
     repaired = true;
   }
 
