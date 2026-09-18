@@ -198,6 +198,13 @@ export default function OneRMProgressionModal({
         useNativeDriver: true,
       }),
     ]).start(() => {
+      // Sync the JS-side values to the end state BEFORE any state update. The
+      // native driver only writes the final value back to JS *after* this
+      // callback returns, and a re-render in between re-sends the stale
+      // pre-close value (translateY 0 / opacity 1) to the view, so the sheet
+      // snaps to full screen for a frame before the Modal is torn down.
+      slideY.setValue(windowHeight);
+      backdropOpacity.setValue(0);
       setInternalVisible(false);
       onClose();
     });

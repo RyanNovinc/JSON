@@ -76,7 +76,15 @@ export default function HowItWorksModal({
         duration: 200,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
-      }).start(() => setMounted(false));
+      }).start(() => {
+        // Sync the JS-side value to the end state BEFORE unmounting. The native
+        // driver only writes the final value back to JS *after* this callback
+        // returns, and the re-render in between re-sends the stale open value
+        // (opacity 1 / translateY 0) to the view, flashing the modal at full
+        // size for a frame before it is torn down.
+        slide.setValue(0);
+        setMounted(false);
+      });
     }
   }, [visible]);
 
